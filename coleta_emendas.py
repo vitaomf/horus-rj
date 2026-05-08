@@ -140,8 +140,9 @@ def coletar_emendas():
         print(f"[ERRO] Falha ao conectar ao banco ou criar a tabela em {db_path}: {e}")
         sys.exit(1)
 
-    # Bug 12 fix: range dinâmico, nunca precisa editar manualmente
-    ANOS = list(range(2014, datetime.now().year + 1))
+    # Coleta desde 2010 (início das emendas parlamentares individualizadas no Portal)
+    ANO_INICIO = int(os.getenv("COLETA_ANO_INICIO", "2010"))
+    ANOS = list(range(ANO_INICIO, datetime.now().year + 1))
     resumo_por_ano = {}
     total_processado = 0
     total_inserido = 0

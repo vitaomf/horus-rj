@@ -14,6 +14,45 @@ interface FeatureProperties {
     [key: string]: any;
 }
 
+// ── Legenda com ranges reais do quantile scale ────────────────────────────────
+const CORES_LEGENDA = ['#2a1800', '#4a2e00', '#7a4e00', '#b87800', '#cc9900', '#FFD700'];
+
+function fmtLegenda(v: number): string {
+    if (v >= 1e9) return `R$${(v / 1e9).toFixed(1)}B`;
+    if (v >= 1e6) return `R$${(v / 1e6).toFixed(0)}M`;
+    if (v >= 1e3) return `R$${(v / 1e3).toFixed(0)}K`;
+    return `R$${v.toFixed(0)}`;
+}
+
+const LegendaHeatmap: React.FC<{ heatmap: Record<string, { valor_total: number; total_emendas: number }> }> = ({ heatmap }) => {
+    const valores = Object.values(heatmap).map(h => h.valor_total).filter(v => v > 0).sort((a, b) => a - b);
+    const scale = d3.scaleQuantile<string>().domain(valores).range(CORES_LEGENDA);
+    const quantiles = scale.quantiles();  // limites entre faixas
+
+    const faixas = CORES_LEGENDA.map((cor, i) => {
+        const min = i === 0 ? valores[0] : quantiles[i - 1];
+        const max = i < quantiles.length ? quantiles[i] : valores[valores.length - 1];
+        return { cor, label: min && max ? `${fmtLegenda(min)} – ${fmtLegenda(max)}` : '–' };
+    });
+
+    return (
+        <div className="absolute bottom-4 right-4 bg-black/80 border border-[#FFD700]/30 p-3 rounded-sm backdrop-blur-sm shadow-xl z-20 pointer-events-none">
+            <p className="font-bebas text-[#FFD700] text-xs tracking-[0.2em] mb-2 border-b border-[#FFD700]/20 pb-1">VOLUME DE EMENDAS</p>
+            {[...faixas].reverse().map(({ cor, label }) => (
+                <div key={cor} className="flex items-center gap-2 mb-1">
+                    <div className="w-4 h-2 rounded-[1px]" style={{ backgroundColor: cor }} />
+                    <span className="text-[9px] text-gray-300 font-sans tracking-widest font-bold">{label}</span>
+                </div>
+            ))}
+            <div className="flex items-center gap-2 mt-1 pt-1 border-t border-white/10">
+                <div className="w-4 h-2 rounded-[1px]" style={{ backgroundColor: '#1a1000' }} />
+                <span className="text-[9px] text-gray-500 font-sans tracking-widest font-bold">SEM DADOS</span>
+            </div>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, height = 500 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -120,18 +159,25 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
         const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
         const normalizedMunicipalities = municipalities.map(normalize);
 
-        const maxValor = Math.max(...Object.values(heatmap).map(h => h.valor_total), 1);
-        const getCorMunicipio = (muniName: string) => {
-            const nomeKey = normalize(muniName);
-            const data = heatmap[nomeKey];
-            if (!data || data.valor_total === 0) return '#1a1000';
+        // Escala quantile: distribui as cores igualmente entre os municípios com dados.
+        // Cada faixa de cor tem o mesmo número de municípios, tornando o mapa muito
+        // mais informativo (evita que um outlier compacte todo o resto numa cor só).
+        const COR_VAZIA = '#1a1000';
+        const CORES = ['#2a1800', '#4a2e00', '#7a4e00', '#b87800', '#cc9900', '#FFD700'];
 
-            const ratio = Math.log(data.valor_total + 1) / Math.log(maxValor + 1);
-            if (ratio < 0.2) return '#2a1800';
-            if (ratio < 0.4) return '#4a2e00';
-            if (ratio < 0.6) return '#7a4e00';
-            if (ratio < 0.8) return '#b87800';
-            return '#FFD700';
+        const valoresComDados = Object.values(heatmap)
+            .map(h => h.valor_total)
+            .filter(v => v > 0)
+            .sort(d3.ascending);
+
+        const colorScale = d3.scaleQuantile<string>()
+            .domain(valoresComDados)
+            .range(CORES);
+
+        const getCorMunicipio = (muniName: string) => {
+            const data = heatmap[normalize(muniName)];
+            if (!data || data.valor_total === 0) return COR_VAZIA;
+            return colorScale(data.valor_total);
         };
 
         // Prepara e adiciona os paths pro SVG
@@ -253,23 +299,8 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
                 style={{ background: 'transparent' }}
             />
 
-            {/* LEGENDA */}
-            <div className="absolute bottom-4 right-4 bg-black/80 border border-[#FFD700]/30 p-3 rounded-sm backdrop-blur-sm shadow-xl z-20 pointer-events-none">
-                <p className="font-bebas text-[#FFD700] text-xs tracking-[0.2em] mb-2 border-b border-[#FFD700]/20 pb-1">VOLUME DE EMENDAS</p>
-                {[
-                    { cor: '#FFD700', label: 'MUITO ALTO' },
-                    { cor: '#b87800', label: 'ALTO' },
-                    { cor: '#7a4e00', label: 'MÉDIO' },
-                    { cor: '#4a2e00', label: 'BAIXO' },
-                    { cor: '#2a1800', label: 'CRÍTICO' },
-                    { cor: '#1a1000', label: 'SEM DADOS' },
-                ].map(item => (
-                    <div key={item.cor} className="flex items-center gap-2 mb-1">
-                        <div className="w-4 h-2 rounded-[1px]" style={{ backgroundColor: item.cor }} />
-                        <span className="text-[9px] text-gray-300 font-sans tracking-widest font-bold">{item.label}</span>
-                    </div>
-                ))}
-            </div>
+            {/* LEGENDA com ranges reais do quantile */}
+            <LegendaHeatmap heatmap={heatmap} />
 
             {/* FLOAT TOOLTIP */}
             {tooltip.show && (

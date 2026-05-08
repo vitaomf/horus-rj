@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Database, Users, MapPin, Link as LinkIcon, Eye, Menu, X } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import logoHorus from './assets/logo_amarelo.png';
@@ -14,6 +15,15 @@ import { BuscaAvancadaPage } from './pages/BuscaAvancadaPage';
 import { CountUp } from './components/CountUp';
 
 type AbaAtiva = 'inicio' | 'municipios' | 'politicos' | 'busca' | 'painel';
+
+// Mapeia path → aba
+function pathToAba(path: string): AbaAtiva {
+  if (path.startsWith('/municipios')) return 'municipios';
+  if (path.startsWith('/politicos'))  return 'politicos';
+  if (path === '/busca')              return 'busca';
+  if (path === '/painel')             return 'painel';
+  return 'inicio';
+}
 
 // Componente ScrollReveal
 const ScrollReveal = ({ children, className = '', delay = 0, baseClass = 'reveal-up' }: { children: React.ReactNode, className?: string, delay?: number, baseClass?: string }) => {
@@ -161,6 +171,9 @@ interface Metricas {
 }
 
 function App() {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [busca, setBusca] = useState('');
   const [metricas, setMetricas] = useState<Metricas>({
@@ -172,8 +185,34 @@ function App() {
   const [apiError, setApiError] = useState(false);
   const [municipioSelecionado, setMunicipioSelecionado] = useState<string | null>(null);
   const [politicoSelecionado, setPoliticoSelecionado] = useState<number | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>(() => pathToAba(location.pathname));
   const [menuAberto, setMenuAberto] = useState(false);
+
+  // ── URL → Estado (browser back/forward + link direto) ──────────────────────
+  useEffect(() => {
+    const path = location.pathname;
+    const polMatch = path.match(/^\/politicos\/(\d+)/);
+    const munMatch = path.match(/^\/municipios\/(.+)/);
+    if (polMatch) {
+      setPoliticoSelecionado(Number(polMatch[1]));
+      setMunicipioSelecionado(null);
+    } else if (munMatch) {
+      setMunicipioSelecionado(decodeURIComponent(munMatch[1]));
+      setPoliticoSelecionado(null);
+    } else {
+      setPoliticoSelecionado(null);
+      setMunicipioSelecionado(null);
+      setAbaAtiva(pathToAba(path));
+    }
+  }, [location.pathname]);
+
+  // ── Estado → URL (navegação interna) ───────────────────────────────────────
+  const navegar = {
+    aba:       (aba: AbaAtiva)  => { setAbaAtiva(aba); navigate(aba === 'inicio' ? '/' : `/${aba}`); setMunicipioSelecionado(null); setPoliticoSelecionado(null); setMenuAberto(false); window.scrollTo(0,0); },
+    municipio: (nome: string)   => { navigate(`/municipios/${encodeURIComponent(nome)}`); window.scrollTo(0,0); },
+    politico:  (id: number)     => { navigate(`/politicos/${id}`); window.scrollTo(0,0); },
+    voltar:    ()               => navigate(-1),
+  };
 
   useEffect(() => {
     carregarDados();
@@ -210,12 +249,7 @@ function App() {
   const handleMunicipioClickFromMap = (nome: string) => {
     const buscaLimpa = removeAcentos(nome.toLowerCase());
     const munEncontrado = municipios.find(m => removeAcentos(getMunName(m.nome).toLowerCase()) === buscaLimpa);
-
-    if (munEncontrado) {
-      setMunicipioSelecionado(munEncontrado.nome);
-    } else {
-      setMunicipioSelecionado(nome);
-    }
+    navegar.municipio(munEncontrado ? munEncontrado.nome : nome);
   };
 
   const removeAcentos = (str: string) => {
@@ -237,8 +271,8 @@ function App() {
       return (
         <PoliticoPage
           politicoId={politicoSelecionado}
-          onVoltar={() => setPoliticoSelecionado(null)}
-          onMunicipioClick={setMunicipioSelecionado}
+          onVoltar={navegar.voltar}
+          onMunicipioClick={navegar.municipio}
         />
       );
     }
@@ -249,9 +283,9 @@ function App() {
           nome={municipioSelecionado}
           municipios={munOrdenados}
           municipioIndex={municipioIndex}
-          onNavegar={(idx) => setMunicipioSelecionado(munOrdenados[idx].nome)}
-          onVoltar={() => setMunicipioSelecionado(null)}
-          onPoliticoClick={(id) => setPoliticoSelecionado(id)}
+          onNavegar={(idx) => navegar.municipio(munOrdenados[idx].nome)}
+          onVoltar={navegar.voltar}
+          onPoliticoClick={navegar.politico}
         />
       );
     }
@@ -268,7 +302,7 @@ function App() {
       <nav className="fixed top-0 left-0 right-0 z-[1000] bg-black border-b-2 border-[#FFD700]/30 backdrop-blur-sm shadow-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
           {/* Logo */}
-          <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => { setAbaAtiva('inicio'); setMunicipioSelecionado(null); setPoliticoSelecionado(null); window.scrollTo(0, 0); }}>
+          <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => navegar.aba('inicio')}>
             <img src={logoHorus} alt="Horus" style={{ height: '28px' }} />
             <span style={{ fontFamily: "'Cinzel Decorative', serif" }} className="text-[#FFD700] text-xl tracking-widest">HORUS</span>
           </div>
@@ -280,7 +314,7 @@ function App() {
               const ativo = abaAtiva === aba && !paginaInterna;
               return (
                 <button key={aba}
-                  onClick={() => { setAbaAtiva(aba); setMunicipioSelecionado(null); setPoliticoSelecionado(null); setMenuAberto(false); window.scrollTo(0, 0); }}
+                  onClick={() => navegar.aba(aba)}
                   className={`font-bebas tracking-widest px-5 py-2 text-lg transition-all duration-200 border-b-[3px] ${ativo
                     ? 'text-black bg-[#FFD700] border-[#FFD700]'
                     : 'text-white border-transparent hover:text-[#FFD700] hover:border-[#FFD700]/50'
@@ -300,8 +334,8 @@ function App() {
           {/* Busca global */}
           <div className="hidden lg:block shrink-0">
             <SearchBar
-              onSelectMunicipio={(m) => { setMunicipioSelecionado(m); }}
-              onSelectPolitico={(p) => { setPoliticoSelecionado(p); }}
+              onSelectMunicipio={navegar.municipio}
+              onSelectPolitico={navegar.politico}
             />
           </div>
         </div>
@@ -314,7 +348,7 @@ function App() {
             const labels = { inicio: 'INÍCIO', municipios: 'MUNICÍPIOS', politicos: 'POLÍTICOS', busca: 'BUSCA', painel: 'PAINEL' };
             return (
               <button key={aba}
-                onClick={() => { setAbaAtiva(aba); setMunicipioSelecionado(null); setPoliticoSelecionado(null); setMenuAberto(false); window.scrollTo(0, 0); }}
+                onClick={() => navegar.aba(aba)}
                 className="w-full text-left px-6 py-3 font-bebas text-lg tracking-widest text-white hover:text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors border-b border-[#333]"
               >
                 {labels[aba]}
@@ -338,23 +372,19 @@ function App() {
       {paginaInterna ? renderConteudo() : abaAtiva === 'municipios' ? (
         <MunicipiosListPage
           municipios={municipios}
-          onMunicipioClick={(nome) => setMunicipioSelecionado(nome)}
+          onMunicipioClick={navegar.municipio}
         />
       ) : abaAtiva === 'politicos' ? (
         <PoliticosListPage
-          onPoliticoClick={(id) => setPoliticoSelecionado(id)}
+          onPoliticoClick={navegar.politico}
         />
       ) : abaAtiva === 'busca' ? (
         <BuscaAvancadaPage />
       ) : abaAtiva === 'painel' ? (
         <EstatisticasPage
-          onVoltar={() => setAbaAtiva('inicio')}
-          onPoliticoClick={(id) => {
-            setPoliticoSelecionado(id);
-          }}
-          onMunicipioClick={(nome) => {
-            setMunicipioSelecionado(nome);
-          }}
+          onVoltar={() => navegar.aba('inicio')}
+          onPoliticoClick={navegar.politico}
+          onMunicipioClick={navegar.municipio}
         />
       ) : (
         /* ABA INÍCIO — Conteúdo original da home */
@@ -530,7 +560,7 @@ function App() {
                     filtrados.map((m, idx) => (
                       <ScrollReveal key={m.id} delay={(idx % 10) * 50} baseClass="reveal-grid">
                         <div
-                          onClick={() => setMunicipioSelecionado(m.nome)}
+                          onClick={() => navegar.municipio(m.nome)}
                           className="h-[60px] bg-black border border-[#FFD700]/20 border-l-[4px] border-l-[#FFD700] text-gray-200 hover:border-[#FFD700] hover:text-[#FFD700] transition-all duration-150 cursor-pointer flex items-center justify-between px-5 group rounded-r-sm w-full"
                         >
                           <span className="font-bebas text-2xl tracking-wider truncate mr-2">{getMunName(m.nome)}</span>

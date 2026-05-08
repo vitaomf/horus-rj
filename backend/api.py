@@ -3,6 +3,7 @@ import math
 import unicodedata
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from typing import List, Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -10,6 +11,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
+import functools
 
 # Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
 # Localmente continua usando SQLite via sqlite3.
@@ -36,6 +38,22 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app = FastAPI(title="Transparência RJ API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Cache-Control: dados mudam raramente, então cacheia por 1h no browser.
+# /api/health nunca é cacheado (mostra estado em tempo real).
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/api/") and path != "/api/health":
+            response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hora
+        elif path.startswith("/assets/"):
+            response.headers["Cache-Control"] = "public, max-age=86400"  # 24h para assets
+        return response
+
+app.add_middleware(CacheMiddleware)
 
 # Filtro: rankings públicos só consideram parlamentares individuais.
 # Autores coletivos (bancadas, comissões, relatores) são marcados em
@@ -791,13 +809,41 @@ def obter_estatisticas():
 
 @app.get("/api/health")
 def health():
+    """
+    Health check. Inclui últimos erros de coleta (se existirem)
+    lendo o arquivo logs/coleta_errors.log gerado pelo scheduler.
+    """
     try:
         conn = get_db_connection()
-        conn.execute("SELECT 1").fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM emendas")
+        total_emendas = cur.fetchone()[0]
+        cur.execute("SELECT MAX(ano) FROM emendas")
+        ultimo_ano = cur.fetchone()[0]
         conn.close()
-        return {"status": "ok", "db": "ok"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"db error: {e}")
+
+    # Lê erros recentes do scheduler (últimas 5 linhas)
+    erros_recentes = []
+    errors_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "logs", "coleta_errors.log"
+    )
+    if os.path.exists(errors_file):
+        try:
+            linhas = open(errors_file, encoding="utf-8").readlines()
+            erros_recentes = [l.strip() for l in linhas[-5:] if l.strip()]
+        except Exception:
+            pass
+
+    return {
+        "status": "ok",
+        "db": "ok",
+        "emendas": total_emendas,
+        "ultimo_ano": ultimo_ano,
+        "coleta_errors": erros_recentes,   # lista vazia = tudo ok
+    }
 
 
 # Configuração para servir o Frontend (React/Vite)
