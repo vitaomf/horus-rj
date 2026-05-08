@@ -1,17 +1,16 @@
 import sqlite3
 import math
 import unicodedata
+import os
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from typing import List, Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import os
-import functools
+from typing import Optional
 
 # Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
 # Localmente continua usando SQLite via sqlite3.
