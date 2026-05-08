@@ -1,19 +1,23 @@
 export const config = { runtime: 'edge' };
 
-const UPSTREAM = 'https://synergistic-hemathermal-myesha.ngrok-free.dev';
+// UPSTREAM_URL definido por variavel de ambiente no Vercel:
+//   Production  → porta 7291 (main)
+//   Preview/dev → porta 7292 (beta)
+// Fallback: producao
+const UPSTREAM = process.env.UPSTREAM_URL ||
+  'https://synergistic-hemathermal-myesha.ngrok-free.dev';
 
 export default async function handler(req) {
-  // Extrai o caminho original da query ?__path=
   const url = new URL(req.url);
   const originalPath = url.searchParams.get('__path') || '/';
-  const qs = url.searchParams;
+  const qs = new URLSearchParams(url.searchParams);
   qs.delete('__path');
   const queryString = qs.toString();
   const target = UPSTREAM + originalPath + (queryString ? '?' + queryString : '');
 
   const headers = new Headers(req.headers);
   headers.set('ngrok-skip-browser-warning', '1');
-  headers.set('host', 'synergistic-hemathermal-myesha.ngrok-free.dev');
+  headers.set('host', new URL(UPSTREAM).host);
   headers.delete('x-forwarded-host');
   headers.delete('x-vercel-id');
 
