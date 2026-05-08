@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "https://synergistic-hemathermal-myesha.ngrok-free.dev/$1"
+    }
+  ]
+}
