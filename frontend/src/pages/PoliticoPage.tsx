@@ -318,8 +318,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
                 </div>
 
-                {/* 3. ATIVIDADE POR ANO — barras horizontais compactas */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative self-start">
+                {/* 3. COLUNA DIREITA: Atividade + Análise Comportamental */}
+                <div className="flex flex-col gap-5">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative">
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl" />
 
                     <div className="flex items-center gap-2 mb-1">
@@ -382,163 +383,139 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         );
                     })()}
                 </div>
-            </div>
 
-            {/* ── ANÁLISE COMPORTAMENTAL (4 widgets) ─────────────────────── */}
-            {(() => {
-                // Dados derivados dos dados já carregados — sem nova requisição
-                const CORES = ['#4ade80','#60a5fa','#f97316','#c084fc','#f472b6','#94a3b8'];
+                {/* Widgets analíticos — preenchem a coluna direita */}
+                {(() => {
+                    const CORES = ['#4ade80','#60a5fa','#f97316','#c084fc','#f472b6','#94a3b8'];
+                    const porArea = Object.entries(
+                        data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
+                            const k = e.objetivo || 'Não informado';
+                            acc[k] = (acc[k] || 0) + e.valor;
+                            return acc;
+                        }, {})
+                    ).sort(([,a],[,b]) => (b as number) - (a as number));
+                    const totalArea = porArea.reduce((s,[,v]) => s + (v as number), 0);
+                    const top5 = porArea.slice(0, 5);
+                    const outrosVal = porArea.slice(5).reduce((s,[,v]) => s + (v as number), 0);
+                    const fatias: [string, number][] = outrosVal > 0 ? [...top5 as [string,number][], ['Outros', outrosVal]] : top5 as [string,number][];
+                    let acum = 0;
+                    const gradient = fatias.map(([, v], i) => {
+                        const p = ((v as number) / totalArea) * 100;
+                        const s = `${CORES[i]} ${acum.toFixed(1)}% ${(acum+p).toFixed(1)}%`;
+                        acum += p; return s;
+                    }).join(', ');
+                    const topAreaLabel = top5[0]?.[0] as string || '—';
+                    const topAreaPct = top5[0] ? (top5[0][1] as number) / totalArea : 0;
+                    const topMun = data.municipios_beneficiados[0];
+                    const topMunPct = topMun ? topMun.valor / data.valor_total : 0;
+                    const anoMaisAtivo = [...data.emendas_por_ano].sort((a,b) => b.valor_total - a.valor_total)[0];
+                    const numMuns = data.municipios_beneficiados.length;
+                    const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
+                    const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
+                    const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
+                    const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s + a.valor_total, 0) / medEleit.length : 0;
+                    const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s + a.valor_total, 0) / medNorm.length  : 0;
+                    const tags: { label: string; desc: string; cor: string; emoji: string }[] = [];
+                    if (numMuns >= 20)     tags.push({ label: 'DISTRIBUIDOR', desc: `Enviou verbas para ${numMuns} municípios`, cor: '#4ade80', emoji: '🌐' });
+                    else if (numMuns >= 8) tags.push({ label: 'EQUILIBRADO',  desc: `Atende ${numMuns} municípios no total`,   cor: '#60a5fa', emoji: '⚖️' });
+                    else                   tags.push({ label: 'CONCENTRADOR', desc: `Foca em apenas ${numMuns} município${numMuns>1?'s':''}`, cor: '#f97316', emoji: '🎯' });
+                    if (topAreaPct >= 0.6)      tags.push({ label: 'ESPECIALISTA', desc: `${(topAreaPct*100).toFixed(0)}% do total vai para ${topAreaLabel}`, cor: '#c084fc', emoji: '🔬' });
+                    else if (topAreaPct >= 0.4) tags.push({ label: 'FOCADO',       desc: `Prioriza ${topAreaLabel} (${(topAreaPct*100).toFixed(0)}%)`, cor: '#a78bfa', emoji: '🎯' });
+                    else                        tags.push({ label: 'GENERALISTA',  desc: 'Investe em múltiplas áreas sem foco dominante', cor: '#94a3b8', emoji: '📊' });
+                    if (avgNorm > 0 && avgEleit > avgNorm * 1.8)
+                        tags.push({ label: 'ELEITOREIRO', desc: `Gastou ${(avgEleit/avgNorm).toFixed(1)}× mais em anos eleitorais`, cor: '#ef4444', emoji: '🗳️' });
+                    if (topMunPct >= 0.4)
+                        tags.push({ label: 'CLIENTELISTA', desc: `${(topMunPct*100).toFixed(0)}% vai para ${topMun?.nome.replace(' - RJ','')}`, cor: '#f59e0b', emoji: '📍' });
 
-                // Donut: agrupa emendas por área
-                const porArea = Object.entries(
-                    data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
-                        const k = e.objetivo || 'Não informado';
-                        acc[k] = (acc[k] || 0) + e.valor;
-                        return acc;
-                    }, {})
-                ).sort(([,a],[,b]) => (b as number) - (a as number));
-                const totalArea = porArea.reduce((s,[,v]) => s + (v as number), 0);
-                const top5 = porArea.slice(0, 5);
-                const outrosVal = porArea.slice(5).reduce((s,[,v]) => s + (v as number), 0);
-                const fatias: [string, number][] = outrosVal > 0 ? [...top5 as [string,number][], ['Outros', outrosVal]] : top5 as [string,number][];
-                let acum = 0;
-                const gradient = fatias.map(([, v], i) => {
-                    const p = ((v as number) / totalArea) * 100;
-                    const s = `${CORES[i]} ${acum.toFixed(1)}% ${(acum+p).toFixed(1)}%`;
-                    acum += p; return s;
-                }).join(', ');
-
-                // Insights
-                const topAreaLabel = top5[0]?.[0] as string || '—';
-                const topAreaPct = top5[0] ? (top5[0][1] as number) / totalArea : 0;
-                const topMun = data.municipios_beneficiados[0];
-                const topMunPct = topMun ? topMun.valor / data.valor_total : 0;
-                const anoMaisAtivo = [...data.emendas_por_ano].sort((a,b) => b.valor_total - a.valor_total)[0];
-
-                // Tags comportamentais
-                const numMuns = data.municipios_beneficiados.length;
-                const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
-                const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
-                const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
-                const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s + a.valor_total, 0) / medEleit.length : 0;
-                const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s + a.valor_total, 0) / medNorm.length  : 0;
-
-                const tags: { label: string; desc: string; cor: string; emoji: string }[] = [];
-                if (numMuns >= 20)      tags.push({ label: 'DISTRIBUIDOR',  desc: `Enviou verbas para ${numMuns} municípios`,                         cor: '#4ade80', emoji: '🌐' });
-                else if (numMuns >= 8)  tags.push({ label: 'EQUILIBRADO',   desc: `Atende ${numMuns} municípios no total`,                             cor: '#60a5fa', emoji: '⚖️' });
-                else                    tags.push({ label: 'CONCENTRADOR',  desc: `Foca em apenas ${numMuns} município${numMuns>1?'s':''}`,             cor: '#f97316', emoji: '🎯' });
-
-                if (topAreaPct >= 0.6)      tags.push({ label: 'ESPECIALISTA', desc: `${(topAreaPct*100).toFixed(0)}% do total vai para ${topAreaLabel}`, cor: '#c084fc', emoji: '🔬' });
-                else if (topAreaPct >= 0.4) tags.push({ label: 'FOCADO',       desc: `Prioriza ${topAreaLabel} (${(topAreaPct*100).toFixed(0)}%)`,        cor: '#a78bfa', emoji: '🎯' });
-                else                        tags.push({ label: 'GENERALISTA',  desc: 'Investe em múltiplas áreas sem foco dominante',                     cor: '#94a3b8', emoji: '📊' });
-
-                if (avgNorm > 0 && avgEleit > avgNorm * 1.8)
-                    tags.push({ label: 'ELEITOREIRO', desc: `Gastou ${(avgEleit/avgNorm).toFixed(1)}× mais em anos eleitorais`, cor: '#ef4444', emoji: '🗳️' });
-
-                if (topMunPct >= 0.4)
-                    tags.push({ label: 'CLIENTELISTA', desc: `${(topMunPct*100).toFixed(0)}% das verbas vão para ${topMun?.nome.replace(' - RJ','')}`, cor: '#f59e0b', emoji: '📍' });
-
-                return (
-                    <div className="max-w-7xl mx-auto mt-8 mb-8 space-y-5">
-
-                        {/* ROW 1: Donut + Insights */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                            {/* Donut de áreas */}
-                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
-                                <p className="font-bebas text-[#FFD700] text-lg tracking-widest mb-4">INVESTIMENTO POR ÁREA</p>
-                                <div className="flex items-center gap-6">
-                                    {/* Círculo CSS */}
-                                    <div className="shrink-0 relative" style={{ width: 120, height: 120 }}>
-                                        <div style={{
-                                            width: 120, height: 120,
-                                            borderRadius: '50%',
-                                            background: totalArea > 0
-                                                ? `conic-gradient(${gradient})`
-                                                : '#27272a',
-                                        }} />
-                                        {/* Buraco central */}
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="bg-[#0a0a0a] rounded-full flex items-center justify-center text-center" style={{ width: 56, height: 56 }}>
-                                                <span className="font-bebas text-[#FFD700] text-xs leading-tight">{fatias.length}<br/>ÁREAS</span>
+                    return (
+                        <>
+                            {/* Donut + Insights lado a lado */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {/* Donut */}
+                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">INVESTIMENTO POR ÁREA</p>
+                                    <div className="flex items-center gap-5">
+                                        <div className="shrink-0 relative" style={{ width: 110, height: 110 }}>
+                                            <div style={{ width: 110, height: 110, borderRadius: '50%', background: totalArea > 0 ? `conic-gradient(${gradient})` : '#27272a' }} />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="bg-[#0a0a0a] rounded-full flex items-center justify-center text-center" style={{ width: 50, height: 50 }}>
+                                                    <span className="font-bebas text-[#FFD700] text-[10px] leading-tight">{fatias.length}<br/>ÁREAS</span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <div className="flex-1 space-y-1 min-w-0">
+                                            {fatias.map(([area, val], i) => (
+                                                <div key={area} className="flex items-center gap-1.5">
+                                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CORES[i] }} />
+                                                    <span className="text-zinc-400 text-[11px] truncate flex-1">{area}</span>
+                                                    <span className="text-zinc-600 text-[10px] font-mono shrink-0">{(((val as number)/totalArea)*100).toFixed(0)}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    {/* Legenda */}
-                                    <div className="flex-1 space-y-1.5 min-w-0">
-                                        {fatias.map(([area, val], i) => (
-                                            <div key={area} className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CORES[i] }} />
-                                                <span className="text-zinc-300 text-xs font-sans truncate flex-1">{area}</span>
-                                                <span className="text-zinc-500 text-[10px] font-mono shrink-0">
-                                                    {(((val as number) / totalArea) * 100).toFixed(0)}%
-                                                </span>
+                                </div>
+
+                                {/* Insights */}
+                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">PERFIL EM NÚMEROS</p>
+                                    <div className="space-y-2">
+                                        {[
+                                            { emoji: '🏆', label: 'ÁREA PREDILETA',     value: topAreaLabel, detalhe: `${(topAreaPct*100).toFixed(0)}% do total` },
+                                            { emoji: '📍', label: 'MUNICÍPIO FAVORITO', value: topMun?.nome.replace(' - RJ','') || '—', detalhe: topMun ? `${(topMunPct*100).toFixed(0)}% · ${formatMillions(topMun.valor)}` : '' },
+                                            { emoji: '📅', label: 'ANO MAIS ATIVO',     value: anoMaisAtivo ? String(anoMaisAtivo.ano) : '—', detalhe: anoMaisAtivo ? `R$ ${(anoMaisAtivo.valor_total/1e6).toFixed(1)}M · ${anoMaisAtivo.total} emendas` : '' },
+                                        ].map(({ emoji, label, value, detalhe }) => (
+                                            <div key={label} className="flex items-center gap-2 bg-zinc-900/40 rounded-lg px-3 py-2 border border-zinc-800">
+                                                <span className="text-lg shrink-0">{emoji}</span>
+                                                <div className="min-w-0">
+                                                    <p className="text-[9px] text-zinc-600 font-bebas tracking-widest">{label}</p>
+                                                    <p className="text-white font-bebas text-base leading-none truncate">{value}</p>
+                                                    <p className="text-zinc-500 text-[10px]">{detalhe}</p>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Insights rápidos */}
-                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 space-y-3">
-                                <p className="font-bebas text-[#FFD700] text-lg tracking-widest mb-4">PERFIL EM NÚMEROS</p>
-                                {[
-                                    { emoji: '🏆', label: 'ÁREA PREDILETA',      value: topAreaLabel,    detalhe: `${(topAreaPct*100).toFixed(0)}% do total investido` },
-                                    { emoji: '📍', label: 'MUNICÍPIO FAVORITO',  value: topMun?.nome.replace(' - RJ','') || '—', detalhe: topMun ? `${(topMunPct*100).toFixed(0)}% do total · ${formatMillions(topMun.valor)}` : '' },
-                                    { emoji: '📅', label: 'ANO MAIS ATIVO',      value: anoMaisAtivo ? String(anoMaisAtivo.ano) : '—', detalhe: anoMaisAtivo ? `R$ ${(anoMaisAtivo.valor_total/1e6).toFixed(1)}M · ${anoMaisAtivo.total} emendas` : '' },
-                                ].map(({ emoji, label, value, detalhe }) => (
-                                    <div key={label} className="flex items-center gap-3 bg-zinc-900/40 rounded-lg px-3 py-2 border border-zinc-800">
-                                        <span className="text-xl shrink-0">{emoji}</span>
-                                        <div className="min-w-0">
-                                            <p className="text-[9px] text-zinc-600 font-bebas tracking-widest">{label}</p>
-                                            <p className="text-white font-bebas text-lg leading-none truncate">{value}</p>
-                                            <p className="text-zinc-500 text-[10px] font-sans">{detalhe}</p>
+                            {/* Tags comportamentais */}
+                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">ANÁLISE DE COMPORTAMENTO</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {tags.map(t => (
+                                        <div key={t.label} className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-700 rounded-lg px-3 py-2 hover:border-zinc-500 transition-colors">
+                                            <span className="text-base shrink-0">{t.emoji}</span>
+                                            <div>
+                                                <span className="font-bebas tracking-widest text-xs" style={{ color: t.cor }}>{t.label}</span>
+                                                <p className="text-zinc-500 text-[10px] leading-tight">{t.desc}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        </>
+                    );
+                })()}
+                </div>{/* fim flex flex-col direita */}
+            </div>{/* fim grid */}
 
-                        {/* ROW 2: Tags comportamentais */}
-                        <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
-                            <p className="font-bebas text-[#FFD700] text-lg tracking-widest mb-3">ANÁLISE DE COMPORTAMENTO</p>
-                            <div className="flex flex-wrap gap-3">
-                                {tags.map(t => (
-                                    <div key={t.label} className="flex items-start gap-2 bg-zinc-900/60 border border-zinc-700 rounded-lg px-3 py-2 hover:border-zinc-500 transition-colors">
-                                        <span className="text-lg mt-0.5 shrink-0">{t.emoji}</span>
-                                        <div>
-                                            <span className="font-bebas tracking-widest text-sm" style={{ color: t.cor }}>{t.label}</span>
-                                            <p className="text-zinc-500 text-[10px] font-sans leading-tight mt-0.5">{t.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ROW 3: Mini-mapa */}
-                        <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
-                            <p className="font-bebas text-[#FFD700] text-lg tracking-widest mb-3">MAPA DE ATUAÇÃO</p>
-                            <p className="text-zinc-600 text-[11px] font-sans uppercase tracking-widest mb-3">
-                                Municípios beneficiados destacados · clique para ver detalhes
-                            </p>
-                            <div className="rounded-lg overflow-hidden border border-zinc-800">
-                                <Suspense fallback={
-                                    <div className="h-[220px] flex items-center justify-center text-[#FFD700]/30 font-bebas text-xl animate-pulse">
-                                        CARREGANDO MAPA...
-                                    </div>
-                                }>
-                                    <MapaRJMini
-                                        municipalities={data.municipios_beneficiados.map(m => m.nome.replace(' - RJ',''))}
-                                        onMunicipioClick={(nome) => onMunicipioClick?.(nome + ' - RJ')}
-                                        height={220}
-                                    />
-                                </Suspense>
-                            </div>
-                        </div>
-
+            {/* Mini-mapa full-width */}
+            <div className="max-w-7xl mx-auto mt-5 mb-8">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-1">MAPA DE ATUAÇÃO</p>
+                    <p className="text-zinc-600 text-[11px] uppercase tracking-widest mb-3">
+                        Municípios beneficiados · clique para filtrar emendas
+                    </p>
+                    <div className="rounded-lg overflow-hidden border border-zinc-800">
+                        <Suspense fallback={<div className="h-[240px] flex items-center justify-center text-[#FFD700]/30 font-bebas text-xl animate-pulse">CARREGANDO MAPA...</div>}>
+                            <MapaRJMini
+                                municipalities={data.municipios_beneficiados.map(m => m.nome.replace(' - RJ',''))}
+                                onMunicipioClick={(nome) => onMunicipioClick?.(nome + ' - RJ')}
+                                height={240}
+                            />
+                        </Suspense>
                     </div>
-                );
-            })()}
+                </div>
+            </div>
 
             {/* 4. FINANÇAS DE CAMPANHA (TSE) */}
             {data.dados_campanha && (
