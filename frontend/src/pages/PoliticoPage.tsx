@@ -317,7 +317,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
 
                 {/* 3. ATIVIDADE POR ANO — barras horizontais compactas */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative self-start">
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl" />
 
                     <div className="flex items-center gap-2 mb-1">
