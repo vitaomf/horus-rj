@@ -316,116 +316,66 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
                 </div>
 
-                {/* 3. ATIVIDADE POR ANO (SVG Chart) */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6 relative flex flex-col w-full">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl"></div>
+                {/* 3. ATIVIDADE POR ANO — barras horizontais compactas */}
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl" />
 
-                    <h2 className="text-4xl font-bebas text-white mb-2">ATIVIDADE POR ANO</h2>
-                    <p className="text-gray-400 mb-8 font-medium">Progressão histórica de repasses do parlamentar.</p>
+                    <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-4 h-4 text-[#FFD700]" />
+                        <h2 className="text-2xl font-bebas text-white tracking-widest">ATIVIDADE POR ANO</h2>
+                    </div>
+                    <p className="text-zinc-600 text-[11px] font-sans mb-4 uppercase tracking-widest">
+                        Repasses históricos · clique para filtrar emendas
+                    </p>
 
-                    {(() => {
-                        const alturaGrafico = 160;
+                    {data.emendas_por_ano.length === 0 ? (
+                        <p className="text-zinc-600 text-sm italic">Nenhum dado disponível.</p>
+                    ) : (() => {
                         const maxVal = Math.max(...data.emendas_por_ano.map(a => a.valor_total), 1);
+                        const sorted = [...data.emendas_por_ano].sort((a, b) => b.ano - a.ano);
 
                         return (
-                            <div className="w-full mt-4">
-                                <div
-                                    style={{ overflowX: 'auto' }}
-                                    className="custom-scrollbar pb-4 pt-2"
-                                >
-                                    <div style={{
-                                        minWidth: `${Math.max(data.emendas_por_ano.length * 100, 600)}px`,
-                                        height: `${alturaGrafico + 120}px`,
-                                        display: 'flex',
-                                        alignItems: 'flex-end',
-                                        gap: '12px',
-                                        paddingTop: '80px',
-                                        paddingBottom: '0px',
-                                        paddingLeft: '16px',
-                                        paddingRight: '16px',
-                                        position: 'relative'
-                                    }}>
+                            <div className="space-y-2">
+                                {sorted.map(row => {
+                                    const pct = Math.max((row.valor_total / maxVal) * 100, 2);
+                                    const isMax = row.valor_total === maxVal;
+                                    const label = row.valor_total >= 1e9
+                                        ? `R$ ${(row.valor_total / 1e9).toFixed(1)}B`
+                                        : row.valor_total >= 1e6
+                                            ? `R$ ${(row.valor_total / 1e6).toFixed(1)}M`
+                                            : `R$ ${(row.valor_total / 1e3).toFixed(0)}K`;
 
-                                        {/* Linhas de grade horizontais */}
-                                        {[0.25, 0.5, 0.75, 1].map((ratio) => (
-                                            <div key={ratio} style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                right: 0,
-                                                bottom: `${48 + ratio * alturaGrafico}px`,
-                                                borderTop: '1px dashed rgba(255,255,255,0.07)',
-                                                pointerEvents: 'none'
-                                            }} />
-                                        ))}
+                                    return (
+                                        <div key={row.ano}
+                                            className="flex items-center gap-3 group cursor-pointer"
+                                            onClick={() => { setCidadeFiltro(null); setPaginaAtual(1); }}
+                                            title={`${row.total} emenda${row.total !== 1 ? 's' : ''} em ${row.ano} — ${formatCurrency(row.valor_total)}`}
+                                        >
+                                            {/* Ano */}
+                                            <span className={`font-bebas text-sm w-10 shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-zinc-500 group-hover:text-[#FFD700]'}`}>
+                                                {row.ano}
+                                            </span>
 
-                                        {data.emendas_por_ano.map((anoData) => {
-                                            const barHeight = Math.max(
-                                                (anoData.valor_total / maxVal) * alturaGrafico,
-                                                4
-                                            );
-                                            const label = anoData.valor_total >= 1e6
-                                                ? `R$ ${(anoData.valor_total / 1e6).toFixed(1)}M`
-                                                : `R$ ${(anoData.valor_total / 1000).toFixed(0)}k`;
+                                            {/* Barra */}
+                                            <div className="flex-1 bg-zinc-900 rounded-full h-4 overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 group-hover:brightness-125 ${isMax ? 'bg-[#FFD700]' : 'bg-[#FFD700]/50'}`}
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
 
-                                            return (
-                                                <div key={anoData.ano} style={{
-                                                    flex: '0 0 80px',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: 'center',
-                                                    height: `${alturaGrafico + 48}px`,
-                                                    justifyContent: 'flex-end'
-                                                }} className="group relative">
+                                            {/* Valor */}
+                                            <span className={`font-bebas text-sm w-[72px] text-right shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-zinc-400 group-hover:text-white'}`}>
+                                                {label}
+                                            </span>
 
-                                                    {/* Tooltip on hover */}
-                                                    <div className="absolute bottom-[calc(100%+12px)] opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 text-white text-xs whitespace-nowrap px-3 py-2 rounded pointer-events-none z-20 shadow-lg border border-zinc-700">
-                                                        <span className="block font-bold text-[#FFD700]">{formatCurrency(anoData.valor_total)}</span>
-                                                        <span className="block text-gray-300">{anoData.total} emendas</span>
-                                                    </div>
-
-                                                    {/* Valor acima da barra */}
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        color: 'rgba(255,255,255,0.7)',
-                                                        fontWeight: 'bold',
-                                                        marginBottom: '4px',
-                                                        whiteSpace: 'nowrap',
-                                                        fontFamily: 'monospace'
-                                                    }}>
-                                                        {label}
-                                                    </span>
-
-                                                    {/* Barra */}
-                                                    <div style={{
-                                                        width: '100%',
-                                                        height: `${barHeight}px`,
-                                                        backgroundColor: '#FFD700',
-                                                        borderRadius: '3px 3px 0 0',
-                                                        transition: 'background-color 0.2s'
-                                                    }}
-                                                        className="group-hover:brightness-125 group-hover:shadow-[0_0_15px_rgba(255,215,0,0.4)]"
-                                                    />
-
-                                                    {/* Separador + Ano */}
-                                                    <div style={{
-                                                        width: '100%',
-                                                        borderTop: '2px solid rgba(255,215,0,0.4)',
-                                                        marginTop: '0'
-                                                    }} />
-                                                    <span style={{
-                                                        fontSize: '13px',
-                                                        color: '#FFD700',
-                                                        fontWeight: 'bold',
-                                                        marginTop: '8px',
-                                                        fontFamily: 'monospace'
-                                                    }}>
-                                                        {anoData.ano}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                                            {/* Qtd emendas */}
+                                            <span className="text-zinc-700 text-[10px] w-6 text-right shrink-0 font-mono group-hover:text-zinc-500">
+                                                {row.total}×
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         );
                     })()}
