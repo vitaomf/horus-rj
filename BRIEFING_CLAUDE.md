@@ -84,11 +84,9 @@ python rebuild_db.py                             # reset total (com backup)
 
 ### CRÍTICOS — bloquear o deploy até resolver
 
-- **6.1 Chave da API exposta em `.env`** linha 3: `CHAVE_API_PORTAL=
-  6bcbfa4ff4de221fa9c6698f0d284cb4`. Já vazou antes. Rotacionar no Portal
-  da Transparência, gerar nova chave, atualizar `.env`. Verificar com
-  `git log --all --full-history -- .env` se está em algum commit; se
-  estiver, reescrever histórico com `git filter-repo`.
+- **6.1 Chave da API exposta em `.env`** [RESOLVIDO 2026-05]: chave anterior
+  rotacionada no Portal da Transparência. `.env` confirmado fora do git
+  via `.gitignore`. Nova chave armazenada apenas localmente.
 - **6.2 CORS aberto em `backend/api.py` linha 29:** `allow_origins=["*"]`.
   Trocar pelo domínio real antes de expor publicamente.
 - **6.3 Sem rate limiting.** Adicionar `slowapi` (ex: 60 req/min/IP) nos
