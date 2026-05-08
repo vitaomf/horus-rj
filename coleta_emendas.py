@@ -97,6 +97,14 @@ def processar_emendas_lote(dados, cursor):
             valor, valor_empenhado, valor_pago,
             descricao, objetivo, municipio, codigo_emenda, fonte_url
         ))
+        # Atualiza valor_empenhado e valor_pago mesmo em registros já existentes
+        # (necessário quando colunas foram adicionadas depois da coleta original)
+        if cursor.rowcount == 0 and (valor_empenhado > 0 or valor_pago > 0):
+            cursor.execute("""
+                UPDATE emendas
+                SET valor_empenhado = ?, valor_pago = ?
+                WHERE codigo_emenda = ? AND municipio_destino = ?
+            """, (valor_empenhado, valor_pago, codigo_emenda, municipio))
         
         if cursor.rowcount > 0:
             insercoes += 1

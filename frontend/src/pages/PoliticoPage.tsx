@@ -119,6 +119,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [paginaAtual, setPaginaAtual] = useState(1);
     const [isScrolled, setIsScrolled] = useState(false);
     const [cidadeFiltro, setCidadeFiltro] = useState<string | null>(null);
+    const [filtroPagamento, setFiltroPagamento] = useState<'todas' | 'pagas' | 'nao_pagas'>('todas');
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -249,7 +250,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
             </button>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 mb-12 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 mb-12">
                 {/* 2. MUNICÍPIOS BENEFICIADOS */}
                 <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6 relative overflow-hidden flex flex-col min-h-[400px]">
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#FFD700]"></div>
@@ -316,14 +317,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
 
                 {/* 3. ATIVIDADE POR ANO (SVG Chart) */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-8 relative flex flex-col min-h-[400px] w-full">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6 relative flex flex-col w-full">
                     <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl"></div>
 
                     <h2 className="text-4xl font-bebas text-white mb-2">ATIVIDADE POR ANO</h2>
                     <p className="text-gray-400 mb-8 font-medium">Progressão histórica de repasses do parlamentar.</p>
 
                     {(() => {
-                        const alturaGrafico = 220;
+                        const alturaGrafico = 160;
                         const maxVal = Math.max(...data.emendas_por_ano.map(a => a.valor_total), 1);
 
                         return (
@@ -527,13 +528,33 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             {/* 4. CARDS DE EMENDAS */}
             <div className="max-w-7xl mx-auto mt-8 mb-20" ref={tabelaRef}>
-                <div className="flex flex-col mb-6 gap-2">
+                <div className="flex flex-col mb-6 gap-3">
                     <h2 className="text-4xl font-bebas text-white flex items-center gap-3">
                         <FileText className="w-7 h-7 text-[#FFD700]" /> EMENDAS REGISTRADAS
                     </h2>
                     <p className="text-gray-400 text-sm font-sans">
                         Histórico completo dos repasses federais identificados.
                     </p>
+
+                    {/* Filtro pago / não pago */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-zinc-500 text-xs font-bebas tracking-widest">PAGAMENTO:</span>
+                        {(['todas', 'pagas', 'nao_pagas'] as const).map(op => {
+                            const labels = { todas: 'TODAS', pagas: '✅ PAGAS', nao_pagas: '⏳ NÃO PAGAS' };
+                            const ativo = filtroPagamento === op;
+                            return (
+                                <button key={op}
+                                    onClick={() => { setFiltroPagamento(op); setPaginaAtual(1); }}
+                                    className={`font-bebas tracking-widest text-sm px-3 py-1 rounded-sm border transition-all ${ativo
+                                        ? 'bg-[#FFD700] text-black border-[#FFD700]'
+                                        : 'text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-white'}`}
+                                >
+                                    {labels[op]}
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     {cidadeFiltro !== null && (
                         <div className="flex items-center gap-4 mb-4 bg-[#FFD700]/10 border border-[#FFD700]/30 px-4 py-2 rounded-sm w-fit">
                             <span className="font-bebas text-[#FFD700] tracking-widest text-xl">
@@ -550,9 +571,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
                 {/* ── Novo design de cards ── */}
                 {(() => {
-                    const emendasFiltradas = cidadeFiltro
-                        ? data.ultimas_emendas.filter(e => e.municipio_destino === cidadeFiltro)
-                        : data.ultimas_emendas;
+                    const emendasFiltradas = data.ultimas_emendas
+                        .filter(e => !cidadeFiltro || e.municipio_destino === cidadeFiltro)
+                        .filter(e => {
+                            if (filtroPagamento === 'pagas')     return (e.valor_pago ?? 0) > 0;
+                            if (filtroPagamento === 'nao_pagas') return (e.valor_pago ?? 0) === 0;
+                            return true;
+                        });
                     const totalPaginas = Math.ceil(emendasFiltradas.length / 20);
                     const pagina = emendasFiltradas.slice((paginaAtual - 1) * 20, paginaAtual * 20);
 
