@@ -37,16 +37,17 @@ function usePlaceholderRotativo(ativo: boolean): string {
 }
 
 // Sugestões rápidas clicáveis abaixo do campo de texto
+// Sugestões válidas: só termos que batem com descricao ou objetivo das emendas
 const SUGESTOES_RAPIDAS = [
-    { label: 'Saúde',           q: 'saúde' },
-    { label: 'Educação',        q: 'educação' },
-    { label: 'Saneamento',      q: 'saneamento' },
-    { label: 'Benedita',        q: 'Benedita da Silva' },
-    { label: 'Hugo Leal',       q: 'Hugo Leal' },
-    { label: 'PT',              q: 'PT' },
-    { label: 'PL',              q: 'PL' },
-    { label: 'Habitação',       q: 'habitação' },
-    { label: 'Infraestrutura',  q: 'infraestrutura' },
+    { label: '🏥 Saúde',           q: 'saúde' },
+    { label: '📚 Educação',        q: 'educação' },
+    { label: '💧 Saneamento',      q: 'saneamento' },
+    { label: '🏠 Habitação',       q: 'habitação' },
+    { label: '🏗️ Infraestrutura',  q: 'infraestrutura' },
+    { label: '🌱 Agricultura',     q: 'agricultura' },
+    { label: '🤝 Assistência',     q: 'assistência social' },
+    { label: '⚽ Esporte',         q: 'desporto' },
+    { label: '📋 Pix',             q: 'transferências especiais' },
 ];
 
 interface Emenda {
@@ -88,7 +89,9 @@ export const BuscaAvancadaPage: React.FC = () => {
     // Metadados para os filtros
     const [municipiosList, setMunicipiosList] = useState<{ id: number, nome: string }[]>([]);
     const [politicosList, setPoliticosList] = useState<{ id: number, nome: string, partido?: string }[]>([]);
-    const anosList = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
+    // Gera anos dinamicamente de 2010 até o ano atual
+    const anoAtual = new Date().getFullYear();
+    const anosList = Array.from({ length: anoAtual - 2009 }, (_, i) => anoAtual - i);
 
     const fetchMetadata = async () => {
         try {
