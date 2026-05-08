@@ -1,0 +1,825 @@
+import sqlite3
+import math
+import unicodedata
+from fastapi import FastAPI, Query, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+import os
+
+# Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
+# Localmente continua usando SQLite via sqlite3.
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
+_use_turso = bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
+if _use_turso:
+    try:
+        import libsql_experimental as libsql  # noqa: F401 — só importa se disponível (Linux/Koyeb)
+    except ImportError:
+        _use_turso = False
+        print("AVISO: libsql_experimental não encontrado; usando SQLite local.")
+
+
+def _unaccent(value):
+    """Remove acentos pra busca textual case/acento-insensitive."""
+    if value is None:
+        return ''
+    nfd = unicodedata.normalize('NFD', str(value))
+    return ''.join(c for c in nfd if unicodedata.category(c) != 'Mn')
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
+app = FastAPI(title="Transparência RJ API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Filtro: rankings públicos só consideram parlamentares individuais.
+# Autores coletivos (bancadas, comissões, relatores) são marcados em
+# coleta_emendas.py com cargo='Autor Coletivo' e excluídos via este predicado.
+NOT_AUTOR_COLETIVO_SQL = "COALESCE(p.cargo, '') != 'Autor Coletivo'"
+
+# CORS: em produção definir ALLOWED_ORIGINS no .env (ex: "https://horus.dominio.com.br")
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+_allow_origins = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allow_origins,
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
+# Caminho do banco (fica um diretório acima do /backend case seja executado na raiz)
+# Se executado dentro da pasta backend, db fica num nível acima
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "transparencia_rj.db")
+if not os.path.exists(DB_PATH):
+    # Fallback caso seja executado diretamente na raiz
+    DB_PATH = "transparencia_rj.db"
+
+def get_db_connection():
+    """
+    Retorna conexão com o banco.
+    - Turso (libSQL): quando TURSO_DATABASE_URL e TURSO_AUTH_TOKEN estão definidos (Koyeb).
+      Usa embedded replica: lê do SQLite local sincronizado com a nuvem.
+    - SQLite padrão: para desenvolvimento local.
+    """
+    if _use_turso:
+        import libsql_experimental as libsql
+        conn = libsql.connect(
+            database=DB_PATH,
+            sync_url=TURSO_DATABASE_URL,
+            auth_token=TURSO_AUTH_TOKEN,
+        )
+        conn.sync()
+    else:
+        conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.create_function("unaccent", 1, _unaccent)
+    return conn
+
+
+
+
+@app.get("/api/municipios/heatmap")
+def obter_municipios_heatmap():
+    """
+    Retorna lista de municípios com valor total de emendas e contagem,
+    usado para gerar o heatmap no mapa.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Query SQL para agrupar emendas por município e somar os valores
+        cur.execute("""
+            SELECT 
+                UPPER(municipio_destino) as nome,
+                SUM(valor) as valor_total,
+                COUNT(*) as total_emendas
+            FROM emendas
+            WHERE municipio_destino IS NOT NULL AND municipio_destino != ''
+            GROUP BY UPPER(municipio_destino)
+            ORDER BY valor_total DESC
+        """)
+        rows = cur.fetchall()
+        return [
+            {"nome": r["nome"], "valor_total": r["valor_total"], "total_emendas": r["total_emendas"]}
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+@app.get("/api/emendas/busca")
+def buscar_emendas(
+    q: Optional[str] = Query(None),
+    ano: Optional[int] = Query(None),
+    municipio: Optional[str] = Query(None),
+    politico: Optional[int] = Query(None),
+    pagina: int = Query(1, ge=1),
+    limite: int = Query(50, ge=1, le=200)
+):
+    """
+    Busca avançada de emendas com múltiplos filtros.
+    """
+    conn = get_db_connection()
+    try:
+        query = """
+            SELECT e.*, p.nome as politico_nome, p.partido as politico_partido
+            FROM emendas e
+            LEFT JOIN politicos p ON e.politico_id = p.id
+            WHERE 1=1
+        """
+        params = []
+
+        if q:
+            # Busca acento/case-insensitive: normaliza tanto o conteúdo quanto a query.
+            # "saude" bate com "Saúde", "EDUCAÇÃO" bate com "educacao".
+            query += " AND (UPPER(unaccent(e.descricao)) LIKE UPPER(unaccent(?)) OR UPPER(unaccent(e.objetivo)) LIKE UPPER(unaccent(?)))"
+            params.extend([f"%{q}%", f"%{q}%"])
+        
+        if ano:
+            query += " AND e.ano = ?"
+            params.append(ano)
+            
+        if municipio:
+            query += " AND UPPER(e.municipio_destino) LIKE UPPER(?)"
+            params.append(f"%{municipio}%")
+            
+        if politico:
+            query += " AND e.politico_id = ?"
+            params.append(politico)
+
+        # Contar total para paginação
+        count_query = f"SELECT COUNT(*) as total FROM ({query})"
+        result_count = conn.execute(count_query, params).fetchone()
+        total = result_count["total"] if result_count else 0
+        paginas = math.ceil(total / limite) if total > 0 else 0
+
+        # 404 quando pagina solicitada está fora do intervalo válido.
+        if total > 0 and pagina > paginas:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Página {pagina} fora do intervalo. Total de páginas: {paginas}."
+            )
+
+        # Paginação
+        query += " ORDER BY e.ano DESC, e.valor DESC LIMIT ? OFFSET ?"
+        params.extend([limite, (pagina - 1) * limite])
+
+        rows = conn.execute(query, params).fetchall()
+
+        return {
+            "total": total,
+            "pagina": pagina,
+            "limite": limite,
+            "paginas": paginas,
+            "resultados": [dict(r) for r in rows]
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/municipios")
+def listar_municipios(busca: Optional[str] = Query(None)):
+    """
+    Retorna lista de todos os municípios do RJ com id e nome.
+    Se a tabela `municipios` ainda não existir, extrai unicamente do `municipio_destino` da tabela de `emendas`.
+    Pode ser filtrado opcionalmente pelo parâmetro `busca`.
+    """
+    conn = get_db_connection()
+    try:
+        # Tenta buscar da tabela oficial `municipios` caso exista
+        query = "SELECT id, nome FROM municipios WHERE 1=1"
+        params = []
+        
+        if busca:
+            query += " AND UPPER(nome) LIKE UPPER(?)"
+            params.append(f'%{busca}%')
+            
+        query += " ORDER BY nome"
+        
+        municipios = conn.execute(query, params).fetchall()
+        return [dict(m) for m in municipios]
+    except sqlite3.OperationalError:
+        try:
+            # Fallback: Extrai nomes únicos direto das emendas se a tabela municipios não tiver sido criada
+            query_fallback = "SELECT DISTINCT municipio_destino as nome FROM emendas WHERE municipio_destino != ''"
+            params_fallback = []
+            if busca:
+                query_fallback += " AND UPPER(municipio_destino) LIKE UPPER(?)"
+                params_fallback.append(f'%{busca}%')
+                
+            query_fallback += " ORDER BY municipio_destino"
+                
+            municipios = conn.execute(query_fallback, params_fallback).fetchall()
+            # Gera um ID fake baseado na ordem para não quebrar a listagem do front-end
+            return [{"id": i+1, "nome": m["nome"]} for i, m in enumerate(municipios)]
+        except sqlite3.OperationalError:
+            return []
+    finally:
+        conn.close()
+
+
+@app.get("/api/municipios/{municipio_id}/problemas")
+def listar_problemas(municipio_id: int, severidade_min: Optional[int] = Query(None)):
+    """
+    Retorna problemas de um município filtrados por severidade_min (opcional).
+    Ordenados por severidade decrescente.
+    """
+    conn = get_db_connection()
+    try:
+        query = "SELECT * FROM problemas WHERE municipio_id = ?"
+        params = [municipio_id]
+        
+        if severidade_min is not None:
+            query += " AND severidade >= ?"
+            params.append(severidade_min)
+            
+        query += " ORDER BY severidade DESC"
+        
+        problemas = conn.execute(query, params).fetchall()
+        return [dict(p) for p in problemas]
+    except sqlite3.OperationalError as e:
+        # Caso a tabela problemas não exista
+        if "no such table" in str(e):
+            return []
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/api/municipios/{municipio_id}/emendas")
+def listar_emendas(municipio_id: int):
+    """
+    Retorna emendas destinadas a esse município.
+    Traz o nome do político autor junto através de um JOIN.
+    """
+    conn = get_db_connection()
+    try:
+        # Precisamos descobrir o nome do município primeiro para cruzar com "municipio_destino" da tabela de emendas.
+        # Se sua tabela `emendas` já tiver a coluna `municipio_id` configurada, basta alterar esta lógica.
+        try:
+            mun_row = conn.execute("SELECT nome FROM municipios WHERE id = ?", (municipio_id,)).fetchone()
+            if not mun_row:
+                raise HTTPException(status_code=404, detail="Município não encontrado.")
+            nome_municipio = mun_row["nome"]
+        except sqlite3.OperationalError:
+            # Se não existe a tabela de município, a gente pega pelo ID fake do endpoint anterior (ordem alfabética)
+            municipios = conn.execute("SELECT DISTINCT municipio_destino FROM emendas WHERE municipio_destino != '' ORDER BY municipio_destino").fetchall()
+            if municipio_id <= 0 or municipio_id > len(municipios):
+                raise HTTPException(status_code=404, detail="Município não encontrado.")
+            nome_municipio = municipios[municipio_id - 1]["municipio_destino"]
+            
+        # Busca as emendas usando o JOIN
+        query = """
+            SELECT e.*, p.nome as politico_nome, p.partido as politico_partido 
+            FROM emendas e 
+            LEFT JOIN politicos p ON e.politico_id = p.id 
+            WHERE e.municipio_destino = ?
+            ORDER BY e.valor DESC
+        """
+        emendas = conn.execute(query, (nome_municipio,)).fetchall()
+        return [dict(e) for e in emendas]
+        
+    except sqlite3.OperationalError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/emendas/total")
+def obter_total_emendas():
+    """
+    Retorna a contagem total de emendas registradas no banco.
+    """
+    conn = get_db_connection()
+    try:
+        resultado = conn.execute("SELECT COUNT(id) as total FROM emendas").fetchone()
+        return {"total": resultado["total"]}
+    except sqlite3.OperationalError:
+        return {"total": 0}
+    finally:
+        conn.close()
+
+
+@app.get("/api/politicos/total")
+def obter_total_politicos():
+    """
+    Retorna a contagem total de políticos individuais (exclui autores coletivos).
+    """
+    conn = get_db_connection()
+    try:
+        resultado = conn.execute(f"""
+            SELECT COUNT(id) as total
+            FROM politicos p
+            WHERE {NOT_AUTOR_COLETIVO_SQL}
+        """).fetchone()
+        return {"total": resultado["total"]}
+    except sqlite3.OperationalError:
+        return {"total": 0}
+    finally:
+        conn.close()
+
+
+
+@app.get("/api/politicos")
+def listar_politicos_paginado(
+    pagina: int = Query(1, ge=1),
+    limite: int = Query(20, ge=1, le=2000),
+    busca: Optional[str] = Query(None)
+):
+    """
+    Lista políticos paginados com total de emendas e valor.
+    Suporta busca por nome.
+    """
+    conn = get_db_connection()
+    try:
+        where_parts = [NOT_AUTOR_COLETIVO_SQL]
+        params = []
+
+        if busca and busca.strip():
+            where_parts.append("UPPER(p.nome) LIKE UPPER(?)")
+            params.append(f'%{busca.strip()}%')
+
+        where_clause = "WHERE " + " AND ".join(where_parts)
+
+        # Contar total
+        count_query = f"""
+            SELECT COUNT(DISTINCT p.id) as total
+            FROM politicos p
+            {where_clause}
+        """
+        total = conn.execute(count_query, params).fetchone()["total"]
+        total_paginas = max(1, math.ceil(total / limite))
+        
+        # Buscar página
+        offset = (pagina - 1) * limite
+        data_query = f"""
+            SELECT p.id, p.nome, p.partido, p.cargo,
+                   COUNT(e.id) as total_emendas,
+                   SUM(e.valor) as valor_total
+            FROM politicos p
+            LEFT JOIN emendas e ON p.id = e.politico_id
+            {where_clause}
+            GROUP BY p.id
+            ORDER BY valor_total DESC
+            LIMIT ? OFFSET ?
+        """
+        data_params = params + [limite, offset]
+        rows = conn.execute(data_query, data_params).fetchall()
+        
+        politicos = [
+            {
+                "id": r["id"],
+                "nome": r["nome"],
+                "partido": r["partido"],
+                "cargo": r["cargo"],
+                "total_emendas": r["total_emendas"] or 0,
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+            }
+            for r in rows
+        ]
+        
+        return {
+            "politicos": politicos,
+            "total": total,
+            "pagina": pagina,
+            "total_paginas": total_paginas
+        }
+    except Exception as e:
+        print(f"Erro ao listar politicos paginado:", e)
+        return {"politicos": [], "total": 0, "pagina": 1, "total_paginas": 1}
+    finally:
+        conn.close()
+
+@app.get("/api/politicos/busca")
+def buscar_politicos(q: str = Query(..., description="Termo de busca pelo nome")):
+    """
+    Busca políticos individuais pelo nome (case-insensitive, exclui autores coletivos).
+    Retorna até 8 resultados contendo id, nome, partido e cargo.
+    """
+    conn = get_db_connection()
+    try:
+        query = f"""
+            SELECT p.id, p.nome, p.partido, p.cargo
+            FROM politicos p
+            WHERE UPPER(p.nome) LIKE UPPER(?)
+              AND {NOT_AUTOR_COLETIVO_SQL}
+            ORDER BY p.nome
+            LIMIT 8
+        """
+        politicos = conn.execute(query, (f'%{q}%',)).fetchall()
+        return [dict(p) for p in politicos]
+    except sqlite3.OperationalError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/municipios/{nome}/detalhes")
+def obter_detalhes_municipio(nome: str):
+    conn = get_db_connection()
+    try:
+        # A query vai receber o nome COMPLETO do frontend (ex: "NITERÓI"),
+        # e vai buscar no banco usando LIKE para bater com "NITERÓI - RJ" ou similares.
+        termo_busca = nome.strip().upper()
+        # Se o nome não tiver o sufixo - RJ, adicionamos um curinga no final
+        if " - RJ" not in termo_busca:
+            termo_like = f"{termo_busca}%"
+        else:
+            termo_like = termo_busca
+
+        # 1. Total Geral do Municipio
+        totais = conn.execute("""
+            SELECT COUNT(id) as total_emendas, SUM(valor) as valor_total
+            FROM emendas
+            WHERE municipio_destino LIKE ?
+        """, (termo_like,)).fetchone()
+
+        total_emendas = totais["total_emendas"] if totais and totais["total_emendas"] else 0
+        valor_total = totais["valor_total"] if totais and totais["valor_total"] else 0
+
+        # 404 quando município não existe (sem nenhuma emenda associada).
+        # Distingue "município sem dados" de "termo inválido".
+        if total_emendas == 0:
+            raise HTTPException(status_code=404, detail=f"Município '{nome}' não encontrado.")
+
+        # 2. Ranking de Políticos para este Municipio
+        politicos_rows = conn.execute("""
+            SELECT 
+                p.id as id,
+                p.nome as nome,  
+                p.partido as partido, 
+                COUNT(e.id) as total_emendas, 
+                SUM(e.valor) as valor_total
+            FROM emendas e
+            JOIN politicos p ON e.politico_id = p.id
+            WHERE e.municipio_destino LIKE ?
+            GROUP BY p.id
+            ORDER BY valor_total DESC
+            LIMIT 20
+        """, (termo_like,)).fetchall()
+        
+        politicos = []
+        for row in politicos_rows:
+            politicos.append({
+                "id": row["id"],
+                "nome": row["nome"],
+                "partido": row["partido"],
+                "total_emendas": row["total_emendas"],
+                "valor_total": float(row["valor_total"]) if row["valor_total"] else 0
+            })
+
+        # 3. Lista de Emendas
+        emendas_rows = conn.execute("""
+            SELECT ano, valor, 
+                   descricao, objetivo, fonte_url
+            FROM emendas
+            WHERE municipio_destino LIKE ?
+            ORDER BY ano DESC, valor DESC
+        """, (termo_like,)).fetchall()
+        
+        emendas = []
+        for row in emendas_rows:
+            emendas.append({
+                "ano": row["ano"],
+                "valor": float(row["valor"]) if row["valor"] else 0,
+                "descricao": row["descricao"] or "SEM ESPECIFICAÇÃO",
+                "objetivo": row["objetivo"] or "NÃO INFORMADO",
+                "status": "CADASTRADA",
+                "fonte_url": row["fonte_url"]
+            })
+
+        return {
+            "municipio": nome.upper(),
+            "total_emendas": total_emendas,
+            "valor_total": float(valor_total),
+            "politicos": politicos,
+            "emendas": emendas
+        }
+
+    except Exception as e:
+        print(f"Erro ao buscar detalhes do municipio {nome}:", e)
+        return {
+            "municipio": nome,
+            "total_emendas": 0,
+            "valor_total": 0,
+            "politicos": [],
+            "emendas": []
+        }
+    finally:
+        conn.close()
+
+@app.get("/api/municipios/{nome}/contratos")
+def obter_contratos_municipio(nome: str):
+    conn = get_db_connection()
+    try:
+        termo_busca = f"%{nome.strip().upper()}%"
+        
+        contratos_rows = conn.execute("""
+            SELECT numero, objeto, valor, fornecedor_nome, data_inicio, fonte_url
+            FROM contratos
+            WHERE UPPER(municipio) LIKE ?
+            ORDER BY valor DESC
+        """, (termo_busca,)).fetchall()
+        
+        contratos = []
+        for r in contratos_rows:
+            contratos.append({
+                "numero": r["numero"],
+                "objeto": r["objeto"] or "Sem Objeto",
+                "valor": float(r["valor"]) if r["valor"] else 0,
+                "fornecedor_nome": r["fornecedor_nome"] or "Não Informado",
+                "data_inicio": r["data_inicio"],
+                "fonte_url": r["fonte_url"]
+            })
+            
+        return contratos
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return []
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        print(f"Erro ao buscar contratos do municipio {nome}:", e)
+        return []
+    finally:
+        conn.close()
+
+@app.get("/api/politicos/{politico_id}")
+def obter_detalhes_politico(politico_id: int):
+    conn = get_db_connection()
+    try:
+        # 1. Informações básicas do político e totais gerais
+        politico_info = conn.execute("""
+            SELECT p.id, p.nome, p.partido, p.cargo,
+                   COUNT(e.id) as total_emendas,
+                   SUM(e.valor) as valor_total
+            FROM politicos p
+            LEFT JOIN emendas e ON p.id = e.politico_id
+            WHERE p.id = ?
+            GROUP BY p.id
+        """, (politico_id,)).fetchone()
+
+        if not politico_info:
+            raise HTTPException(status_code=404, detail="Político não encontrado")
+
+        # 2. Municípios Beneficiados
+        municipios_rows = conn.execute("""
+            SELECT UPPER(municipio_destino) as nome,
+                   COUNT(id) as total,
+                   SUM(valor) as valor
+            FROM emendas
+            WHERE politico_id = ?
+            GROUP BY UPPER(municipio_destino)
+            ORDER BY valor DESC
+            LIMIT 10
+        """, (politico_id,)).fetchall()
+
+        municipios_beneficiados = [
+            {"nome": r["nome"], "total": r["total"], "valor": float(r["valor"]) if r["valor"] else 0}
+            for r in municipios_rows
+        ]
+
+        # 3. Emendas por Ano
+        ano_rows = conn.execute("""
+            SELECT ano,
+                   COUNT(id) as total,
+                   SUM(valor) as valor_total
+            FROM emendas
+            WHERE politico_id = ?
+            GROUP BY ano
+            ORDER BY ano ASC
+        """, (politico_id,)).fetchall()
+
+        emendas_por_ano = [
+            {"ano": r["ano"], "total": r["total"], "valor_total": float(r["valor_total"]) if r["valor_total"] else 0}
+            for r in ano_rows
+        ]
+
+        # 4. Dados de Campanha (TSE)
+        campanha_row = conn.execute("""
+            SELECT id, cargo, total_receitas, total_despesas, situacao 
+            FROM campanhas 
+            WHERE politico_id = ? 
+            ORDER BY ano DESC 
+            LIMIT 1
+        """, (politico_id,)).fetchone()
+
+        dados_campanha = None
+        if campanha_row:
+            # Buscar doadores desta campanha
+            doadores_rows = conn.execute("""
+                SELECT nome_doador, valor 
+                FROM doadores 
+                WHERE campanha_id = ? 
+                ORDER BY valor DESC
+            """, (campanha_row["id"],)).fetchall()
+            
+            dados_campanha = {
+                "cargo": campanha_row["cargo"],
+                "total_receitas": float(campanha_row["total_receitas"]),
+                "total_despesas": float(campanha_row["total_despesas"]),
+                "situacao": campanha_row["situacao"],
+                "top_doadores": [
+                    {"nome": r["nome_doador"], "valor": float(r["valor"])}
+                    for r in doadores_rows
+                ]
+            }
+
+        # 5. Todas as Emendas (LIMIT 1000 defensivo — evita payload gigante; paginação no frontend)
+        ultimas_emendas_rows = conn.execute("""
+            SELECT ano, valor, descricao, objetivo, municipio_destino, fonte_url
+            FROM emendas
+            WHERE politico_id = ?
+            ORDER BY ano DESC, valor DESC
+            LIMIT 1000
+        """, (politico_id,)).fetchall()
+
+        ultimas_emendas = [
+            {
+                "ano": r["ano"],
+                "valor": float(r["valor"]) if r["valor"] else 0,
+                "descricao": r["descricao"] or "SEM ESPECIFICAÇÃO",
+                "objetivo": r["objetivo"] or "NÃO INFORMADO",
+                "municipio_destino": r["municipio_destino"],
+                "status": "CADASTRADA",
+                "fonte_url": r["fonte_url"]
+            }
+            for r in ultimas_emendas_rows
+        ]
+
+        return {
+            "id": politico_info["id"],
+            "nome": politico_info["nome"],
+            "partido": politico_info["partido"],
+            "cargo": politico_info["cargo"],
+            "total_emendas": politico_info["total_emendas"] or 0,
+            "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
+            "dados_campanha": dados_campanha,
+            "municipios_beneficiados": municipios_beneficiados,
+            "emendas_por_ano": emendas_por_ano,
+            "ultimas_emendas": ultimas_emendas
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erro ao buscar politico {politico_id}:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/estatisticas")
+def obter_estatisticas():
+    conn = get_db_connection()
+    try:
+        # 1. Total Geral e Média
+        totais = conn.execute("""
+            SELECT SUM(valor) as valor_total_geral, 
+                   AVG(valor) as media_por_emenda,
+                   COUNT(id) as total_absoluto
+            FROM emendas
+        """).fetchone()
+
+        valor_total_geral = float(totais["valor_total_geral"]) if totais["valor_total_geral"] else 0
+        media_por_emenda = float(totais["media_por_emenda"]) if totais["media_por_emenda"] else 0
+
+        # 2. TOP 10 Políticos (exclui autores coletivos)
+        top_politicos_rows = conn.execute(f"""
+            SELECT p.id, p.nome, p.partido, p.cargo,
+                   COUNT(e.id) as total_emendas,
+                   SUM(e.valor) as valor_total
+            FROM politicos p
+            JOIN emendas e ON p.id = e.politico_id
+            WHERE {NOT_AUTOR_COLETIVO_SQL}
+            GROUP BY p.id
+            ORDER BY valor_total DESC
+            LIMIT 10
+        """).fetchall()
+
+        top_politicos = [
+            {
+                "id": r["id"],
+                "nome": r["nome"],
+                "partido": r["partido"],
+                "cargo": r["cargo"],
+                "total_emendas": r["total_emendas"],
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+            }
+            for r in top_politicos_rows
+        ]
+
+        # 3. TOP 10 Municípios
+        top_municipios_rows = conn.execute("""
+            SELECT municipio_destino as nome,
+                   COUNT(id) as total_emendas,
+                   SUM(valor) as valor_total
+            FROM emendas
+            WHERE municipio_destino != ''
+            GROUP BY municipio_destino
+            ORDER BY valor_total DESC
+            LIMIT 10
+        """).fetchall()
+
+        top_municipios = [
+            {
+                "nome": r["nome"].replace(" - RJ", "").strip(),
+                "total_emendas": r["total_emendas"],
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+            }
+            for r in top_municipios_rows
+        ]
+
+        # 4. Por Ano
+        por_ano_rows = conn.execute("""
+            SELECT ano,
+                   COUNT(id) as total_emendas,
+                   SUM(valor) as valor_total
+            FROM emendas
+            GROUP BY ano
+            ORDER BY ano ASC
+        """).fetchall()
+
+        por_ano = [
+            {
+                "ano": r["ano"],
+                "total_emendas": r["total_emendas"],
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+            }
+            for r in por_ano_rows
+        ]
+
+        # 5. Por Objetivo (Top 8)
+        por_objetivo_rows = conn.execute("""
+            SELECT objetivo,
+                   COUNT(id) as total,
+                   SUM(valor) as valor_total
+            FROM emendas
+            WHERE objetivo != '' AND objetivo IS NOT NULL
+            GROUP BY objetivo
+            ORDER BY valor_total DESC
+            LIMIT 8
+        """).fetchall()
+
+        por_objetivo = [
+            {
+                "objetivo": r["objetivo"],
+                "total": r["total"],
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+            }
+            for r in por_objetivo_rows
+        ]
+
+        return {
+            "valor_total_geral": valor_total_geral,
+            "media_por_emenda": media_por_emenda,
+            "top_politicos": top_politicos,
+            "top_municipios": top_municipios,
+            "por_ano": por_ano,
+            "por_objetivo": por_objetivo
+        }
+
+    except Exception as e:
+        print(f"Erro ao buscar estatisticas gerais:", e)
+        return {"erro": str(e)}
+    finally:
+        conn.close()
+
+
+@app.get("/api/health")
+def health():
+    try:
+        conn = get_db_connection()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+        return {"status": "ok", "db": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"db error: {e}")
+
+
+# Configuração para servir o Frontend (React/Vite)
+FRONTEND_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
+
+if os.path.exists(FRONTEND_PATH):
+    # Monta a pasta de assets e arquivos estáticos
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_PATH, "assets")), name="assets")
+    
+    # Rota para servir o index.html em qualquer caminho que não seja API
+    @app.get("/{rest_of_path:path}")
+    async def serve_frontend(rest_of_path: str):
+        # Se o caminho começar com 'api/', retornar 404 para não mascarar erros de API
+        if rest_of_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API route not found")
+            
+        # Tenta servir o arquivo solicitado na pasta dist (ex: imagens, svgs)
+        file_path = os.path.join(FRONTEND_PATH, rest_of_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
+        # Fallback para o index.html (SPA routing)
+        return FileResponse(os.path.join(FRONTEND_PATH, "index.html"))
+else:
+    print(f"AVISO: Pasta dist do frontend não encontrada em {FRONTEND_PATH}")

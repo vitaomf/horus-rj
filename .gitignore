@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.local
+
+# Banco e cache (regeráveis via coletas)
+*.db
+*.db-journal
+cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# Logs gerais
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Horus Eye - Sua Art + Pupila Móvel</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel+Decorative:wght@700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #050505; /* Cor de fundo do Dashboard */
+      color: white;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .eye-wrapper {
+      position: relative;
+      width: 400px;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* A SUA ARTE ORIGINAL */
+    .original-art {
+      width: 100%;
+      height: auto;
+      z-index: 10;
+      pointer-events: none;
+      filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.2));
+    }
+
+    /* MÁSCARA PARA "APAGAR" A PUPILA ORIGINAL */
+    /* Posicionada exatamente sobre a pupila original da logo_amarelo.png */
+    .pupil-mask {
+      position: absolute;
+      top: 48%; /* Ajustado para o centro do olho na imagem */
+      left: 50.5%;
+      width: 45px;
+      height: 45px;
+      background: #050505; /* Mesma cor do fundo para camuflar */
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      z-index: 15;
+    }
+
+    /* A NOVA PUPILA QUE SEGUE O MOUSE */
+    .new-pupil {
+      position: absolute;
+      top: 48%;
+      left: 50.5%;
+      width: 28px;
+      height: 28px;
+      background: #FFD700;
+      border-radius: 50%;
+      z-index: 20;
+      box-shadow: 
+        0 0 10px #FFD700,
+        0 0 20px rgba(255, 215, 0, 0.5);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: transform 0.1s ease-out;
+    }
+
+    /* Brilho interno da pupila (detalhe extra) */
+    .new-pupil::after {
+      content: '';
+      position: absolute;
+      top: 25%;
+      left: 25%;
+      width: 8px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+    }
+
+    /* UI */
+    .labels { text-align: center; margin-top: 20px; }
+    .title { font-family: 'Cinzel Decorative', serif; font-size: 48px; color: #FFD700; margin-bottom: 5px; }
+    .subtitle { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 6px; opacity: 0.5; }
+
+    .hint {
+      position: fixed;
+      bottom: 30px;
+      color: #FFD700;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      letter-spacing: 2px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="eye-wrapper" id="eyeArea">
+      
+      <!-- USANDO O SEU ARQUIVO ORIGINAL -->
+      <img src="logo_amarelo.png" alt="Horus Eye" class="original-art">
+
+      <!-- MÁSCARA QUE OCULTA A PUPILA ESTÁTICA -->
+      <div class="pupil-mask"></div>
+
+      <!-- NOVA PUPILA ANIMADA -->
+      <div class="new-pupil" id="movingPupil"></div>
+
+    </div>
+
+    <div class="labels">
+      <h1 class="title">HORUS</h1>
+      <p class="subtitle">SUA ARTE COM VIDA</p>
+    </div>
+  </div>
+
+  <div class="hint">SUA ARTE ORIGINAL COM PUPILA RASTREADORA</div>
+
+  <script>
+    const pupil = document.getElementById('movingPupil');
+    const eyeArea = document.getElementById('eyeArea');
+
+    document.addEventListener('mousemove', (e) => {
+      const rect = eyeArea.getBoundingClientRect();
+      
+      // Centro do olho na tela
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height * 0.48; // Leve ajuste para o centro da íris
+      
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+      
+      // Limitar o movimento da pupila para não "sair" do globo ocular da imagem
+      const maxDistance = 14; 
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      
+      const sensitivity = 0.04;
+      let moveX = dx * sensitivity;
+      let moveY = dy * sensitivity;
+      
+      const currentDist = Math.sqrt(moveX*moveX + moveY*moveY);
+      if (currentDist > maxDistance) {
+        const ratio = maxDistance / currentDist;
+        moveX *= ratio;
+        moveY *= ratio;
+      }
+      
+      pupil.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+    });
+  </script>
+</body>
+</html>

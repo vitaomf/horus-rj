@@ -1,0 +1,10 @@
+import sqlite3
+conn = sqlite3.connect('transparencia_rj.db')
+cur = conn.cursor()
+cur.execute('SELECT COUNT(*) FROM politicos')
+print('Politicos:', cur.fetchone())
+cur.execute('SELECT id, nome FROM politicos LIMIT 5')
+print('Amostra politicos:', cur.fetchall())
+cur.execute('SELECT status, descricao, objetivo FROM emendas LIMIT 3')
+print('Amostra emendas:', cur.fetchall())
+conn.close()
