@@ -123,6 +123,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [cidadeFiltro, setCidadeFiltro] = useState<string | null>(null);
     const [filtroPagamento, setFiltroPagamento] = useState<'todas' | 'pagas' | 'nao_pagas'>('todas');
     const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+    const [cruzamento, setCruzamento] = useState<{
+        camada_geografica: { municipio: string; valor_emendas: number; num_emendas: number; valor_contratos: number; num_contratos: number }[];
+        camada_financeira: { doador: string; documento: string; valor_doacao: number; valor_contratos: number; num_contratos: number; municipios: string }[];
+        tem_cruzamento: boolean;
+    } | null>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -149,6 +154,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         };
 
         fetchData();
+
+        // Cruzamento emendas × contratos (carrega em paralelo)
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/cruzamento`)
+            .then(res => setCruzamento(res.data))
+            .catch(() => {});
     }, [politicoId]);
 
     // Busca foto na API pública da Câmara dos Deputados (só funciona para deputados federais)
@@ -635,6 +645,89 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
                 </div>
             </div>
+
+            {/* ── CRUZAMENTO EMENDAS × CONTRATOS ──────────────────────────── */}
+            {cruzamento && cruzamento.tem_cruzamento && (
+                <div className="max-w-7xl mx-auto mt-8 mb-8">
+                    <div className="bg-[#0a0a0a] border border-red-900/40 rounded-xl overflow-hidden">
+                        <div className="bg-red-950/30 border-b border-red-900/40 px-5 py-3 flex items-center gap-3">
+                            <span className="text-red-400 text-xl">🔍</span>
+                            <div>
+                                <p className="font-bebas text-red-400 text-lg tracking-widest">CRUZAMENTO INVESTIGATIVO</p>
+                                <p className="text-zinc-500 text-[11px] font-sans">Emendas parlamentares × contratos federais nos mesmos municípios</p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Camada 1: Geográfica */}
+                            {cruzamento.camada_geografica.length > 0 && (
+                                <div>
+                                    <p className="font-bebas text-zinc-400 text-sm tracking-widest mb-3 flex items-center gap-2">
+                                        <span className="text-base">📍</span> MUNICÍPIOS COM EMENDAS E CONTRATOS
+                                    </p>
+                                    <div className="space-y-2">
+                                        {cruzamento.camada_geografica.map((row, i) => (
+                                            <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+                                                <p className="font-bebas text-white text-base tracking-wide mb-1">{row.municipio}</p>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                    <div>
+                                                        <span className="text-zinc-600">EMENDAS</span>
+                                                        <p className="text-[#FFD700] font-bebas text-sm">
+                                                            R$ {(row.valor_emendas/1e6).toFixed(1)}M <span className="text-zinc-600">({row.num_emendas}x)</span>
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-zinc-600">CONTRATOS</span>
+                                                        <p className="text-red-400 font-bebas text-sm">
+                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M <span className="text-zinc-600">({row.num_contratos}x)</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Camada 2: Financeira */}
+                            {cruzamento.camada_financeira.length > 0 && (
+                                <div>
+                                    <p className="font-bebas text-zinc-400 text-sm tracking-widest mb-3 flex items-center gap-2">
+                                        <span className="text-base">💰</span> DOADORES QUE TAMBÉM SÃO CONTRATADOS
+                                    </p>
+                                    <div className="space-y-2">
+                                        {cruzamento.camada_financeira.map((row, i) => (
+                                            <div key={i} className="bg-zinc-900/50 border border-red-900/30 rounded-lg p-3">
+                                                <p className="font-bebas text-white text-sm tracking-wide mb-1 truncate">{row.doador}</p>
+                                                {row.municipios && (
+                                                    <p className="text-zinc-600 text-[10px] mb-1 truncate">📍 {row.municipios}</p>
+                                                )}
+                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                    <div>
+                                                        <span className="text-zinc-600">DOAÇÃO</span>
+                                                        <p className="text-green-400 font-bebas text-sm">
+                                                            R$ {(row.valor_doacao/1e3).toFixed(0)}K
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-zinc-600">CONTRATOS</span>
+                                                        <p className="text-red-400 font-bebas text-sm">
+                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-zinc-700 text-[10px] mt-3 font-sans italic">
+                                        * Cruzamento por CNPJ e nome. Verificar antes de publicar.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 4. FINANÇAS DE CAMPANHA (TSE) */}
             {data.dados_campanha && (
