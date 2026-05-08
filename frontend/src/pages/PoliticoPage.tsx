@@ -122,6 +122,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [isScrolled, setIsScrolled] = useState(false);
     const [cidadeFiltro, setCidadeFiltro] = useState<string | null>(null);
     const [filtroPagamento, setFiltroPagamento] = useState<'todas' | 'pagas' | 'nao_pagas'>('todas');
+    const [fotoUrl, setFotoUrl] = useState<string | null>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -150,6 +151,24 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         fetchData();
     }, [politicoId]);
 
+    // Busca foto na API pública da Câmara dos Deputados (só funciona para deputados federais)
+    useEffect(() => {
+        if (!data?.nome) return;
+        const primeiroNome = data.nome.split(' ')[0];
+        fetch(`https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(data.nome)}&itens=5`)
+            .then(r => r.ok ? r.json() : null)
+            .then(result => {
+                const dep = result?.dados?.find((d: any) => {
+                    const nomeCamara = d.nome?.toUpperCase() || '';
+                    const nomeSistema = data.nome.toUpperCase();
+                    return nomeCamara.includes(primeiroNome.toUpperCase()) ||
+                           nomeSistema.includes(d.nome?.split(' ')[0]?.toUpperCase() || '');
+                }) || result?.dados?.[0];
+                if (dep?.id) setFotoUrl(`https://www.camara.leg.br/internet/deputado/bandep/${dep.id}.jpg`);
+            })
+            .catch(() => { /* silencioso — fallback para iniciais */ });
+    }, [data?.nome]);
+
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     };
@@ -162,6 +181,59 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         const parts = name.trim().split(' ');
         if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
+
+    // Bio irônica gerada automaticamente a partir dos padrões de gasto
+    const getBioIronica = (): string => {
+        if (!data) return '';
+        const total = data.valor_total;
+        const numMuns = data.municipios_beneficiados.length;
+        const topMun = data.municipios_beneficiados[0];
+        const topMunPct = topMun ? Math.round((topMun.valor / total) * 100) : 0;
+        const anos = data.emendas_por_ano.map(a => a.ano);
+        const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
+        const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
+        const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
+        const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s+a.valor_total,0)/medEleit.length : 0;
+        const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s+a.valor_total,0)/medNorm.length  : 0;
+        const ehEleitoreiro = avgNorm > 0 && avgEleit > avgNorm * 1.8;
+
+        // Área dominante
+        const porArea = data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
+            const k = e.objetivo || 'sem área';
+            acc[k] = (acc[k]||0) + e.valor;
+            return acc;
+        }, {});
+        const topArea = Object.entries(porArea).sort(([,a],[,b]) => b-a)[0]?.[0] || 'diversas áreas';
+        const topAreaPct = Math.round((porArea[topArea]||0) / total * 100);
+
+        const totalFmt = total >= 1e9
+            ? `R$ ${(total/1e9).toFixed(1)} bilhões`
+            : `R$ ${(total/1e6).toFixed(0)} milhões`;
+
+        let bio = `Parlamentar com ${anos.length} ano${anos.length!==1?'s':''} de atividade rastreada, `;
+        bio += `tendo destinado ${totalFmt} em emendas parlamentares ao Rio de Janeiro. `;
+
+        if (topMunPct >= 40) {
+            bio += `Fiel ao método da concentração: ${topMunPct}% dos recursos foram para ${topMun.nome.replace(' - RJ','')} — `;
+            bio += `que, por coincidência ou não, lidera sua lista de municípios favoritos. `;
+        } else {
+            bio += `Distribuiu verbas por ${numMuns} municípios diferentes — generosidade digna de nota, `;
+            bio += `ou estratégia eleitoral bem calibrada, dependendo do ângulo. `;
+        }
+
+        if (topAreaPct >= 50) {
+            bio += `Especialista declarado em ${topArea} (${topAreaPct}% do total investido). `;
+        }
+
+        if (ehEleitoreiro) {
+            const mult = (avgEleit/avgNorm).toFixed(1);
+            bio += `Curiosidade: seus investimentos crescem ${mult}× em anos eleitorais. Coincidências acontecem.`;
+        } else {
+            bio += `Dados coletados do Portal da Transparência do Governo Federal.`;
+        }
+
+        return bio;
     };
 
     if (loading) {
@@ -194,11 +266,19 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             <div className={`sticky top-16 z-[40] transition-all duration-300 border-b-2 border-[#FFD700] mb-12 ${isScrolled ? 'bg-black/95 backdrop-blur-[10px] py-4 px-4 md:px-8 -mx-4 md:-mx-12 shadow-[0_4px_20px_rgba(0,0,0,0.8)]' : 'pb-8 bg-transparent'}`}>
                 <div className={`flex flex-col lg:flex-row ${isScrolled ? 'lg:items-center' : 'lg:items-end'} justify-between gap-8`}>
                     <div className="flex items-center gap-6">
-                        {/* Avatar */}
-                        <div className={`${isScrolled ? 'w-[40px] h-[40px]' : 'w-[80px] h-[80px]'} rounded-full bg-[#1a1a00] border-2 border-[#FFD700] flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(255,215,0,0.2)] transition-all duration-300`}>
-                            <span className={`font-bebas text-[#FFD700] pt-1 transition-all duration-300 ${isScrolled ? 'text-xl' : 'text-4xl'}`}>
-                                {getInitials(data.nome)}
-                            </span>
+                        {/* Avatar — foto real ou iniciais */}
+                        <div className={`${isScrolled ? 'w-[40px] h-[40px]' : 'w-[80px] h-[80px]'} rounded-full border-2 border-[#FFD700] shrink-0 shadow-[0_0_15px_rgba(255,215,0,0.2)] transition-all duration-300 overflow-hidden`}>
+                            {fotoUrl ? (
+                                <img src={fotoUrl} alt={data.nome}
+                                    className="w-full h-full object-cover object-top"
+                                    onError={() => setFotoUrl(null)} />
+                            ) : (
+                                <div className="w-full h-full bg-[#1a1a00] flex items-center justify-center">
+                                    <span className={`font-bebas text-[#FFD700] pt-1 transition-all duration-300 ${isScrolled ? 'text-xl' : 'text-4xl'}`}>
+                                        {getInitials(data.nome)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -244,13 +324,52 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             </div>
 
-            <button
-                onClick={onVoltar}
-                className="flex items-center gap-2 text-[#FFD700] hover:text-white transition-colors mb-6 group w-fit cursor-pointer"
-            >
-                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
-            </button>
+            <div className="flex items-center justify-between mb-6">
+                <button onClick={onVoltar}
+                    className="flex items-center gap-2 text-[#FFD700] hover:text-white transition-colors group w-fit cursor-pointer">
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                    <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
+                </button>
+            </div>
+
+            {/* ── DOSSIÊ: Bio irônica ───────────────────────────────────────── */}
+            <div className="max-w-7xl mx-auto mb-8">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative overflow-hidden">
+                    {/* Marca d'água "DOSSIÊ" */}
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bebas text-[80px] text-zinc-900 select-none pointer-events-none leading-none">
+                        DOSSIÊ
+                    </span>
+                    <div className="flex items-start gap-5 relative z-10">
+                        {/* Foto grande no dossiê */}
+                        <div className="shrink-0 w-20 h-24 rounded-md border border-zinc-700 overflow-hidden bg-zinc-900">
+                            {fotoUrl ? (
+                                <img src={fotoUrl} alt={data.nome}
+                                    className="w-full h-full object-cover object-top"
+                                    onError={() => setFotoUrl(null)} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <span className="font-bebas text-zinc-500 text-3xl">{getInitials(data.nome)}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="font-bebas text-[10px] tracking-widest text-zinc-600 border border-zinc-700 px-2 py-0.5 rounded-sm">
+                                    ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
+                                </span>
+                                {!fotoUrl && (
+                                    <span className="font-bebas text-[10px] tracking-widest text-zinc-700 border border-zinc-800 px-2 py-0.5 rounded-sm">
+                                        FOTO NÃO DISPONÍVEL
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-zinc-300 text-sm font-sans leading-relaxed">
+                                {getBioIronica()}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 mb-12">
                 {/* 2. MUNICÍPIOS BENEFICIADOS */}
