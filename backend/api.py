@@ -570,15 +570,33 @@ def obter_detalhes_politico(politico_id: int):
     conn = get_db_connection()
     try:
         # 1. Informações básicas do político e totais gerais
-        politico_info = conn.execute("""
-            SELECT p.id, p.nome, p.partido, p.cargo,
-                   COUNT(e.id) as total_emendas,
-                   SUM(e.valor) as valor_total
-            FROM politicos p
-            LEFT JOIN emendas e ON p.id = e.politico_id
-            WHERE p.id = ?
-            GROUP BY p.id
-        """, (politico_id,)).fetchone()
+        # COALESCE para foto_url (coluna pode não existir em bancos antigos)
+        try:
+            conn.execute("SELECT foto_url FROM politicos LIMIT 1").fetchone()
+            tem_foto_col = True
+        except sqlite3.OperationalError:
+            tem_foto_col = False
+
+        if tem_foto_col:
+            politico_info = conn.execute("""
+                SELECT p.id, p.nome, p.partido, p.cargo, p.foto_url,
+                       COUNT(e.id) as total_emendas,
+                       SUM(e.valor) as valor_total
+                FROM politicos p
+                LEFT JOIN emendas e ON p.id = e.politico_id
+                WHERE p.id = ?
+                GROUP BY p.id
+            """, (politico_id,)).fetchone()
+        else:
+            politico_info = conn.execute("""
+                SELECT p.id, p.nome, p.partido, p.cargo, NULL as foto_url,
+                       COUNT(e.id) as total_emendas,
+                       SUM(e.valor) as valor_total
+                FROM politicos p
+                LEFT JOIN emendas e ON p.id = e.politico_id
+                WHERE p.id = ?
+                GROUP BY p.id
+            """, (politico_id,)).fetchone()
 
         if not politico_info:
             raise HTTPException(status_code=404, detail="Político não encontrado")
@@ -678,6 +696,7 @@ def obter_detalhes_politico(politico_id: int):
             "nome": politico_info["nome"],
             "partido": politico_info["partido"],
             "cargo": politico_info["cargo"],
+            "foto_url": politico_info["foto_url"] if tem_foto_col else None,
             "total_emendas": politico_info["total_emendas"] or 0,
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "dados_campanha": dados_campanha,
