@@ -25,12 +25,65 @@ interface EmendasPorAno {
 interface UltimaEmenda {
     ano: number;
     valor: number;
+    valor_empenhado: number;
+    valor_pago: number;
     descricao: string;
     objetivo: string;
     municipio_destino: string;
     status: string;
     codigo_emenda: string;
     fonte_url?: string;
+}
+
+// ── Dicionários de tradução para linguagem humana ─────────────────────────────
+
+const TIPO_LEGIVEL: Record<string, { nome: string; explicacao: string }> = {
+    'Emenda Individual - Transferências Especiais':
+        { nome: 'Emenda Pix', explicacao: 'Dinheiro enviado direto para a prefeitura, sem exigir nenhum projeto ou destino específico. O prefeito decide como gastar.' },
+    'Emenda Individual - Transferências com Finalidade Definida':
+        { nome: 'Emenda com destino obrigatório', explicacao: 'O recurso tem destino fixo — só pode ser usado na área indicada (ex: saúde, educação). O prefeito não pode redirecionar.' },
+    'Emenda de Bancada - Transferências Especiais':
+        { nome: 'Emenda coletiva (Pix)', explicacao: 'Aprovada em conjunto por todos os deputados do estado. Vai direto para a prefeitura sem restrição de uso.' },
+    'Emenda de Bancada - Transferências com Finalidade Definida':
+        { nome: 'Emenda coletiva com destino', explicacao: 'Votada pelos deputados do estado em bloco, com área de gasto obrigatória.' },
+    'Emenda de Comissão - Transferências Especiais':
+        { nome: 'Emenda técnica (Pix)', explicacao: 'Aprovada por uma comissão especializada do Congresso, sem restrição de uso pelo município.' },
+    'Emenda de Comissão - Transferências com Finalidade Definida':
+        { nome: 'Emenda técnica com destino', explicacao: 'Votada por comissão especializada, vinculada a uma área específica de gasto.' },
+};
+
+function tipoLegivel(descricao: string): { nome: string; explicacao: string } {
+    for (const [chave, val] of Object.entries(TIPO_LEGIVEL)) {
+        if (descricao?.toLowerCase().includes(chave.toLowerCase().split(' - ')[0].toLowerCase())) {
+            return val;
+        }
+    }
+    if (descricao?.toLowerCase().includes('especial'))
+        return { nome: 'Emenda Pix', explicacao: 'Recurso enviado direto ao município sem restrição de uso.' };
+    if (descricao?.toLowerCase().includes('finalidade'))
+        return { nome: 'Emenda com destino obrigatório', explicacao: 'Recurso com área de gasto definida por lei.' };
+    return { nome: descricao || 'Emenda parlamentar', explicacao: 'Verba federal direcionada ao município pelo parlamentar.' };
+}
+
+const AREA_CONFIG: Record<string, { cor: string; textoCor: string; icone: string; descricaoSimples: string }> = {
+    'Saúde':             { cor: '#166534', textoCor: '#4ade80', icone: '🏥', descricaoSimples: 'hospitais, postos de saúde, equipamentos médicos' },
+    'Educação':          { cor: '#1e3a8a', textoCor: '#60a5fa', icone: '📚', descricaoSimples: 'escolas, creches, material didático' },
+    'Saneamento básico': { cor: '#164e63', textoCor: '#22d3ee', icone: '💧', descricaoSimples: 'água tratada, esgoto, resíduos' },
+    'Infraestrutura':    { cor: '#7c2d12', textoCor: '#fb923c', icone: '🏗️', descricaoSimples: 'obras, estradas, pontes' },
+    'Habitação':         { cor: '#4c1d95', textoCor: '#c084fc', icone: '🏠', descricaoSimples: 'construção e reforma de moradias' },
+    'Assistência social':{ cor: '#831843', textoCor: '#f472b6', icone: '🤝', descricaoSimples: 'programas sociais, CRAS' },
+    'Agricultura':       { cor: '#365314', textoCor: '#a3e635', icone: '🌱', descricaoSimples: 'apoio ao produtor rural' },
+    'Desporto e Lazer':  { cor: '#0c4a6e', textoCor: '#38bdf8', icone: '⚽', descricaoSimples: 'quadras, praças, esportes' },
+    'Encargos especiais':{ cor: '#1c1917', textoCor: '#a8a29e', icone: '📋', descricaoSimples: 'obrigações legais e administrativas' },
+    'Urbanismo':         { cor: '#292524', textoCor: '#d6d3d1', icone: '🏙️', descricaoSimples: 'planejamento urbano, calçadas, praças' },
+    'Segurança pública': { cor: '#1e293b', textoCor: '#94a3b8', icone: '🚔', descricaoSimples: 'equipamentos para polícia e defesa civil' },
+};
+
+function getAreaConfig(objetivo: string) {
+    const key = Object.keys(AREA_CONFIG).find(k =>
+        objetivo?.toLowerCase().includes(k.toLowerCase())
+    );
+    return AREA_CONFIG[key ?? ''] ?? { cor: '#1c1917', textoCor: '#d6d3d1', icone: '📌', descricaoSimples: 'destinação a definir' };
 }
 
 interface DoadoresCampanha {
@@ -472,10 +525,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 <EstagiosEmenda />
             </div>
 
-            {/* 4. TABELA DE EMENDAS */}
+            {/* 4. CARDS DE EMENDAS */}
             <div className="max-w-7xl mx-auto mt-8 mb-20" ref={tabelaRef}>
                 <div className="flex flex-col mb-6 gap-2">
-                    <h2 className="text-4xl font-bebas text-white">REGISTRO DE EMENDAS DIRECIONADAS</h2>
+                    <h2 className="text-4xl font-bebas text-white flex items-center gap-3">
+                        <FileText className="w-7 h-7 text-[#FFD700]" /> EMENDAS REGISTRADAS
+                    </h2>
+                    <p className="text-gray-400 text-sm font-sans">
+                        Histórico completo dos repasses federais identificados.
+                    </p>
                     {cidadeFiltro !== null && (
                         <div className="flex items-center gap-4 mb-4 bg-[#FFD700]/10 border border-[#FFD700]/30 px-4 py-2 rounded-sm w-fit">
                             <span className="font-bebas text-[#FFD700] tracking-widest text-xl">
@@ -490,156 +548,177 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         </div>
                     )}
                 </div>
-                <div className="bg-[#111111] rounded-xl border border-zinc-800 overflow-hidden">
-                    {(() => {
-                        const emendasFiltradas = cidadeFiltro
-                            ? data.ultimas_emendas.filter(e => e.municipio_destino === cidadeFiltro)
-                            : data.ultimas_emendas;
+                {/* ── Novo design de cards ── */}
+                {(() => {
+                    const emendasFiltradas = cidadeFiltro
+                        ? data.ultimas_emendas.filter(e => e.municipio_destino === cidadeFiltro)
+                        : data.ultimas_emendas;
+                    const totalPaginas = Math.ceil(emendasFiltradas.length / 20);
+                    const pagina = emendasFiltradas.slice((paginaAtual - 1) * 20, paginaAtual * 20);
 
-                        return (
-                            <>
-                                <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="bg-zinc-900 border-b border-zinc-800">
-                                                <th className="p-4 text-gray-400 font-semibold tracking-wider text-sm">ANO</th>
-                                                <th className="p-4 text-gray-400 font-semibold tracking-wider text-sm">MUNICÍPIO DESTINO</th>
-                                                <th className="p-4 text-gray-400 font-semibold tracking-wider text-sm">TIPO / DESCRIÇÃO</th>
-                                                <th className="p-4 text-gray-400 font-semibold tracking-wider text-sm">OBJETIVO</th>
-                                                <th className="p-4 text-right text-gray-400 font-semibold tracking-wider text-sm">VALOR</th>
-                                                <th className="p-4 text-center text-gray-400 font-semibold tracking-wider text-sm">FONTE</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-zinc-800">
-                                            {emendasFiltradas.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={6} className="p-8 text-center text-gray-500">
-                                                        {cidadeFiltro
-                                                            ? `Nenhuma emenda registrada para ${cidadeFiltro}.`
-                                                            : 'Nenhuma emenda registrada para este político.'}
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                emendasFiltradas
-                                                    .slice((paginaAtual - 1) * 20, paginaAtual * 20)
-                                                    .map((emenda, idx) => (
-                                                        <tr key={idx} className="hover:bg-zinc-800/50 transition-colors">
-                                                            <td className="p-4">
-                                                                <span className="bg-zinc-800 text-gray-300 px-3 py-1 rounded text-sm font-medium">
-                                                                    {emenda.ano}
-                                                                </span>
-                                                            </td>
-                                                            <td
-                                                                className="p-4 text-white font-medium hover:text-[#FFD700] cursor-pointer transition-colors"
-                                                                onClick={() => onMunicipioClick?.(emenda.municipio_destino)}
-                                                            >
-                                                                {emenda.municipio_destino.replace(' - RJ', '')}
-                                                            </td>
-                                                            <td className="p-4 text-gray-300 text-sm max-w-[200px] truncate" title={emenda.descricao}>
-                                                                {emenda.descricao}
-                                                            </td>
-                                                            <td className="p-4 text-gray-400 text-sm max-w-[250px] truncate" title={emenda.objetivo}>
-                                                                {emenda.objetivo}
-                                                            </td>
-                                                            <td className="p-4 text-right align-middle">
-                                                                <span className="text-[#FFD700] font-bebas text-2xl tracking-wide">
-                                                                    {formatCurrency(emenda.valor)}
-                                                                </span>
-                                                            </td>
-                                                            <td className="p-4 text-center align-middle">
-                                                                <a
-                                                                    href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/consulta?codigoEmenda=${emenda.codigo_emenda}&de=${emenda.ano}&ate=${emenda.ano}&ordenarPor=autor&direcao=asc`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-2 text-zinc-500 hover:text-[#FFD700] transition-colors bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-md hover:border-[#FFD700]/30"
-                                                                    title="Ver no Portal da Transparência"
-                                                                >
-                                                                    <ExternalLink className="w-4 h-4" />
-                                                                </a>
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    if (emendasFiltradas.length === 0) return (
+                        <div className="p-12 text-center text-gray-500 border border-zinc-800 rounded-lg">
+                            <p className="font-bebas text-2xl">
+                                {cidadeFiltro ? `Nenhuma emenda para ${cidadeFiltro}` : 'Nenhuma emenda registrada'}
+                            </p>
+                        </div>
+                    );
 
-                                {/* Mobile Cards View */}
-                                <div className="md:hidden divide-y divide-zinc-800">
-                                    {emendasFiltradas.length === 0 ? (
-                                        <div className="p-8 text-center text-gray-500">
-                                            {cidadeFiltro
-                                                ? `Nenhuma emenda registrada para ${cidadeFiltro}.`
-                                                : 'Nenhuma emenda registrada para este político.'}
-                                        </div>
-                                    ) : (
-                                        emendasFiltradas
-                                            .slice((paginaAtual - 1) * 20, paginaAtual * 20)
-                                            .map((emenda, idx) => (
-                                                <div key={idx} className="p-4 space-y-3">
-                                                    <div className="flex justify-between items-start">
-                                                        <span className="bg-zinc-800 text-gray-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest">
-                                                            {emenda.ano}
-                                                        </span>
-                                                        <span className="text-[#FFD700] font-bebas text-2xl">
-                                                            {formatCurrency(emenda.valor)}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <h4
-                                                            className="text-white font-bold text-sm uppercase group-hover:text-[#FFD700] cursor-pointer"
-                                                            onClick={() => onMunicipioClick?.(emenda.municipio_destino)}
-                                                        >
-                                                            {emenda.municipio_destino.replace(' - RJ', '')}
-                                                        </h4>
-                                                        <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-                                                            {emenda.descricao}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex justify-between items-center pt-2">
-                                                        <span className="text-[10px] text-zinc-600 font-medium truncate max-w-[200px]">
-                                                            OBJ: {emenda.objetivo}
-                                                        </span>
-                                                        <a
-                                                            href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/consulta?codigoEmenda=${emenda.codigo_emenda}&de=${emenda.ano}&ate=${emenda.ano}&ordenarPor=autor&direcao=asc`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-[#FFD700] text-[10px] font-bold tracking-tighter flex items-center gap-1 border border-[#FFD700]/30 px-2 py-1 rounded-sm"
-                                                        >
-                                                            PORTAL <ExternalLink className="w-3 h-3" />
-                                                        </a>
+                    return (
+                        <>
+                            <div className="space-y-3">
+                                {pagina.map((emenda, idx) => {
+                                    const area   = getAreaConfig(emenda.objetivo);
+                                    const tipo   = tipoLegivel(emenda.descricao);
+                                    const empenhado = emenda.valor_empenhado || emenda.valor || 0;
+                                    const pago      = emenda.valor_pago || 0;
+                                    const execPct   = empenhado > 0 ? Math.min(100, (pago / empenhado) * 100) : 0;
+                                    const foiPago   = pago > 0;
+                                    const municipio = emenda.municipio_destino?.replace(' - RJ', '') || '—';
+
+                                    return (
+                                        <div key={idx} className="bg-[#0d0d0d] border border-zinc-800 hover:border-zinc-600 rounded-lg overflow-hidden transition-all">
+
+                                            {/* ── Faixa superior: área + ano + município ── */}
+                                            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
+                                                style={{ backgroundColor: area.cor }}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">{area.icone}</span>
+                                                    <span className="font-bebas tracking-widest text-sm"
+                                                        style={{ color: area.textoCor }}>
+                                                        {emenda.objetivo?.toUpperCase() || 'NÃO INFORMADO'}
+                                                    </span>
+                                                    <span className="text-[10px] opacity-60 font-sans"
+                                                        style={{ color: area.textoCor }}>
+                                                        ({area.descricaoSimples})
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-bebas text-sm opacity-80"
+                                                        style={{ color: area.textoCor }}>
+                                                        {emenda.ano}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => onMunicipioClick?.(emenda.municipio_destino)}
+                                                        className="font-bebas tracking-widest text-sm hover:underline transition-all"
+                                                        style={{ color: area.textoCor }}
+                                                    >
+                                                        📍 {municipio}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* ── Corpo do card ── */}
+                                            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                                {/* COLUNA 1: O que é essa emenda */}
+                                                <div className="md:col-span-1">
+                                                    <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-1">O QUE É</p>
+                                                    <p className="text-white font-semibold text-sm mb-1">{tipo.nome}</p>
+                                                    <p className="text-zinc-400 text-xs leading-relaxed">{tipo.explicacao}</p>
+                                                </div>
+
+                                                {/* COLUNA 2: Valores prometido vs pago */}
+                                                <div className="md:col-span-1">
+                                                    <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-2">VALORES</p>
+                                                    <div className="space-y-2">
+                                                        {/* Prometido */}
+                                                        <div>
+                                                            <div className="flex justify-between mb-0.5">
+                                                                <span className="text-[10px] text-zinc-500 font-sans">
+                                                                    💰 RESERVADO (prometido)
+                                                                </span>
+                                                                <span className="text-[#FFD700] font-bebas text-base">
+                                                                    {formatCurrency(empenhado)}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[9px] text-zinc-600 font-sans">
+                                                                Valor que o governo federal reservou no orçamento.
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Pago + barra */}
+                                                        <div>
+                                                            <div className="flex justify-between mb-1">
+                                                                <span className="text-[10px] font-sans"
+                                                                    style={{ color: foiPago ? '#4ade80' : '#ef4444' }}>
+                                                                    {foiPago ? '✅ PAGO (transferido)' : '⏳ AINDA NÃO PAGO'}
+                                                                </span>
+                                                                <span className="font-bebas text-base"
+                                                                    style={{ color: foiPago ? '#4ade80' : '#6b7280' }}>
+                                                                    {foiPago ? formatCurrency(pago) : '—'}
+                                                                </span>
+                                                            </div>
+                                                            {/* Barra de execução */}
+                                                            <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                                                                <div
+                                                                    className="h-full rounded-full transition-all duration-500"
+                                                                    style={{
+                                                                        width: `${execPct}%`,
+                                                                        backgroundColor: execPct >= 90 ? '#4ade80' : execPct >= 50 ? '#facc15' : '#ef4444'
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <p className="text-[9px] text-zinc-600 font-sans mt-0.5">
+                                                                {foiPago
+                                                                    ? `${execPct.toFixed(0)}% do valor reservado foi efetivamente transferido.`
+                                                                    : 'O dinheiro foi reservado mas ainda não chegou ao município.'}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            ))
-                                    )}
-                                </div>
 
-                                {/* Paginação */}
-                                {emendasFiltradas.length > 20 && (
-                                    <div className="bg-zinc-900 border-t border-zinc-800 p-4 flex justify-between items-center">
-                                        <button
-                                            onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
-                                            disabled={paginaAtual === 1}
-                                            className="px-4 py-2 text-sm font-semibold text-white bg-zinc-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition"
-                                        >
-                                            Anterior
-                                        </button>
-                                        <span className="text-gray-400 text-sm">
-                                            Total: {emendasFiltradas.length} registros (Página {paginaAtual} de {Math.ceil(emendasFiltradas.length / 20)})
-                                        </span>
-                                        <button
-                                            onClick={() => setPaginaAtual(p => p + 1)}
-                                            disabled={paginaAtual >= Math.ceil(emendasFiltradas.length / 20)}
-                                            className="px-4 py-2 text-sm font-semibold text-white bg-zinc-800 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-700 transition"
-                                        >
-                                            Próxima
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        );
-                    })()}
-                </div>
+                                                {/* COLUNA 3: Para onde foi + link */}
+                                                <div className="md:col-span-1 flex flex-col justify-between">
+                                                    <div>
+                                                        <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-1">DESTINO</p>
+                                                        <button
+                                                            onClick={() => onMunicipioClick?.(emenda.municipio_destino)}
+                                                            className="text-white font-bebas text-xl tracking-wide hover:text-[#FFD700] transition-colors text-left"
+                                                        >
+                                                            {municipio}
+                                                        </button>
+                                                        <p className="text-[9px] text-zinc-600 font-sans mt-0.5">
+                                                            Clique para ver todas as emendas deste município.
+                                                        </p>
+                                                    </div>
+                                                    <a
+                                                        href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/consulta?codigoEmenda=${emenda.codigo_emenda}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-3 inline-flex items-center gap-2 text-zinc-500 hover:text-[#FFD700] text-[10px] font-bebas tracking-widest border border-zinc-700 hover:border-[#FFD700]/40 px-3 py-1.5 rounded-sm transition-all w-fit"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        VER COMPROVAÇÃO OFICIAL
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Paginação */}
+                            {totalPaginas > 1 && (
+                                <div className="mt-6 flex justify-between items-center">
+                                    <button onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                                        disabled={paginaAtual === 1}
+                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all rounded-sm">
+                                        ← ANTERIOR
+                                    </button>
+                                    <span className="text-zinc-500 font-sans text-sm">
+                                        {emendasFiltradas.length} emendas · pág. {paginaAtual}/{totalPaginas}
+                                    </span>
+                                    <button onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                                        disabled={paginaAtual >= totalPaginas}
+                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all rounded-sm">
+                                        PRÓXIMA →
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
             </div>
         </div>
     );

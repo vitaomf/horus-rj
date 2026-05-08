@@ -649,7 +649,10 @@ def obter_detalhes_politico(politico_id: int):
 
         # 5. Todas as Emendas (LIMIT 1000 defensivo — evita payload gigante; paginação no frontend)
         ultimas_emendas_rows = conn.execute("""
-            SELECT ano, valor, descricao, objetivo, municipio_destino, fonte_url
+            SELECT ano, valor,
+                   COALESCE(valor_empenhado, valor, 0) as valor_empenhado,
+                   COALESCE(valor_pago, 0)             as valor_pago,
+                   descricao, objetivo, municipio_destino, fonte_url
             FROM emendas
             WHERE politico_id = ?
             ORDER BY ano DESC, valor DESC
@@ -660,6 +663,8 @@ def obter_detalhes_politico(politico_id: int):
             {
                 "ano": r["ano"],
                 "valor": float(r["valor"]) if r["valor"] else 0,
+                "valor_empenhado": float(r["valor_empenhado"]) if r["valor_empenhado"] else 0,
+                "valor_pago": float(r["valor_pago"]) if r["valor_pago"] else 0,
                 "descricao": r["descricao"] or "SEM ESPECIFICAÇÃO",
                 "objetivo": r["objetivo"] or "NÃO INFORMADO",
                 "municipio_destino": r["municipio_destino"],

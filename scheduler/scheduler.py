@@ -97,17 +97,17 @@ def status_banco():
 # ── Agendamentos ──────────────────────────────────────────────────────────────
 scheduler = BlockingScheduler(timezone="America/Sao_Paulo")
 
-# Coleta emendas todos os dias às 9h
-scheduler.add_job(coletar_emendas,  CronTrigger(hour=9, minute=0),
-    id="emendas_diario",  name="Coleta diária de emendas (9h)")
+# Coleta emendas todos os dias às 3h da manhã
+scheduler.add_job(coletar_emendas,  CronTrigger(hour=3, minute=0),
+    id="emendas_diario",  name="Coleta diária de emendas (3h)")
 
-# Coleta contratos todos os dias às 9h30
-scheduler.add_job(coletar_contratos, CronTrigger(hour=9, minute=30),
-    id="contratos_diario", name="Coleta diária de contratos (9h30)")
+# Coleta contratos todos os dias às 3h30 da manhã
+scheduler.add_job(coletar_contratos, CronTrigger(hour=3, minute=30),
+    id="contratos_diario", name="Coleta diária de contratos (3h30)")
 
-# Coleta TSE toda segunda às 9h (dados mudam raramente)
-scheduler.add_job(coletar_tse, CronTrigger(day_of_week="mon", hour=9, minute=0),
-    id="tse_semanal", name="Coleta semanal TSE (seg 9h)")
+# Coleta TSE toda segunda às 3h da manhã (dados mudam raramente)
+scheduler.add_job(coletar_tse, CronTrigger(day_of_week="mon", hour=3, minute=0),
+    id="tse_semanal", name="Coleta semanal TSE (seg 3h)")
 
 # Status a cada 6h
 scheduler.add_job(status_banco, CronTrigger(hour="0,6,12,18"),
