@@ -30,3 +30,5 @@ Thumbs.db
 
 # Runtime logs (gerados pelo watchdog/tunnel)
 logs/
+
+.vercel
