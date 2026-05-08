@@ -7,7 +7,7 @@ Site de transparência pública do Rio de Janeiro. Coleta emendas parlamentares,
 - **Backend**: FastAPI + uvicorn, SQLite, APScheduler — Python 3.x
 - **Frontend**: React 19 + Vite 7 + TypeScript + Tailwind 3 + D3 7
 - **OS principal**: Windows 10 (PowerShell). `start.sh` cobre Linux/WSL.
-- **Exposição pública**: a definir (ngrok removido em 2026-05-07).
+- **Exposição pública**: ngrok (domínio fixo) → Vercel Edge proxy → `horus-rj.vercel.app`
 
 ## Como rodar
 

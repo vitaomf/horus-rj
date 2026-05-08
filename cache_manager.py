@@ -53,9 +53,9 @@ def status_cache():
                 info = json.load(f)
             modificado = os.path.getmtime(path)
             dias = (datetime.now().timestamp() - modificado) / 86400
-            valido = "✅ válido" if dias < 7 else "⚠️ expirado"
+            valido = "[ok] valido" if dias < 7 else "[!] expirado"
             print(f"  {ano}: {info['total']} emendas | "
                   f"coletado {info['coletado_em'][:10]} | {valido}")
         else:
-            print(f"  {ano}: ❌ sem cache")
+            print(f"  {ano}: [x] sem cache")
     print("=======================\n")

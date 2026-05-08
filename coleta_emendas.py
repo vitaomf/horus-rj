@@ -62,16 +62,21 @@ def processar_emendas_lote(dados, cursor):
             politico_id = cursor.lastrowid
         
         ano_emenda = emenda.get("ano")
-        # Bug 6 fix: cascata de fallback para valor (a API muda campos entre anos)
-        valor_str_api = (
-            emenda.get("valorEmenda") 
-            or emenda.get("valorEmpenhado") 
-            or emenda.get("valorPago") 
-            or emenda.get("valorLiquidado") 
-            or emenda.get("valorRestoPago") 
-            or "0,00"
+
+        # Valor empenhado (prometido/reservado — estágio 1)
+        valor_empenhado = processar_valor(
+            emenda.get("valorEmpenhado") or emenda.get("valorEmenda") or "0,00"
         )
-        valor = processar_valor(valor_str_api)
+        # Valor pago (efetivamente transferido — estágio 3)
+        valor_pago = processar_valor(
+            emenda.get("valorPago") or emenda.get("valorLiquidado") or emenda.get("valorRestoPago") or "0,00"
+        )
+        # Campo legado `valor` mantido para retrocompatibilidade
+        valor = valor_empenhado if valor_empenhado > 0 else processar_valor(
+            emenda.get("valorEmenda") or emenda.get("valorEmpenhado") or
+            emenda.get("valorPago") or emenda.get("valorLiquidado") or
+            emenda.get("valorRestoPago") or "0,00"
+        )
 
         descricao = emenda.get("tipoEmenda", "")
         objetivo = emenda.get("funcao", "")
@@ -82,12 +87,24 @@ def processar_emendas_lote(dados, cursor):
         fonte_url = f"https://portaldatransparencia.gov.br/emendas/detalhe?codigoEmenda={codigo_emenda}" if codigo_emenda else None
         
         query = """
-        INSERT OR IGNORE INTO emendas 
-        (politico_id, ano, valor, descricao, objetivo, municipio_destino, codigo_emenda, fonte_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO emendas
+        (politico_id, ano, valor, valor_empenhado, valor_pago,
+         descricao, objetivo, municipio_destino, codigo_emenda, fonte_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        
-        cursor.execute(query, (politico_id, ano_emenda, valor, descricao, objetivo, municipio, codigo_emenda, fonte_url))
+        cursor.execute(query, (
+            politico_id, ano_emenda,
+            valor, valor_empenhado, valor_pago,
+            descricao, objetivo, municipio, codigo_emenda, fonte_url
+        ))
+        # Atualiza valor_empenhado e valor_pago mesmo em registros já existentes
+        # (necessário quando colunas foram adicionadas depois da coleta original)
+        if cursor.rowcount == 0 and (valor_empenhado > 0 or valor_pago > 0):
+            cursor.execute("""
+                UPDATE emendas
+                SET valor_empenhado = ?, valor_pago = ?
+                WHERE codigo_emenda = ? AND municipio_destino = ?
+            """, (valor_empenhado, valor_pago, codigo_emenda, municipio))
         
         if cursor.rowcount > 0:
             insercoes += 1
@@ -127,6 +144,8 @@ def coletar_emendas():
                 politico_id INTEGER,
                 ano INTEGER,
                 valor REAL,
+                valor_empenhado REAL DEFAULT 0,
+                valor_pago REAL DEFAULT 0,
                 descricao TEXT,
                 objetivo TEXT,
                 municipio_destino TEXT,
@@ -135,13 +154,20 @@ def coletar_emendas():
                 UNIQUE(codigo_emenda, municipio_destino)
             )
         """)
+        # Migração: adiciona colunas se o banco já existe sem elas
+        for col, default in [("valor_empenhado", 0), ("valor_pago", 0)]:
+            try:
+                cursor.execute(f"ALTER TABLE emendas ADD COLUMN {col} REAL DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass  # coluna já existe
         conn.commit()
     except sqlite3.Error as e:
         print(f"[ERRO] Falha ao conectar ao banco ou criar a tabela em {db_path}: {e}")
         sys.exit(1)
 
-    # Bug 12 fix: range dinâmico, nunca precisa editar manualmente
-    ANOS = list(range(2014, datetime.now().year + 1))
+    # Coleta desde 2010 (início das emendas parlamentares individualizadas no Portal)
+    ANO_INICIO = int(os.getenv("COLETA_ANO_INICIO", "2010"))
+    ANOS = list(range(ANO_INICIO, datetime.now().year + 1))
     resumo_por_ano = {}
     total_processado = 0
     total_inserido = 0

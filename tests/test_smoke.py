@@ -27,6 +27,11 @@ def test_health():
     body = r.json()
     assert body["status"] == "ok"
     assert body["db"] == "ok"
+    # Novos campos adicionados na sessão beta
+    assert "emendas" in body
+    assert "ultimo_ano" in body
+    assert "coleta_errors" in body
+    assert isinstance(body["coleta_errors"], list)
 
 
 # ------------------------------------------------------------------

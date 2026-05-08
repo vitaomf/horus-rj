@@ -1,15 +1,16 @@
 import sqlite3
 import math
 import unicodedata
+import os
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import os
+from typing import Optional
 
 # Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
 # Localmente continua usando SQLite via sqlite3.
@@ -36,6 +37,22 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app = FastAPI(title="Transparência RJ API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Cache-Control: dados mudam raramente, então cacheia por 1h no browser.
+# /api/health nunca é cacheado (mostra estado em tempo real).
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/api/") and path != "/api/health":
+            response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hora
+        elif path.startswith("/assets/"):
+            response.headers["Cache-Control"] = "public, max-age=86400"  # 24h para assets
+        return response
+
+app.add_middleware(CacheMiddleware)
 
 # Filtro: rankings públicos só consideram parlamentares individuais.
 # Autores coletivos (bancadas, comissões, relatores) são marcados em
@@ -631,7 +648,10 @@ def obter_detalhes_politico(politico_id: int):
 
         # 5. Todas as Emendas (LIMIT 1000 defensivo — evita payload gigante; paginação no frontend)
         ultimas_emendas_rows = conn.execute("""
-            SELECT ano, valor, descricao, objetivo, municipio_destino, fonte_url
+            SELECT ano, valor,
+                   COALESCE(valor_empenhado, valor, 0) as valor_empenhado,
+                   COALESCE(valor_pago, 0)             as valor_pago,
+                   descricao, objetivo, municipio_destino, fonte_url
             FROM emendas
             WHERE politico_id = ?
             ORDER BY ano DESC, valor DESC
@@ -642,6 +662,8 @@ def obter_detalhes_politico(politico_id: int):
             {
                 "ano": r["ano"],
                 "valor": float(r["valor"]) if r["valor"] else 0,
+                "valor_empenhado": float(r["valor_empenhado"]) if r["valor_empenhado"] else 0,
+                "valor_pago": float(r["valor_pago"]) if r["valor_pago"] else 0,
                 "descricao": r["descricao"] or "SEM ESPECIFICAÇÃO",
                 "objetivo": r["objetivo"] or "NÃO INFORMADO",
                 "municipio_destino": r["municipio_destino"],
@@ -789,15 +811,130 @@ def obter_estatisticas():
         conn.close()
 
 
+@app.get("/api/politicos/{politico_id}/cruzamento")
+def cruzamento_emendas_contratos(politico_id: int):
+    """
+    Cruzamento investigativo: emendas do político × contratos federais nos mesmos municípios.
+    Camada 1 — geográfica: municípios que receberam emendas e também têm contratos federais.
+    Camada 2 — financeira: doadores de campanha que coincidem com empresas contratadas.
+    """
+    conn = get_db_connection()
+    try:
+        # ── Camada 1: Municípios com emendas E contratos ──────────────────
+        geo_rows = conn.execute("""
+            SELECT
+                e.municipio_destino,
+                SUM(e.valor)   AS valor_emendas,
+                COUNT(e.id)    AS num_emendas,
+                COUNT(c.id)    AS num_contratos,
+                COALESCE(SUM(c.valor), 0) AS valor_contratos
+            FROM emendas e
+            LEFT JOIN contratos c
+                ON UPPER(REPLACE(c.municipio, ' - RJ', ''))
+                   LIKE '%' || UPPER(REPLACE(REPLACE(e.municipio_destino,' - RJ',''), ' - RJ', '')) || '%'
+            WHERE e.politico_id = ?
+            GROUP BY e.municipio_destino
+            HAVING valor_contratos > 0
+            ORDER BY valor_contratos DESC
+            LIMIT 10
+        """, (politico_id,)).fetchall()
+
+        camada_geo = [
+            {
+                "municipio":       r["municipio_destino"].replace(" - RJ", ""),
+                "valor_emendas":   float(r["valor_emendas"] or 0),
+                "num_emendas":     r["num_emendas"],
+                "valor_contratos": float(r["valor_contratos"] or 0),
+                "num_contratos":   r["num_contratos"],
+            }
+            for r in geo_rows
+        ]
+
+        # ── Camada 2: Doadores que coincidem com contratados ──────────────
+        fin_rows = conn.execute("""
+            SELECT
+                d.nome_doador,
+                d.documento_doador,
+                d.valor              AS valor_doacao,
+                SUM(c.valor)         AS valor_contratos,
+                COUNT(DISTINCT c.id) AS num_contratos,
+                GROUP_CONCAT(DISTINCT REPLACE(c.municipio,' - RJ','')) AS municipios
+            FROM campanhas camp
+            JOIN doadores d    ON d.campanha_id = camp.id
+            JOIN contratos c   ON (
+                (d.documento_doador != '' AND d.documento_doador = c.fornecedor_cnpj)
+                OR UPPER(c.fornecedor_nome) LIKE '%' || UPPER(SUBSTR(d.nome_doador,1,10)) || '%'
+            )
+            WHERE camp.politico_id = ?
+              AND c.valor > 0
+              AND d.valor > 0
+            GROUP BY d.nome_doador, d.documento_doador
+            ORDER BY valor_contratos DESC
+            LIMIT 10
+        """, (politico_id,)).fetchall()
+
+        camada_fin = [
+            {
+                "doador":          r["nome_doador"],
+                "documento":       r["documento_doador"] or "",
+                "valor_doacao":    float(r["valor_doacao"] or 0),
+                "valor_contratos": float(r["valor_contratos"] or 0),
+                "num_contratos":   r["num_contratos"],
+                "municipios":      r["municipios"] or "",
+            }
+            for r in fin_rows
+        ]
+
+        return {
+            "camada_geografica":  camada_geo,
+            "camada_financeira":  camada_fin,
+            "tem_cruzamento":     len(camada_geo) > 0 or len(camada_fin) > 0,
+        }
+
+    except Exception as e:
+        print(f"Erro no cruzamento politico {politico_id}:", e)
+        return {"camada_geografica": [], "camada_financeira": [], "tem_cruzamento": False}
+    finally:
+        conn.close()
+
+
 @app.get("/api/health")
 def health():
+    """
+    Health check. Inclui últimos erros de coleta (se existirem)
+    lendo o arquivo logs/coleta_errors.log gerado pelo scheduler.
+    """
     try:
         conn = get_db_connection()
-        conn.execute("SELECT 1").fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM emendas")
+        total_emendas = cur.fetchone()[0]
+        cur.execute("SELECT MAX(ano) FROM emendas")
+        ultimo_ano = cur.fetchone()[0]
         conn.close()
-        return {"status": "ok", "db": "ok"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"db error: {e}")
+
+    # Lê erros recentes do scheduler (últimas 5 linhas)
+    erros_recentes = []
+    errors_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "logs", "coleta_errors.log"
+    )
+    if os.path.exists(errors_file):
+        try:
+            linhas = open(errors_file, encoding="utf-8").readlines()
+            erros_recentes = [l.strip() for l in linhas[-5:] if l.strip()]
+        except Exception:
+            pass
+
+    return {
+        "status": "ok",
+        "db": "ok",
+        "emendas": total_emendas,
+        "ultimo_ano": ultimo_ano,
+        "coleta_errors": erros_recentes,   # lista vazia = tudo ok
+    }
 
 
 # Configuração para servir o Frontend (React/Vite)
