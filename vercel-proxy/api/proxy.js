@@ -1,11 +1,8 @@
 export const config = { runtime: 'edge' };
 
-// UPSTREAM_URL definido por variavel de ambiente no Vercel:
-//   Production  → porta 7291 (main)
-//   Preview/dev → porta 7292 (beta)
-// Fallback: producao
-const UPSTREAM = process.env.UPSTREAM_URL ||
-  'https://synergistic-hemathermal-myesha.ngrok-free.dev';
+// URL do backend local exposto via ngrok.
+// Para mudar: editar esta linha e fazer `vercel deploy --prod` na pasta vercel-proxy/
+const UPSTREAM = 'https://synergistic-hemathermal-myesha.ngrok-free.dev';
 
 export default async function handler(req) {
   const url = new URL(req.url);
