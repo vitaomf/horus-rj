@@ -1,6 +1,53 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Calendar, MapPin, User, ArrowRight, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+
+// ── Placeholder rotativo ──────────────────────────────────────────────────────
+const EXEMPLOS_BUSCA = [
+    'Ex: saúde',
+    'Ex: Benedita da Silva',
+    'Ex: educação',
+    'Ex: PT',
+    'Ex: Hugo Leal',
+    'Ex: saneamento básico',
+    'Ex: MDB',
+    'Ex: habitação',
+    'Ex: Alessandro Molon',
+    'Ex: infraestrutura',
+];
+
+function usePlaceholderRotativo(ativo: boolean): string {
+    const [idx, setIdx] = useState(0);
+    const [visivel, setVisivel] = useState(true);
+    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    useEffect(() => {
+        if (!ativo) return;
+        timer.current = setInterval(() => {
+            setVisivel(false);
+            setTimeout(() => {
+                setIdx(i => (i + 1) % EXEMPLOS_BUSCA.length);
+                setVisivel(true);
+            }, 300);
+        }, 2500);
+        return () => { if (timer.current) clearInterval(timer.current); };
+    }, [ativo]);
+
+    return visivel ? EXEMPLOS_BUSCA[idx] : '';
+}
+
+// Sugestões rápidas clicáveis abaixo do campo de texto
+const SUGESTOES_RAPIDAS = [
+    { label: 'Saúde',           q: 'saúde' },
+    { label: 'Educação',        q: 'educação' },
+    { label: 'Saneamento',      q: 'saneamento' },
+    { label: 'Benedita',        q: 'Benedita da Silva' },
+    { label: 'Hugo Leal',       q: 'Hugo Leal' },
+    { label: 'PT',              q: 'PT' },
+    { label: 'PL',              q: 'PL' },
+    { label: 'Habitação',       q: 'habitação' },
+    { label: 'Infraestrutura',  q: 'infraestrutura' },
+];
 
 interface Emenda {
     id: number;
@@ -33,6 +80,7 @@ export const BuscaAvancadaPage: React.FC = () => {
 
     // Filtros
     const [q, setQ] = useState('');
+    const placeholder = usePlaceholderRotativo(q === '');  // só anima quando campo vazio
     const [ano, setAno] = useState('');
     const [municipio, setMunicipio] = useState('');
     const [politicoId, setPoliticoId] = useState('');
@@ -118,11 +166,25 @@ export const BuscaAvancadaPage: React.FC = () => {
                         </label>
                         <input
                             type="text"
-                            placeholder="PALAVRA-CHAVE NA DESCRIÇÃO..."
-                            className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-3 rounded-sm font-sans focus:border-[#FFD700] outline-none transition-all placeholder:text-zinc-600 text-sm"
+                            placeholder={placeholder}
+                            className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-3 rounded-sm font-sans focus:border-[#FFD700] outline-none transition-all placeholder:text-zinc-500 placeholder:italic text-sm"
                             value={q}
                             onChange={(e) => { setQ(e.target.value); handleFilterChange(); }}
                         />
+                        {/* Chips de sugestão — visíveis quando campo vazio */}
+                        {q === '' && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {SUGESTOES_RAPIDAS.map(s => (
+                                    <button
+                                        key={s.q}
+                                        onClick={() => { setQ(s.q); handleFilterChange(); }}
+                                        className="text-[10px] font-bebas tracking-widest px-2 py-0.5 border border-zinc-700 text-zinc-400 hover:border-[#FFD700] hover:text-[#FFD700] rounded-sm transition-all"
+                                    >
+                                        {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* ANO */}
