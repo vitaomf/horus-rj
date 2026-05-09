@@ -51,7 +51,10 @@
       "PowerShell(pip install slowapi 2>&1)",
       "Bash(pip show *)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\joaov\\\\OneDrive\\\\Desktop\\\\HORUS\" | Where-Object { $_.Name -match \"venv|\\\\.venv|env\" } | Format-List Name)",
-      "PowerShell($gcloud = \"$env:LOCALAPPDATA\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\"; & $gcloud auth list 2>&1)"
+      "PowerShell($gcloud = \"$env:LOCALAPPDATA\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\"; & $gcloud auth list 2>&1)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 7291 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name ngrok -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name python -ErrorAction SilentlyContinue)"
     ]
   }
 }

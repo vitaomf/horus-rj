@@ -120,7 +120,8 @@ if __name__ == "__main__":
     log.info(f"Log em: {LOG_FILE}")
     log.info("Próximas execuções:")
     for job in scheduler.get_jobs():
-        log.info(f"  {job.name}: {job.next_run_time}")
+        nrt = getattr(job, 'next_run_time', None) or '(calculando após start)'
+        log.info(f"  {job.name}: {nrt}")
     status_banco()
     try:
         scheduler.start()
