@@ -1,19 +1,17 @@
-# watchdog.ps1 — Horus RJ: mantém backend + Cloudflare Tunnel sempre ativos.
+# watchdog.ps1 — Horus RJ: mantém backend + scheduler + ngrok sempre ativos.
+# Registrar no Windows Task Scheduler via setup_autostart.ps1 para subir no login.
 $ErrorActionPreference = "SilentlyContinue"
 
-$HORUS_DIR   = "C:\Users\joaov\OneDrive\Desktop\HORUS"
-$PYTHON      = "$HORUS_DIR\.venv\Scripts\python.exe"
-$LOG_DIR     = "$HORUS_DIR\logs"
-$LOG_FILE    = "$LOG_DIR\watchdog.log"
-$TUNNEL_FILE = "$LOG_DIR\tunnel_url.txt"
-$TUNNEL_LOG  = "$LOG_DIR\tunnel_raw.log"
+$HORUS_DIR      = "C:\Users\joaov\OneDrive\Desktop\HORUS"
+$PYTHON         = "$HORUS_DIR\.venv\Scripts\python.exe"
+$LOG_DIR        = "$HORUS_DIR\logs"
+$LOG_FILE       = "$LOG_DIR\watchdog.log"
+$TUNNEL_LOG     = "$LOG_DIR\tunnel_raw.log"
+$SCHEDULER_LOG  = "$LOG_DIR\scheduler_stdout.log"
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
             [System.Environment]::GetEnvironmentVariable("Path","User")
-$CLOUDFLARED = (Get-Command cloudflared -ErrorAction SilentlyContinue).Source
-if (-not $CLOUDFLARED -or -not (Test-Path $CLOUDFLARED)) {
-    $CLOUDFLARED = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Cloudflare.cloudflared_Microsoft.Winget.Source_8wekyb3d8bbwe\cloudflared.exe"
-}
+$NGROK = (Get-Command ngrok -ErrorAction SilentlyContinue).Source
 
 if (-not (Test-Path $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR -Force | Out-Null }
 
@@ -30,10 +28,11 @@ function Port-Open($port) {
     } catch { return $false }
 }
 
-Log "=== Horus watchdog iniciado | cloudflared=$CLOUDFLARED ==="
+Log "=== Horus watchdog iniciado | ngrok=$NGROK ==="
 
-$backendPid = 0
-$tunnelPid  = 0
+$backendPid   = 0
+$schedulerPid = 0
+$tunnelPid    = 0
 
 while ($true) {
     # ── Backend ──────────────────────────────────────────────────────────────
@@ -48,34 +47,33 @@ while ($true) {
         Log "Backend PID $backendPid"
     }
 
-    # ── Tunnel ───────────────────────────────────────────────────────────────
+    # ── Scheduler ────────────────────────────────────────────────────────────
+    $schedulerAlive = ($schedulerPid -gt 0) -and (Get-Process -Id $schedulerPid -ErrorAction SilentlyContinue)
+    if (-not $schedulerAlive) {
+        Log "Scheduler offline — iniciando..."
+        $p = Start-Process -PassThru -WindowStyle Hidden `
+            -FilePath $PYTHON `
+            -ArgumentList "scheduler\scheduler.py" `
+            -WorkingDirectory $HORUS_DIR `
+            -RedirectStandardOutput $SCHEDULER_LOG `
+            -RedirectStandardError  $SCHEDULER_LOG
+        $schedulerPid = $p.Id
+        Log "Scheduler PID $schedulerPid"
+    }
+
+    # ── ngrok ────────────────────────────────────────────────────────────────
     $tunnelAlive = ($tunnelPid -gt 0) -and (Get-Process -Id $tunnelPid -ErrorAction SilentlyContinue)
     if (-not $tunnelAlive) {
-        Log "Túnel offline — iniciando..."
+        Log "ngrok offline — iniciando..."
         Remove-Item $TUNNEL_LOG -ErrorAction SilentlyContinue
 
         $p = Start-Process -PassThru -WindowStyle Hidden `
-            -FilePath $CLOUDFLARED `
-            -ArgumentList "tunnel --url http://localhost:7291" `
+            -FilePath $NGROK `
+            -ArgumentList "http 7291 --log=stdout" `
             -WorkingDirectory $HORUS_DIR `
-            -RedirectStandardError $TUNNEL_LOG
+            -RedirectStandardOutput $TUNNEL_LOG
         $tunnelPid = $p.Id
-        Log "Túnel PID $tunnelPid — aguardando URL..."
-
-        # Aguarda URL aparecer no log (até 30s)
-        $waited = 0
-        while ($waited -lt 30) {
-            Start-Sleep -Seconds 3; $waited += 3
-            if (Test-Path $TUNNEL_LOG) {
-                $content = Get-Content $TUNNEL_LOG -Raw -ErrorAction SilentlyContinue
-                if ($content -match 'https://[a-z0-9\-]+\.trycloudflare\.com') {
-                    $url = $Matches[0]
-                    Set-Content $TUNNEL_FILE -Value $url -Encoding UTF8
-                    Log "TUNNEL URL: $url"
-                    break
-                }
-            }
-        }
+        Log "ngrok PID $tunnelPid"
     }
 
     Start-Sleep -Seconds 30
