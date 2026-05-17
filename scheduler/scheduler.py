@@ -50,7 +50,7 @@ def _executar(job_name: str, script_relativo: str):
             [os.sys.executable, str(script)],
             capture_output=True, text=True,
             cwd=str(PROJECT_ROOT),
-            timeout=3600,          # máximo 1h por coleta
+            timeout=5400,          # máximo 1.5h por coleta
         )
         if result.returncode == 0:
             saida = (result.stdout or "")[-500:]
@@ -60,7 +60,7 @@ def _executar(job_name: str, script_relativo: str):
             log.error(f"[{job_name}] Falhou (código {result.returncode}):\n{erro}")
             _registrar_erro(job_name, f"exit {result.returncode}: {erro[:200]}")
     except subprocess.TimeoutExpired:
-        msg = "timeout após 3600s"
+        msg = "timeout após 5400s (1.5h)"
         log.error(f"[{job_name}] {msg}")
         _registrar_erro(job_name, msg)
     except Exception as e:
@@ -120,7 +120,8 @@ if __name__ == "__main__":
     log.info(f"Log em: {LOG_FILE}")
     log.info("Próximas execuções:")
     for job in scheduler.get_jobs():
-        log.info(f"  {job.name}: {job.next_run_time}")
+        nrt = getattr(job, 'next_run_time', None) or '(calculando após start)'
+        log.info(f"  {job.name}: {nrt}")
     status_banco()
     try:
         scheduler.start()

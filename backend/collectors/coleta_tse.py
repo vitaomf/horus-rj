@@ -51,14 +51,15 @@ def get_top_doadores(id_eleicao: int, id_prestador: int, id_ultima_entrega: int)
 def sync_tse_data():
     conn = get_db_connection()
     politicos = conn.execute("SELECT id, nome FROM politicos").fetchall()
-    
-    ano = 2022
-    eleicao_id = 2040602022
+
+    # TSE_ANO: ano da eleição geral (4 em 4 anos: 2022, 2026...). Configurável via .env.
+    ano = int(os.getenv("TSE_ANO", "2022"))
+    eleicao_id = 2040602022 if ano == 2022 else 2045202024
     cargos = [6, 7] # 6: Federal, 7: Estadual
-    
+
     all_tse_candidates = []
     for cargo in cargos:
-        print(f"Buscando lista de candidatos RJ 2022 (Cargo {cargo}) no TSE...")
+        print(f"Buscando lista de candidatos RJ {ano} (Cargo {cargo}) no TSE...")
         all_tse_candidates.extend(get_candidates_list(ano, "RJ", cargo))
     
     if not all_tse_candidates:
@@ -112,7 +113,7 @@ def sync_tse_data():
                 cur = conn.execute("""
                     INSERT INTO campanhas (politico_id, ano, cargo, total_receitas, total_despesas, situacao)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (p_id, 2022, cargo_nome, receitas, despesas, situacao))
+                """, (p_id, ano, cargo_nome, receitas, despesas, situacao))
                 campanha_id = cur.lastrowid
 
                 # 3. Busca Doadores (Ranking)

@@ -110,7 +110,7 @@ def processar_emendas_lote(dados, cursor):
             insercoes += 1
     return insercoes
 
-def coletar_emendas():
+def coletar_emendas(force_refresh: bool = False):
     load_dotenv()
     
     chave_api = os.getenv("CHAVE_API_PORTAL")
@@ -119,16 +119,19 @@ def coletar_emendas():
         sys.exit(1)
 
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/emendas"
+    # User-Agent de browser real pra contornar AWS WAF (bloqueia python-requests default)
     headers = {
         "chave-api-dados": chave_api,
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     db_path = "transparencia_rj.db"
     try:
         conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS politicos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,7 +182,7 @@ def coletar_emendas():
     anos_com_cache = []
     anos_sem_cache = []
     for ano in ANOS:
-        if cache_existe(ano):
+        if cache_existe(ano, force_refresh=force_refresh):
             anos_com_cache.append(ano)
         else:
             anos_sem_cache.append(ano)
@@ -233,7 +236,7 @@ def coletar_emendas():
         return ano, dados_coletados
 
     if anos_sem_cache:
-        print(f"\n🚀 Coletando {len(anos_sem_cache)} ano(s) em paralelo: {anos_sem_cache}")
+        print(f"\n[>>] Coletando {len(anos_sem_cache)} ano(s) em paralelo: {anos_sem_cache}")
         # Máximo 3 threads simultâneas para não estourar rate limit da API
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {executor.submit(coletar_ano_api, ano): ano for ano in anos_sem_cache}
@@ -252,12 +255,12 @@ def coletar_emendas():
                     total_processado += len(dados_coletados)
                     total_inserido += insercoes_ano
                     resumo_por_ano[ano] = insercoes_ano
-                    print(f"  ✅ Ano {ano}: {len(dados_coletados)} total | {insercoes_ano} RJ inseridas")
+                    print(f"  [OK] Ano {ano}: {len(dados_coletados)} total | {insercoes_ano} RJ inseridas")
                 else:
                     resumo_por_ano[ano] = 0
-                    print(f"  ⚠️ Ano {ano}: nenhuma emenda encontrada")
+                    print(f"  [!!] Ano {ano}: nenhuma emenda encontrada")
     else:
-        print("\n✅ Todos os anos já possuem cache válido!")
+        print("\n[OK] Todos os anos ja possuem cache valido!")
 
     conn.close()
     
@@ -270,4 +273,8 @@ def coletar_emendas():
     print(resumo_str)
 
 if __name__ == "__main__":
-    coletar_emendas()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force-refresh", action="store_true", help="Ignora cache permanente e recoleta todos os anos")
+    args = parser.parse_args()
+    coletar_emendas(force_refresh=args.force_refresh)

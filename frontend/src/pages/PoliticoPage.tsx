@@ -106,6 +106,7 @@ interface PoliticoData {
     nome: string;
     partido: string;
     cargo: string;
+    foto_url?: string | null;
     total_emendas: number;
     valor_total: number;
     dados_campanha?: DadosCampanha | null;
@@ -161,23 +162,29 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             .catch(() => {});
     }, [politicoId]);
 
-    // Busca foto na API pública da Câmara dos Deputados (só funciona para deputados federais)
+    // Foto: prefere a já enriquecida no backend; fallback para Câmara API ao vivo
     useEffect(() => {
-        if (!data?.nome) return;
+        if (!data) return;
+
+        // Caminho rápido: foto já está no banco
+        if (data.foto_url) {
+            setFotoUrl(data.foto_url);
+            return;
+        }
+
+        // Fallback: busca na Câmara dos Deputados em tempo real
         const primeiroNome = data.nome.split(' ')[0];
         fetch(`https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(data.nome)}&itens=5`)
             .then(r => r.ok ? r.json() : null)
             .then(result => {
                 const dep = result?.dados?.find((d: any) => {
                     const nomeCamara = d.nome?.toUpperCase() || '';
-                    const nomeSistema = data.nome.toUpperCase();
-                    return nomeCamara.includes(primeiroNome.toUpperCase()) ||
-                           nomeSistema.includes(d.nome?.split(' ')[0]?.toUpperCase() || '');
+                    return nomeCamara.includes(primeiroNome.toUpperCase());
                 }) || result?.dados?.[0];
                 if (dep?.id) setFotoUrl(`https://www.camara.leg.br/internet/deputado/bandep/${dep.id}.jpg`);
             })
-            .catch(() => { /* silencioso — fallback para iniciais */ });
-    }, [data?.nome]);
+            .catch(() => { /* silencioso */ });
+    }, [data]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);

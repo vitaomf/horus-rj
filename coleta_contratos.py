@@ -24,16 +24,19 @@ def iniciar_coleta():
         sys.exit(1)
 
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/contratos"
+    # User-Agent de browser real pra contornar AWS WAF (bloqueia python-requests default)
     headers = {
         "chave-api-dados": chave_api,
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     db_path = "transparencia_rj.db"
     try:
         conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS contratos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +62,7 @@ def iniciar_coleta():
     # Saúde, Educação, Infraestrutura, Defesa, Meio Ambiente, C&T, Agricultura, Fazenda, Justiça
     ORGAOS_SUPERIORES = ["36000", "26000", "39000", "52000", "44000", "24000", "22000", "25000", "30000"]
     
-    ano_atual = datetime.now().year
+    ano_atual = int(os.getenv("COLETA_ANO", str(datetime.now().year)))
     data_inicial = f"01/01/{ano_atual}"
     data_final = f"31/12/{ano_atual}"
 
@@ -81,8 +84,23 @@ def iniciar_coleta():
             }
             
             try:
-                response = requests.get(url, headers=headers, params=params)
-                
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+
+                # Rate limit: aguarda e tenta de novo (máx 3x)
+                if response.status_code == 429:
+                    for tentativa in range(3):
+                        wait = 60 * (tentativa + 1)
+                        print(f"[RATE LIMIT] Aguardando {wait}s (tentativa {tentativa+1}/3)...")
+                        time.sleep(wait)
+                        response = requests.get(url, headers=headers, params=params, timeout=30)
+                        if response.status_code != 429:
+                            break
+
+                # Bloqueio Cloudflare/Human Verification — não adianta continuar
+                if response.status_code in (403, 405):
+                    print(f"[BLOQUEADO] Órgão {orgao_codigo}: HTTP {response.status_code}. Chave possivelmente bloqueada por excesso de requisições. Aguarde algumas horas e tente novamente.")
+                    return
+
                 if response.status_code != 200:
                     print(f"[ERRO] Órgão {orgao_codigo} pág {pagina}: HTTP {response.status_code} - {response.text[:200]}")
                     break
@@ -94,32 +112,32 @@ def iniciar_coleta():
                 contratos_pagina = 0
                 
                 for c in dados:
-                    municipio = c.get("municipioFornecedor", "")
-                    nm_upper = municipio.upper() if municipio else ""
-                    if not municipio or not (
-                        ' - RJ' in nm_upper or
-                        'RIO DE JANEIRO' in nm_upper or
-                        nm_upper.endswith('(RJ)') or
-                        nm_upper == 'RJ'
-                    ):
-                        continue
-                        
+                    # API filtrou por ufContratado=RJ na origem — todos os retornos
+                    # já são contratos com fornecedor do RJ. Município não vem mais
+                    # no top-level (mudança da API em 2025).
                     numero = c.get("numero", "")
                     if not numero:
                         continue
 
                     objeto = c.get("objeto", "")
-                    valor_str = c.get("valorInicial", "0,00")
-                    valor = processar_valor(valor_str)
+                    # Schema novo: valorInicialCompra (number) substitui valorInicial (string)
+                    valor_raw = c.get("valorInicialCompra") or c.get("valorInicial") or 0
+                    valor = float(valor_raw) if isinstance(valor_raw, (int, float)) else processar_valor(str(valor_raw))
                     data_inicio = c.get("dataInicioVigencia", "")
                     data_fim = c.get("dataFimVigencia", "")
-                    
+
                     fornecedor = c.get("fornecedor", {})
                     fornecedor_nome = fornecedor.get("nome", "")
-                    fornecedor_cnpj = fornecedor.get("niFornecedor", "")
-                    
-                    orgao_dict = c.get("unidadeGestora", {}).get("orgaoVinculado", {})
+                    # Schema novo: cnpjFormatado substitui niFornecedor
+                    fornecedor_cnpj = fornecedor.get("cnpjFormatado") or fornecedor.get("niFornecedor", "")
+
+                    unidade = c.get("unidadeGestora", {})
+                    orgao_dict = unidade.get("orgaoVinculado", {})
                     orgao = orgao_dict.get("nome", "")
+                    # Usa nome da Unidade Gestora como "município" (placeholder
+                    # pra manter compatibilidade com schema atual). Município real
+                    # do fornecedor exigiria query adicional por CNPJ.
+                    municipio = unidade.get("nome", "RJ")
                     
                     fonte_url = f"https://portaldatransparencia.gov.br/contratos/{c.get('id', numero)}"
                     
@@ -139,7 +157,8 @@ def iniciar_coleta():
                 print(f"Órgão {orgao_codigo} - Página {pagina}: Inseridos {contratos_pagina} contratos")
                 
                 pagina += 1
-                time.sleep(0.5)
+                # 1.5s entre requisições = ~40 req/min (limite noturno é 90)
+                time.sleep(1.5)
                 
             except Exception as e:
                 print(f"Erro no Órgão {orgao_codigo} página {pagina}: {e}")

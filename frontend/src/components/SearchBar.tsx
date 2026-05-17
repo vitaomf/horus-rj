@@ -22,16 +22,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Debounced Search Effect
+    // Debounced Search Effect com AbortController para cancelar requests obsoletos
     useEffect(() => {
+        const controller = new AbortController();
+
         const searchTimer = setTimeout(async () => {
             if (query.trim().length >= 3) {
                 setIsSearching(true);
                 setShowDropdown(true);
                 try {
                     const [munRes, polRes] = await Promise.all([
-                        axios.get(`${API_BASE_URL}/api/municipios?busca=${encodeURIComponent(query)}`),
-                        axios.get(`${API_BASE_URL}/api/politicos/busca?q=${encodeURIComponent(query)}`)
+                        axios.get(`${API_BASE_URL}/api/municipios?busca=${encodeURIComponent(query)}`, { signal: controller.signal }),
+                        axios.get(`${API_BASE_URL}/api/politicos/busca?q=${encodeURIComponent(query)}`, { signal: controller.signal })
                     ]);
 
                     const muns: SearchResult[] = munRes.data.slice(0, 5).map((m: any) => ({
@@ -49,18 +51,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
 
                     setResults([...muns, ...pols]);
                 } catch (error) {
-                    console.error("Erro na busca:", error);
-                    setResults([]);
+                    if (!axios.isCancel(error)) {
+                        console.error("Erro na busca:", error);
+                        setResults([]);
+                    }
                 } finally {
-                    setIsSearching(false);
+                    if (!controller.signal.aborted) setIsSearching(false);
                 }
             } else {
                 setResults([]);
                 setShowDropdown(false);
             }
-        }, 400); // 400ms debounce
+        }, 400);
 
-        return () => clearTimeout(searchTimer);
+        return () => {
+            clearTimeout(searchTimer);
+            controller.abort();
+        };
     }, [query]);
 
     // Click outside and ESC listener

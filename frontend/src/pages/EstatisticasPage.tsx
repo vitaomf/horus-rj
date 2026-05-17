@@ -10,8 +10,21 @@ interface EstatisticasPageProps {
     onMunicipioClick: (nome: string) => void;
 }
 
+interface Politico { id: number; nome: string; partido: string; cargo: string; total_emendas: number; valor_total: number; }
+interface Municipio { nome: string; total_emendas: number; valor_total: number; }
+interface PorAno { ano: number; total_emendas: number; valor_total: number; }
+interface PorObjetivo { objetivo: string; total: number; valor_total: number; }
+interface EstatisticasData {
+    valor_total_geral: number;
+    media_por_emenda: number;
+    top_politicos: Politico[];
+    top_municipios: Municipio[];
+    por_ano: PorAno[];
+    por_objetivo: PorObjetivo[];
+}
+
 export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, onPoliticoClick, onMunicipioClick }) => {
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<EstatisticasData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
