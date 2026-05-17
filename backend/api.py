@@ -46,10 +46,10 @@ class CacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         path = request.url.path
-        if path.startswith("/api/") and path != "/api/health":
-            response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hora
+        if path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
         elif path.startswith("/assets/"):
-            response.headers["Cache-Control"] = "public, max-age=86400"  # 24h para assets
+            response.headers["Cache-Control"] = "public, max-age=86400"
         return response
 
 app.add_middleware(CacheMiddleware)
@@ -60,8 +60,9 @@ app.add_middleware(CacheMiddleware)
 NOT_AUTOR_COLETIVO_SQL = "COALESCE(p.cargo, '') != 'Autor Coletivo'"
 
 # CORS: em produção definir ALLOWED_ORIGINS no .env (ex: "https://horus.dominio.com.br")
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
-_allow_origins = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
+# Padrão local: apenas localhost:5173 (Vite dev) e localhost:7291 (API próprio)
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:7291,http://127.0.0.1:5173,http://127.0.0.1:7291")
+_allow_origins = [o.strip() for o in _raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
@@ -645,14 +646,15 @@ def obter_detalhes_politico(politico_id: int):
 
         dados_campanha = None
         if campanha_row:
-            # Buscar doadores desta campanha
+            # Top 10 doadores — todos os tipos
             doadores_rows = conn.execute("""
-                SELECT nome_doador, valor 
-                FROM doadores 
-                WHERE campanha_id = ? 
+                SELECT nome_doador, valor
+                FROM doadores
+                WHERE campanha_id = ?
                 ORDER BY valor DESC
+                LIMIT 10
             """, (campanha_row["id"],)).fetchall()
-            
+
             dados_campanha = {
                 "cargo": campanha_row["cargo"],
                 "total_receitas": float(campanha_row["total_receitas"]),
@@ -915,6 +917,196 @@ def cruzamento_emendas_contratos(politico_id: int):
         return {"camada_geografica": [], "camada_financeira": [], "tem_cruzamento": False}
     finally:
         conn.close()
+
+
+@app.get("/api/camara/atividade")
+def atividade_camara(dep_id: int = Query(..., description="ID do deputado na Câmara API")):
+    """Retorna votações recentes + PLs autorais de um deputado.
+    Dados atualizados a cada requisição (mudanças diárias)."""
+    import requests as _req, concurrent.futures as _cf
+    from datetime import datetime as _dt, timedelta as _td
+
+    BASE = "https://dadosabertos.camara.leg.br/api/v2"
+    HDR  = {"Accept": "application/json", "User-Agent": "HorusRJ/1.0"}
+    SESS = _req.Session()
+    SESS.headers.update(HDR)
+
+    def _get(url, params=None):
+        r = SESS.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    hoje   = _dt.now().strftime("%Y-%m-%d")
+    inicio = (_dt.now() - _td(days=60)).strftime("%Y-%m-%d")
+
+    # ── PLs autorais ─────────────────────────────────────────────────────────
+    pls = []
+    for sigla in ("PL", "PEC", "PDL"):
+        try:
+            dados = _get(f"{BASE}/proposicoes",
+                         {"siglaTipo": sigla, "idDeputadoAutor": dep_id, "itens": 20}
+                        ).get("dados", [])
+            for p in dados:
+                pls.append({
+                    "id":      p.get("id"),
+                    "tipo":    p.get("siglaTipo"),
+                    "numero":  p.get("numero"),
+                    "ano":     p.get("ano"),
+                    "ementa":  (p.get("ementa") or "")[:200],
+                    "data":    (p.get("dataApresentacao") or "")[:10],
+                    "url": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={p.get('id')}",
+                })
+        except Exception:
+            pass
+    pls.sort(key=lambda x: x.get("data", ""), reverse=True)
+
+    # ── Votações plenárias recentes (idOrgao=180 = Plenário) ─────────────────
+    votacoes_resultado = []
+    try:
+        sessoes = _get(f"{BASE}/votacoes",
+                       {"dataInicio": inicio, "dataFim": hoje, "idOrgao": 180, "itens": 40}
+                      ).get("dados", [])
+
+        def _check_voto(sessao):
+            vid = sessao.get("id")
+            if not vid:
+                return None
+            try:
+                votos = _get(f"{BASE}/votacoes/{vid}/votos").get("dados", [])
+                if not votos:
+                    return None
+                meu = next((v for v in votos if (v.get("deputado_") or {}).get("id") == dep_id), None)
+                if not meu:
+                    return None
+                prop = sessao.get("proposicaoObjeto") or {}
+                return {
+                    "data":      (sessao.get("data") or "")[:10],
+                    "hora":      ((sessao.get("dataHoraRegistro") or "")[11:16]),
+                    "voto":      meu.get("tipoVoto", "—"),
+                    "descricao": (sessao.get("descricao") or "")[:180],
+                    "aprovado":  sessao.get("aprovacao"),
+                    "pl_tipo":   prop.get("siglaTipo", ""),
+                    "pl_numero": prop.get("numero", ""),
+                    "pl_ano":    prop.get("ano", ""),
+                    "pl_ementa": (prop.get("ementa") or "")[:150],
+                    "url": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={prop.get('id')}" if prop.get("id") else "",
+                }
+            except Exception:
+                return None
+
+        with _cf.ThreadPoolExecutor(max_workers=8) as pool:
+            resultados = list(pool.map(_check_voto, sessoes))
+
+        votacoes_resultado = [r for r in resultados if r is not None]
+        votacoes_resultado.sort(key=lambda x: x.get("data", "") + x.get("hora", ""), reverse=True)
+    except Exception:
+        pass
+
+    return {
+        "dep_id":  dep_id,
+        "periodo": {"inicio": inicio, "fim": hoje},
+        "votacoes": votacoes_resultado,
+        "pls":      pls[:40],
+    }
+
+
+@app.get("/api/camara/bio")
+def bio_camara(nome: str = Query(..., description="Nome do parlamentar")):
+    """Proxy server-side para a Câmara API — evita CORS no browser.
+    Retorna bio, histórico de mandatos, profissão, órgãos e redes sociais."""
+    import urllib.request, urllib.parse, json as _json
+
+    LEGISLATURAS = {53:(2007,2011), 54:(2011,2015), 55:(2015,2019), 56:(2019,2023), 57:(2023,2027), 58:(2027,2031)}
+
+    def _fetch(url):
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "HorusRJ/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            return _json.loads(r.read())
+
+    try:
+        nome_enc = urllib.parse.quote(nome)
+        busca = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados?nome={nome_enc}&itens=5")
+        dados = busca.get("dados", [])
+        if not dados:
+            return {"encontrado": False}
+
+        primeiro_nome = nome.upper().split()[0]
+        dep = next((d for d in dados if primeiro_nome in (d.get("nome") or "").upper()), dados[0])
+        dep_id = dep.get("id")
+        if not dep_id:
+            return {"encontrado": False}
+
+        bio_raw = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}")
+        bio = bio_raw.get("dados", {})
+
+        # Histórico de mandatos: agrupa por legislatura, rastreia mudanças de partido
+        historico_raw = []
+        try:
+            hist = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/historico")
+            historico_raw = hist.get("dados", [])
+        except Exception:
+            pass
+
+        mandatos = {}
+        for h in historico_raw:
+            leg = h.get("idLegislatura")
+            if not leg:
+                continue
+            partido = h.get("siglaPartido", "")
+            if leg not in mandatos:
+                mandatos[leg] = {"idLegislatura": leg, "partidos": []}
+            if partido and partido not in ("", "S.PART.") and partido != (mandatos[leg]["partidos"] or [None])[-1]:
+                mandatos[leg]["partidos"].append(partido)
+
+        historico = []
+        for leg, m in sorted(mandatos.items()):
+            anos = LEGISLATURAS.get(leg, (None, None))
+            historico.append({
+                "idLegislatura": leg,
+                "anoInicio": anos[0],
+                "anoFim": anos[1],
+                "partidos": m["partidos"],
+            })
+
+        # Profissão
+        profissao = None
+        try:
+            prof = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/profissoes")
+            profs = prof.get("dados", [])
+            if profs:
+                profissao = profs[-1].get("titulo")
+        except Exception:
+            pass
+
+        # Órgãos (comissões atuais)
+        orgaos = []
+        try:
+            org = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/orgaos")
+            for o in org.get("dados", [])[:5]:
+                nome_org = o.get("nomeOrgao") or o.get("siglaOrgao", "")
+                titulo = o.get("titulo", "")
+                if nome_org:
+                    orgaos.append({"nome": nome_org, "titulo": titulo})
+        except Exception:
+            pass
+
+        return {
+            "encontrado": True,
+            "id": dep_id,
+            "nomeCivil": bio.get("nomeCivil"),
+            "nomeEleitoral": bio.get("ultimoStatus", {}).get("nomeEleitoral"),
+            "dataNascimento": bio.get("dataNascimento"),
+            "municipioNascimento": bio.get("municipioNascimento"),
+            "ufNascimento": bio.get("ufNascimento"),
+            "escolaridade": bio.get("escolaridade"),
+            "profissao": profissao,
+            "urlFoto": dep.get("urlFoto"),
+            "redeSocial": bio.get("redeSocial") or [],
+            "historico": historico,
+            "orgaos": orgaos,
+        }
+    except Exception as e:
+        return {"encontrado": False, "erro": str(e)}
 
 
 @app.get("/api/health")
