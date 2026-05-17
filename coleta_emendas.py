@@ -110,7 +110,7 @@ def processar_emendas_lote(dados, cursor):
             insercoes += 1
     return insercoes
 
-def coletar_emendas():
+def coletar_emendas(force_refresh: bool = False):
     load_dotenv()
     
     chave_api = os.getenv("CHAVE_API_PORTAL")
@@ -129,8 +129,9 @@ def coletar_emendas():
     db_path = "transparencia_rj.db"
     try:
         conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS politicos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,7 +182,7 @@ def coletar_emendas():
     anos_com_cache = []
     anos_sem_cache = []
     for ano in ANOS:
-        if cache_existe(ano):
+        if cache_existe(ano, force_refresh=force_refresh):
             anos_com_cache.append(ano)
         else:
             anos_sem_cache.append(ano)
@@ -272,4 +273,8 @@ def coletar_emendas():
     print(resumo_str)
 
 if __name__ == "__main__":
-    coletar_emendas()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force-refresh", action="store_true", help="Ignora cache permanente e recoleta todos os anos")
+    args = parser.parse_args()
+    coletar_emendas(force_refresh=args.force_refresh)

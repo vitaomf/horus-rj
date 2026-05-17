@@ -10,9 +10,12 @@ def garantir_pasta():
 def caminho_cache(ano: int) -> str:
     return os.path.join(CACHE_DIR, f"emendas_{ano}.json")
 
-def cache_existe(ano: int) -> bool:
+def cache_existe(ano: int, force_refresh: bool = False) -> bool:
+    """Retorna True se cache válido existe. `force_refresh=True` ignora cache permanente."""
     path = caminho_cache(ano)
     if not os.path.exists(path):
+        return False
+    if force_refresh:
         return False
     # Anos antigos (2 anos atrás ou mais): cache permanente, nunca expira
     ano_atual = datetime.now().year

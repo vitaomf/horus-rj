@@ -291,7 +291,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                     </thead>
                                     <tbody>
                                         {data.emendas.slice((paginaAtual - 1) * 20, paginaAtual * 20).map((emenda, idx) => (
-                                            <tr key={idx} className={`border-b border-[#222] hover:bg-[#FFD700]/5 transition-colors ${idx % 2 === 0 ? 'bg-black' : 'bg-[#111]'}`}>
+                                            <tr key={`${emenda.ano}-${emenda.valor}-${idx}`} className={`border-b border-[#222] hover:bg-[#FFD700]/5 transition-colors ${idx % 2 === 0 ? 'bg-black' : 'bg-[#111]'}`}>
                                                 <td className="p-4 font-bold text-gray-300">{emenda.ano}</td>
                                                 <td className="p-4 font-bold text-[#FFD700] whitespace-nowrap">{formatCurrencyFull(emenda.valor)}</td>
                                                 <td className="p-4 text-sm text-gray-300 leading-relaxed max-w-xs">{emenda.descricao}</td>
@@ -322,7 +322,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                             {/* Mobile Emendas Cards */}
                             <div className="md:hidden space-y-4">
                                 {data.emendas.slice((paginaAtual - 1) * 20, paginaAtual * 20).map((emenda, idx) => (
-                                    <div key={idx} className="bg-[#111] border border-zinc-800 p-4 space-y-3 rounded-sm">
+                                    <div key={`mob-${emenda.ano}-${emenda.valor}-${idx}`} className="bg-[#111] border border-zinc-800 p-4 space-y-3 rounded-sm">
                                         <div className="flex justify-between items-start">
                                             <span className="bg-zinc-800 text-gray-300 px-2 py-0.5 rounded text-[10px] font-bold">
                                                 {emenda.ano}
@@ -407,7 +407,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                     </thead>
                                     <tbody className="divide-y divide-zinc-800">
                                         {data.contratos.map((contrato, idx) => (
-                                            <tr key={idx} className="hover:bg-zinc-800/50 transition-colors">
+                                            <tr key={contrato.numero || idx} className="hover:bg-zinc-800/50 transition-colors">
                                                 <td className="p-4 font-mono text-gray-400 text-xs">
                                                     {contrato.numero}
                                                 </td>
@@ -451,7 +451,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                             {/* Mobile Contratos Cards */}
                             <div className="md:hidden space-y-4">
                                 {data.contratos.map((contrato, idx) => (
-                                    <div key={idx} className="bg-[#111] border border-zinc-800 p-4 space-y-3 rounded-sm">
+                                    <div key={`mob-${contrato.numero || idx}`} className="bg-[#111] border border-zinc-800 p-4 space-y-3 rounded-sm">
                                         <div className="flex justify-between items-start">
                                             <span className="text-gray-500 font-mono text-[10px]">
                                                 {contrato.numero}

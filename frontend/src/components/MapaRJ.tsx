@@ -58,6 +58,7 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [geoData, setGeoData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [geoError, setGeoError] = useState<string | null>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
     // Tooltip state
@@ -83,10 +84,12 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
             try {
                 setLoading(true);
                 const response = await fetch('/municipios-rj.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 setGeoData(data);
             } catch (err) {
                 console.error("Erro ao carregar o GeoJSON do RJ:", err);
+                setGeoError("Não foi possível carregar o mapa. Tente recarregar a página.");
             } finally {
                 setLoading(false);
             }
@@ -273,6 +276,16 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
 
     return (
         <div ref={wrapperRef} className="relative w-full overflow-hidden" style={{ height: `${height}px` }}>
+
+            {/* ERRO GeoJSON */}
+            {geoError && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2 text-center px-6">
+                        <span className="text-red-400 text-2xl">⚠</span>
+                        <p className="text-red-400 font-bebas tracking-widest text-lg">{geoError}</p>
+                    </div>
+                </div>
+            )}
 
             {/* LOADING SKELETON */}
             {loading && (

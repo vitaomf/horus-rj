@@ -6,6 +6,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "transp
 def migrate():
     print(f"Iniciando migração no banco: {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
     try:

@@ -34,8 +34,9 @@ def iniciar_coleta():
     db_path = "transparencia_rj.db"
     try:
         conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS contratos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

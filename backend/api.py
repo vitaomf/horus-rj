@@ -2,6 +2,7 @@ import sqlite3
 import math
 import unicodedata
 import os
+import logging
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,18 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from typing import Optional
+
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, "api.log"), encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger("horus-api")
 
 # Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
 # Localmente continua usando SQLite via sqlite3.
@@ -38,13 +51,13 @@ app = FastAPI(title="Transparência RJ API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Cache-Control: dados mudam raramente, então cacheia por 1h no browser.
-# /api/health nunca é cacheado (mostra estado em tempo real).
-from starlette.middleware.base import BaseHTTPMiddleware
-
 class CacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.error("Unhandled exception in middleware: %s", exc, exc_info=True)
+            raise
         path = request.url.path
         if path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
@@ -97,6 +110,7 @@ def get_db_connection():
     else:
         conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.create_function("unaccent", 1, _unaccent)
     return conn
 
@@ -104,7 +118,8 @@ def get_db_connection():
 
 
 @app.get("/api/municipios/heatmap")
-def obter_municipios_heatmap():
+@limiter.limit("30/minute")
+def obter_municipios_heatmap(request: Request):
     """
     Retorna lista de municípios com valor total de emendas e contagem,
     usado para gerar o heatmap no mapa.
@@ -133,7 +148,9 @@ def obter_municipios_heatmap():
 
 
 @app.get("/api/emendas/busca")
+@limiter.limit("30/minute")
 def buscar_emendas(
+    request: Request,
     q: Optional[str] = Query(None),
     ano: Optional[int] = Query(None),
     municipio: Optional[str] = Query(None),
@@ -203,7 +220,8 @@ def buscar_emendas(
 
 
 @app.get("/api/municipios")
-def listar_municipios(busca: Optional[str] = Query(None)):
+@limiter.limit("60/minute")
+def listar_municipios(request: Request, busca: Optional[str] = Query(None)):
     """
     Retorna lista de todos os municípios do RJ com id e nome.
     Se a tabela `municipios` ainda não existir, extrai unicamente do `municipio_destino` da tabela de `emendas`.
@@ -266,7 +284,8 @@ def listar_problemas(municipio_id: int, severidade_min: Optional[int] = Query(No
         # Caso a tabela problemas não exista
         if "no such table" in str(e):
             return []
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Erro em /problemas municipio_id=%s: %s", municipio_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
     finally:
         conn.close()
 
@@ -305,7 +324,8 @@ def listar_emendas(municipio_id: int):
         return [dict(e) for e in emendas]
         
     except sqlite3.OperationalError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Erro em /emendas municipio_id=%s: %s", municipio_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
     finally:
         conn.close()
 
@@ -345,7 +365,9 @@ def obter_total_politicos():
 
 
 @app.get("/api/politicos")
+@limiter.limit("60/minute")
 def listar_politicos_paginado(
+    request: Request,
     pagina: int = Query(1, ge=1),
     limite: int = Query(20, ge=1, le=2000),
     busca: Optional[str] = Query(None)
@@ -409,13 +431,14 @@ def listar_politicos_paginado(
             "total_paginas": total_paginas
         }
     except Exception as e:
-        print(f"Erro ao listar politicos paginado:", e)
+        logger.error("Erro em /politicos paginado: %s", e, exc_info=True)
         return {"politicos": [], "total": 0, "pagina": 1, "total_paginas": 1}
     finally:
         conn.close()
 
 @app.get("/api/politicos/busca")
-def buscar_politicos(q: str = Query(..., description="Termo de busca pelo nome")):
+@limiter.limit("30/minute")
+def buscar_politicos(request: Request, q: str = Query(..., description="Termo de busca pelo nome")):
     """
     Busca políticos individuais pelo nome (case-insensitive, exclui autores coletivos).
     Retorna até 8 resultados contendo id, nome, partido e cargo.
@@ -433,12 +456,14 @@ def buscar_politicos(q: str = Query(..., description="Termo de busca pelo nome")
         politicos = conn.execute(query, (f'%{q}%',)).fetchall()
         return [dict(p) for p in politicos]
     except sqlite3.OperationalError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Erro em /politicos/busca q=%s: %s", q, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
     finally:
         conn.close()
 
 @app.get("/api/municipios/{nome}/detalhes")
-def obter_detalhes_municipio(nome: str):
+@limiter.limit("30/minute")
+def obter_detalhes_municipio(request: Request, nome: str):
     conn = get_db_connection()
     try:
         # A query vai receber o nome COMPLETO do frontend (ex: "NITERÓI"),
@@ -520,7 +545,7 @@ def obter_detalhes_municipio(nome: str):
         }
 
     except Exception as e:
-        print(f"Erro ao buscar detalhes do municipio {nome}:", e)
+        logger.error("Erro em /municipios/%s/detalhes: %s", nome, e, exc_info=True)
         return {
             "municipio": nome,
             "total_emendas": 0,
@@ -532,7 +557,8 @@ def obter_detalhes_municipio(nome: str):
         conn.close()
 
 @app.get("/api/municipios/{nome}/contratos")
-def obter_contratos_municipio(nome: str):
+@limiter.limit("30/minute")
+def obter_contratos_municipio(request: Request, nome: str):
     conn = get_db_connection()
     try:
         termo_busca = f"%{nome.strip().upper()}%"
@@ -559,24 +585,33 @@ def obter_contratos_municipio(nome: str):
     except sqlite3.OperationalError as e:
         if "no such table" in str(e):
             return []
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Erro em /municipios/%s/contratos: %s", nome, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
     except Exception as e:
-        print(f"Erro ao buscar contratos do municipio {nome}:", e)
+        logger.error("Erro em /municipios/%s/contratos: %s", nome, e, exc_info=True)
         return []
     finally:
         conn.close()
 
+def _tem_coluna_foto() -> bool:
+    """Verifica uma vez se a coluna foto_url existe (cache em módulo)."""
+    try:
+        conn = get_db_connection()
+        conn.execute("SELECT foto_url FROM politicos LIMIT 1").fetchone()
+        conn.close()
+        return True
+    except sqlite3.OperationalError:
+        return False
+
+_FOTO_COL = _tem_coluna_foto()
+
+
 @app.get("/api/politicos/{politico_id}")
-def obter_detalhes_politico(politico_id: int):
+@limiter.limit("30/minute")
+def obter_detalhes_politico(request: Request, politico_id: int):
     conn = get_db_connection()
     try:
-        # 1. Informações básicas do político e totais gerais
-        # COALESCE para foto_url (coluna pode não existir em bancos antigos)
-        try:
-            conn.execute("SELECT foto_url FROM politicos LIMIT 1").fetchone()
-            tem_foto_col = True
-        except sqlite3.OperationalError:
-            tem_foto_col = False
+        tem_foto_col = _FOTO_COL
 
         if tem_foto_col:
             politico_info = conn.execute("""
@@ -710,13 +745,14 @@ def obter_detalhes_politico(politico_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Erro ao buscar politico {politico_id}:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Erro em /politicos/%s: %s", politico_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
     finally:
         conn.close()
 
 @app.get("/api/estatisticas")
-def obter_estatisticas():
+@limiter.limit("20/minute")
+def obter_estatisticas(request: Request):
     conn = get_db_connection()
     try:
         # 1. Total Geral e Média
@@ -826,14 +862,15 @@ def obter_estatisticas():
         }
 
     except Exception as e:
-        print(f"Erro ao buscar estatisticas gerais:", e)
-        return {"erro": str(e)}
+        logger.error("Erro em /estatisticas: %s", e, exc_info=True)
+        return {"erro": "Erro interno"}
     finally:
         conn.close()
 
 
 @app.get("/api/politicos/{politico_id}/cruzamento")
-def cruzamento_emendas_contratos(politico_id: int):
+@limiter.limit("20/minute")
+def cruzamento_emendas_contratos(request: Request, politico_id: int):
     """
     Cruzamento investigativo: emendas do político × contratos federais nos mesmos municípios.
     Camada 1 — geográfica: municípios que receberam emendas e também têm contratos federais.
@@ -913,14 +950,15 @@ def cruzamento_emendas_contratos(politico_id: int):
         }
 
     except Exception as e:
-        print(f"Erro no cruzamento politico {politico_id}:", e)
+        logger.error("Erro em /politicos/%s/cruzamento: %s", politico_id, e, exc_info=True)
         return {"camada_geografica": [], "camada_financeira": [], "tem_cruzamento": False}
     finally:
         conn.close()
 
 
 @app.get("/api/camara/atividade")
-def atividade_camara(dep_id: int = Query(..., description="ID do deputado na Câmara API")):
+@limiter.limit("10/minute")
+def atividade_camara(request: Request, dep_id: int = Query(..., description="ID do deputado na Câmara API")):
     """Retorna votações recentes + PLs autorais de um deputado.
     Dados atualizados a cada requisição (mudanças diárias)."""
     import requests as _req, concurrent.futures as _cf
@@ -1011,7 +1049,8 @@ def atividade_camara(dep_id: int = Query(..., description="ID do deputado na Câ
 
 
 @app.get("/api/camara/bio")
-def bio_camara(nome: str = Query(..., description="Nome do parlamentar")):
+@limiter.limit("10/minute")
+def bio_camara(request: Request, nome: str = Query(..., description="Nome do parlamentar")):
     """Proxy server-side para a Câmara API — evita CORS no browser.
     Retorna bio, histórico de mandatos, profissão, órgãos e redes sociais."""
     import urllib.request, urllib.parse, json as _json
@@ -1134,7 +1173,8 @@ def health():
     )
     if os.path.exists(errors_file):
         try:
-            linhas = open(errors_file, encoding="utf-8").readlines()
+            with open(errors_file, encoding="utf-8") as f:
+                linhas = f.readlines()
             erros_recentes = [l.strip() for l in linhas[-5:] if l.strip()]
         except Exception:
             pass
