@@ -1283,13 +1283,18 @@ def status_coleta():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Emendas por UF
-        cur.execute("""
+        # Apenas as 27 UFs oficiais do Brasil — exclui BR, MULT, REG, EXT, etc.
+        UFS_OFICIAIS = ('AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+                        'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO')
+        placeholders = ','.join('?' * len(UFS_OFICIAIS))
+
+        # Emendas por UF (só estados reais)
+        cur.execute(f"""
             SELECT uf, COUNT(*) as total, MIN(ano) as ano_min, MAX(ano) as ano_max
             FROM emendas
-            WHERE uf IS NOT NULL AND uf != ''
+            WHERE uf IN ({placeholders})
             GROUP BY uf ORDER BY total DESC
-        """)
+        """, UFS_OFICIAIS)
         emendas_por_uf = [
             {"uf": r["uf"], "total": r["total"], "ano_min": r["ano_min"], "ano_max": r["ano_max"]}
             for r in cur.fetchall()
@@ -1298,8 +1303,7 @@ def status_coleta():
         # Totais gerais
         cur.execute("SELECT COUNT(*) FROM emendas")
         total_emendas = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(DISTINCT uf) FROM emendas WHERE uf IS NOT NULL AND uf != ''")
-        ufs_com_dados = cur.fetchone()[0]
+        ufs_com_dados = len(emendas_por_uf)  # já filtrado — sempre ≤ 27
 
         # Parlamentares por casa
         cur.execute("""
