@@ -222,42 +222,77 @@ def buscar_emendas(
 
 @app.get("/api/municipios")
 @limiter.limit("60/minute")
-def listar_municipios(request: Request, busca: Optional[str] = Query(None)):
+def listar_municipios(
+    request: Request,
+    busca: Optional[str] = Query(None),
+    uf:    Optional[str] = Query(None),
+    limite: int = Query(2000, ge=1, le=10000),
+):
     """
-    Retorna lista de todos os municípios do RJ com id e nome.
-    Se a tabela `municipios` ainda não existir, extrai unicamente do `municipio_destino` da tabela de `emendas`.
-    Pode ser filtrado opcionalmente pelo parâmetro `busca`.
+    Lista municípios. Filtros: busca (nome), uf (sigla 2 letras).
+    Fonte: tabela municipios ou fallback em emendas.municipio_destino.
     """
     conn = get_db_connection()
     try:
-        # Tenta buscar da tabela oficial `municipios` caso exista
-        query = "SELECT id, nome FROM municipios WHERE 1=1"
-        params = []
-        
+        query  = "SELECT id, nome FROM municipios WHERE 1=1"
+        params: list = []
+
         if busca:
             query += " AND UPPER(nome) LIKE UPPER(?)"
             params.append(f'%{busca}%')
-            
-        query += " ORDER BY nome"
-        
-        municipios = conn.execute(query, params).fetchall()
-        return [dict(m) for m in municipios]
+
+        if uf:
+            # Nomes armazenados como "CIDADE - UF"
+            query += " AND UPPER(nome) LIKE UPPER(?)"
+            params.append(f'% - {uf.upper()}')
+
+        query += " ORDER BY nome LIMIT ?"
+        params.append(limite)
+
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
     except sqlite3.OperationalError:
         try:
-            # Fallback: Extrai nomes únicos direto das emendas se a tabela municipios não tiver sido criada
-            query_fallback = "SELECT DISTINCT municipio_destino as nome FROM emendas WHERE municipio_destino != ''"
-            params_fallback = []
+            q = "SELECT DISTINCT municipio_destino as nome FROM emendas WHERE municipio_destino != ''"
+            p: list = []
             if busca:
-                query_fallback += " AND UPPER(municipio_destino) LIKE UPPER(?)"
-                params_fallback.append(f'%{busca}%')
-                
-            query_fallback += " ORDER BY municipio_destino"
-                
-            municipios = conn.execute(query_fallback, params_fallback).fetchall()
-            # Gera um ID fake baseado na ordem para não quebrar a listagem do front-end
-            return [{"id": i+1, "nome": m["nome"]} for i, m in enumerate(municipios)]
+                q += " AND UPPER(municipio_destino) LIKE UPPER(?)"; p.append(f'%{busca}%')
+            if uf:
+                q += " AND UPPER(municipio_destino) LIKE UPPER(?)"; p.append(f'% - {uf.upper()}')
+            q += f" ORDER BY municipio_destino LIMIT {limite}"
+            rows = conn.execute(q, p).fetchall()
+            return [{"id": i + 1, "nome": r["nome"]} for i, r in enumerate(rows)]
         except sqlite3.OperationalError:
             return []
+    finally:
+        conn.close()
+
+
+@app.get("/api/estados/{uf}/stats")
+@limiter.limit("60/minute")
+def stats_estado(request: Request, uf: str):
+    """Stats rápidas de emendas para um estado: total, valor, parlamentares únicos, municípios."""
+    conn = get_db_connection()
+    try:
+        uf_upper = uf.upper()
+        row = conn.execute("""
+            SELECT
+                COUNT(*)                        AS total_emendas,
+                COALESCE(SUM(valor), 0)         AS valor_total,
+                COUNT(DISTINCT politico_id)     AS parlamentares,
+                COUNT(DISTINCT municipio_destino) AS municipios
+            FROM emendas
+            WHERE UPPER(uf) = ?
+        """, (uf_upper,)).fetchone()
+        return {
+            "total_emendas":  row[0],
+            "valor_total":    float(row[1]),
+            "parlamentares":  row[2],
+            "municipios":     row[3],
+        }
+    except Exception as e:
+        logger.error("Erro em /estados/%s/stats: %s", uf, e)
+        return {"total_emendas": 0, "valor_total": 0.0, "parlamentares": 0, "municipios": 0}
     finally:
         conn.close()
 

@@ -6,16 +6,18 @@ import { getEstado, getRegiaoByUF } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
 interface Parlamentar { id: number; nome: string; partido: string | null; cargo: string | null; foto_url: string | null; }
+interface Municipio   { id: number; nome: string; }
+interface Stats { total_emendas: number; valor_total: number; parlamentares: number; municipios: number; }
 
 const FONT_DECO   = "'Cinzel Decorative', serif";
 const FONT_CINZEL = "'Cinzel', serif";
 
-const ESTATISTICAS = [
-  { titulo: 'EMENDAS',       sub: 'total registradas' },
-  { titulo: 'VALOR TOTAL',   sub: 'empenhado em emendas' },
-  { titulo: 'PARLAMENTARES', sub: 'com emendas ativas' },
-  { titulo: 'MUNICÍPIOS',    sub: 'beneficiados' },
-];
+function fmtVal(v: number): string {
+  if (v >= 1e9) return `R$ ${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `R$ ${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `R$ ${(v / 1e3).toFixed(0)}K`;
+  return `R$ ${v.toFixed(0)}`;
+}
 
 export function EstadoPage() {
   const { uf } = useParams<{ uf: string }>();
@@ -26,20 +28,36 @@ export function EstadoPage() {
 
   const [parlamentares, setParlamentares] = useState<Parlamentar[]>([]);
   const [loadingParl, setLoadingParl]     = useState(true);
+  const [municipios, setMunicipios]       = useState<Municipio[]>([]);
+  const [loadingMun, setLoadingMun]       = useState(true);
+  const [stats, setStats]                 = useState<Stats | null>(null);
 
   useEffect(() => {
     if (!estado) return;
+
+    // parlamentares federais
     setLoadingParl(true);
-    fetch(`${API_BASE_URL}/api/politicos?uf=${ufUpper}&casa=camara&limite=200`)
-      .then(r => r.json())
-      .then(d => {
-        const dep = d.politicos ?? [];
-        return fetch(`${API_BASE_URL}/api/politicos?uf=${ufUpper}&casa=senado&limite=30`)
-          .then(r2 => r2.json())
-          .then(d2 => setParlamentares([...dep, ...(d2.politicos ?? [])]));
-      })
+    Promise.all([
+      fetch(`${API_BASE_URL}/api/politicos?uf=${ufUpper}&casa=camara&limite=200`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/api/politicos?uf=${ufUpper}&casa=senado&limite=30`).then(r => r.json()),
+    ])
+      .then(([dep, sen]) => setParlamentares([...(dep.politicos ?? []), ...(sen.politicos ?? [])]))
       .catch(() => {})
       .finally(() => setLoadingParl(false));
+
+    // municípios
+    setLoadingMun(true);
+    fetch(`${API_BASE_URL}/api/municipios?uf=${ufUpper}&limite=1000`)
+      .then(r => r.json())
+      .then(d => setMunicipios(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoadingMun(false));
+
+    // stats de emendas
+    fetch(`${API_BASE_URL}/api/estados/${ufUpper}/stats`)
+      .then(r => r.json())
+      .then(d => setStats(d))
+      .catch(() => {});
   }, [ufUpper, estado]);
 
   if (!estado) {
@@ -147,13 +165,20 @@ export function EstadoPage() {
 
       {/* ── ESTATÍSTICAS ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-b border-[#1a1a1a]">
-        {ESTATISTICAS.map((s, i) => (
+        {[
+          { titulo: 'EMENDAS',       valor: stats ? stats.total_emendas.toLocaleString('pt-BR') : null, sub: 'total registradas' },
+          { titulo: 'VALOR TOTAL',   valor: stats ? fmtVal(stats.valor_total) : null,                   sub: 'empenhado em emendas' },
+          { titulo: 'PARLAMENTARES', valor: stats ? stats.parlamentares.toLocaleString('pt-BR') : null, sub: 'com emendas ativas' },
+          { titulo: 'MUNICÍPIOS',    valor: stats ? stats.municipios.toLocaleString('pt-BR') : null,    sub: 'beneficiados' },
+        ].map((s, i) => (
           <div key={i} className="p-6 border-r border-[#1a1a1a] last:border-r-0 relative">
-            {/* crosshair corners */}
             <div className="absolute top-2 left-2 w-3 h-3 border-t border-l border-[#FFD700]/10" />
             <div className="absolute top-2 right-2 w-3 h-3 border-t border-r border-[#FFD700]/10" />
             <p className="font-mono text-[8px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-3">{s.titulo}</p>
-            <div className="h-7 w-20 bg-[#111] animate-pulse mb-2" />
+            {s.valor !== null
+              ? <p className="font-bebas text-2xl text-[#FFD700] leading-none mb-2">{s.valor}</p>
+              : <div className="h-7 w-20 bg-[#111] animate-pulse mb-2" />
+            }
             <p className="font-mono text-[8px] tracking-widest text-gray-800 uppercase">{s.sub}</p>
           </div>
         ))}
@@ -172,23 +197,47 @@ export function EstadoPage() {
               MUNICÍPIOS
             </h2>
           </div>
-          <p className="font-mono text-[8px] tracking-widest text-gray-800 uppercase">EM BREVE</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#1a1a1a]">
-          {Array.from({ length: Math.min(estado.totalMunicipios, 12) }).map((_, i) => (
-            <div key={i} className="bg-black p-4">
-              <div className="h-3 w-16 bg-[#111] animate-pulse mb-2" />
-              <div className="h-2 w-10 bg-[#0d0d0d] animate-pulse" />
-            </div>
-          ))}
-          {estado.totalMunicipios > 12 && (
-            <div className="bg-black p-4 flex items-center justify-center">
-              <p className="font-mono text-[8px] tracking-widest text-gray-800">
-                +{estado.totalMunicipios - 12} MUN.
-              </p>
-            </div>
+          {municipios.length > 0 && (
+            <p className="font-mono text-[8px] tracking-widest text-gray-700">
+              {municipios.length} CADASTRADOS
+            </p>
           )}
         </div>
+
+        {loadingMun ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="bg-black p-4">
+                <div className="h-3 w-16 bg-[#111] animate-pulse mb-2" />
+                <div className="h-2 w-10 bg-[#0d0d0d] animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : municipios.length === 0 ? (
+          <div className="border border-[#1a1a1a] py-12 text-center">
+            <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">
+              Municípios de {estado.nome} em coleta
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
+            {municipios.map(m => (
+              <button
+                key={m.id}
+                onClick={() => navigate(`/municipios/${encodeURIComponent(m.nome)}`)}
+                className="bg-black hover:bg-[#080808] transition-colors p-4 text-left group relative"
+              >
+                <div className="absolute top-0 left-0 right-0 h-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
+                <p className="font-bebas text-sm tracking-wide text-white group-hover:text-[#FFD700] transition-colors leading-tight">
+                  {m.nome.replace(` - ${ufUpper}`, '').trim()}
+                </p>
+                <p className="font-mono text-[7px] tracking-widest text-[#333] mt-1 group-hover:text-gray-700 transition-colors">
+                  {ufUpper}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── PARLAMENTARES FEDERAIS ── */}
