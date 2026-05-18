@@ -37,15 +37,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
         setIsSearching(true);
         setShowDropdown(true);
         try {
-          const [munRes, polRes, emeRes] = await Promise.all([
-            axios.get(`${API_BASE_URL}/api/municipios?busca=${encodeURIComponent(query)}`, { signal: controller.signal }),
-            axios.get(`${API_BASE_URL}/api/politicos/busca?q=${encodeURIComponent(query)}`, { signal: controller.signal }),
-            axios.get(`${API_BASE_URL}/api/emendas/busca?q=${encodeURIComponent(query)}&limite=3`, { signal: controller.signal }),
-          ]);
+          const res = await axios.get(
+            `${API_BASE_URL}/api/busca/global?q=${encodeURIComponent(query)}`,
+            { signal: controller.signal }
+          );
           setResult({
-            municipios:    (munRes.data ?? []).slice(0, 3),
-            parlamentares: (polRes.data ?? []).slice(0, 3),
-            emendas:       (emeRes.data?.resultados ?? []).slice(0, 3),
+            municipios:    (res.data.municipios    ?? []).slice(0, 3),
+            parlamentares: (res.data.parlamentares ?? []).slice(0, 3),
+            emendas:       (res.data.emendas       ?? []).slice(0, 3),
             leis:          [],
           });
         } catch (error) {

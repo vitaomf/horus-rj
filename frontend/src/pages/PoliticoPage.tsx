@@ -377,20 +377,20 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     if (loading) {
         return (
             <div className="w-full flex justify-center items-center py-24">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FFD700]"></div>
+                <div className="animate-spin h-16 w-16 border-t-4 border-b-4 border-[#FFD700]"></div>
             </div>
         );
     }
 
     if (error || !data) {
         return (
-            <div className="w-full bg-[#111111] border border-red-900 rounded-xl p-8 text-center">
+            <div className="w-full bg-[#111111] border border-red-900 p-8 text-center">
                 <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bebas text-white mb-2">ERRO AO CARREGAR DADOS</h2>
                 <p className="text-gray-400 mb-6">{error}</p>
                 <button
                     onClick={onVoltar}
-                    className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                    className="bg-[#111] hover:bg-[#1a1a1a] text-white px-6 py-2 font-medium transition-colors"
                 >
                     Voltar para a página anterior
                 </button>
@@ -506,17 +506,17 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {/* Bio real (Câmara API) */}
                         {getBioReal() && (
-                            <p className="text-zinc-300 text-sm font-sans leading-relaxed mb-4">
+                            <p className="text-gray-300 text-sm font-sans leading-relaxed mb-4">
                                 {getBioReal()}
                             </p>
                         )}
 
                         {/* Bio irônica (análise de gastos) */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 mb-5">
-                            <p className="font-bebas text-[10px] tracking-widest text-zinc-600 mb-2">
+                        <div className="bg-[#080808] border border-[#1a1a1a] p-4 mb-5">
+                            <p className="font-bebas text-[10px] tracking-widest text-gray-600 mb-2">
                                 ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
                             </p>
-                            <p className="text-zinc-400 text-sm font-sans leading-relaxed">
+                            <p className="text-gray-400 text-sm font-sans leading-relaxed">
                                 {getBioIronica()}
                             </p>
                         </div>
@@ -534,13 +534,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
 
                     {/* Linha do tempo */}
-                    <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
                         <p className="font-bebas text-[#FFD700] text-xl tracking-widest mb-1">TRAJETÓRIA POLÍTICA</p>
-                        <p className="text-zinc-600 text-[11px] uppercase tracking-widest mb-6">Linha do tempo · dados oficiais</p>
+                        <p className="text-gray-600 text-[11px] uppercase tracking-widest mb-6">Linha do tempo · dados oficiais</p>
 
                         <div className="relative">
                             {/* Linha vertical */}
-                            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-800" />
+                            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#111]" />
 
                             <div className="space-y-0">
                                 {(() => {
@@ -583,7 +583,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     return eventos.sort((a, b) => a.ano - b.ano).map((ev, i) => (
                                         <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
                                             {/* Ponto */}
-                                            <div className="shrink-0 mt-1 w-[15px] h-[15px] rounded-full border-2 z-10 relative"
+                                            <div className="shrink-0 mt-1 w-[15px] h-[15px] border-2 z-10 relative"
                                                 style={{ borderColor: ev.cor, backgroundColor: '#0a0a0a' }} />
                                             {/* Conteúdo */}
                                             <div className="flex-1 min-w-0">
@@ -591,11 +591,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                     <span className="font-bebas text-2xl leading-none" style={{ color: ev.cor }}>{ev.ano}</span>
                                                     <span className="font-bebas text-sm text-white tracking-wide">{ev.titulo}</span>
                                                     {ev.partido && (
-                                                        <span className="text-[10px] font-bold tracking-widest text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded-sm">{ev.partido}</span>
+                                                        <span className="text-[10px] font-bold tracking-widest text-gray-500 border border-[#2a2a2a] px-1.5 py-0.5">{ev.partido}</span>
                                                     )}
                                                 </div>
                                                 {ev.desc && (
-                                                    <p className="text-zinc-500 text-xs mt-0.5 leading-relaxed">{ev.desc}</p>
+                                                    <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{ev.desc}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -613,18 +613,18 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             const todosPartidos: string[] = [];
                             (bioData.historico || []).forEach(m => m.partidos.forEach(p => { if (!todosPartidos.includes(p)) todosPartidos.push(p); }));
                             return (
-                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                     <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">TRAJETÓRIA PARTIDÁRIA</p>
                                     <div className="flex flex-wrap gap-2">
                                         {todosPartidos.map((p, i) => (
-                                            <span key={p} className="font-bebas tracking-widest text-sm px-3 py-1 rounded-sm border"
+                                            <span key={p} className="font-bebas tracking-widest text-sm px-3 py-1 border"
                                                 style={{ borderColor: i === todosPartidos.length - 1 ? '#FFD700' : '#3f3f46', color: i === todosPartidos.length - 1 ? '#FFD700' : '#71717a' }}>
                                                 {p}
                                             </span>
                                         ))}
                                     </div>
                                     {todosPartidos.length > 1 && (
-                                        <p className="text-zinc-600 text-[10px] mt-2">{todosPartidos.length - 1} mudança{todosPartidos.length > 2 ? 's' : ''} de partido ao longo do mandato</p>
+                                        <p className="text-gray-600 text-[10px] mt-2">{todosPartidos.length - 1} mudança{todosPartidos.length > 2 ? 's' : ''} de partido ao longo do mandato</p>
                                     )}
                                 </div>
                             );
@@ -632,9 +632,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {/* Top 10 doadores — somente pessoas físicas */}
                         {data.dados_campanha?.top_doadores?.length ? (
-                            <div className="bg-[#0a0a0a] border border-red-900/30 rounded-xl p-5">
+                            <div className="bg-[#0a0a0a] border border-red-900/30 p-5">
                                 <p className="font-bebas text-red-400 text-base tracking-widest mb-0.5">QUEM FINANCIOU A CAMPANHA</p>
-                                <p className="text-zinc-600 text-[10px] mb-4 uppercase tracking-widest">Top 10 doadores · Eleição 2022 · Fonte: TSE</p>
+                                <p className="text-gray-600 text-[10px] mb-4 uppercase tracking-widest">Top 10 doadores · Eleição 2022 · Fonte: TSE</p>
                                 <div className="space-y-2.5">
                                     {data.dados_campanha.top_doadores.map((d, i) => {
                                         const pct = d.valor / data.dados_campanha!.top_doadores[0].valor * 100;
@@ -647,31 +647,31 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             <div key={i}>
                                                 <div className="flex items-center justify-between gap-2 mb-1">
                                                     <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="font-bebas text-zinc-600 text-sm w-5 shrink-0">{i+1}</span>
-                                                        <span className="text-zinc-300 text-xs truncate font-medium">{d.nome}</span>
+                                                        <span className="font-bebas text-gray-600 text-sm w-5 shrink-0">{i+1}</span>
+                                                        <span className="text-gray-300 text-xs truncate font-medium">{d.nome}</span>
                                                     </div>
                                                     <span className="font-bebas text-red-400 text-sm shrink-0">{fmt}</span>
                                                 </div>
-                                                <div className="w-full bg-zinc-900 rounded-full h-1 overflow-hidden ml-7">
-                                                    <div className="h-full bg-red-900/70 rounded-full" style={{ width: `${Math.max(pct, 3)}%` }} />
+                                                <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden ml-7">
+                                                    <div className="h-full bg-red-900/70" style={{ width: `${Math.max(pct, 3)}%` }} />
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <p className="text-zinc-700 text-[10px] mt-4 italic">Dados extraídos do portal DivulgaCandContas (TSE).</p>
+                                <p className="text-gray-700 text-[10px] mt-4 italic">Dados extraídos do portal DivulgaCandContas (TSE).</p>
                             </div>
                         ) : null}
 
                         {/* Órgãos / Comissões */}
                         {(bioData.orgaos?.length ?? 0) > 0 && (
-                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                            <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                 <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">CARGOS E COMISSÕES</p>
                                 <div className="space-y-2">
                                     {(bioData.orgaos || []).map((o, i) => (
                                         <div key={i} className="flex flex-col">
                                             <span className="text-white text-xs font-medium leading-snug">{o.nome}</span>
-                                            {o.titulo && <span className="text-zinc-600 text-[10px]">{o.titulo}</span>}
+                                            {o.titulo && <span className="text-gray-600 text-[10px]">{o.titulo}</span>}
                                         </div>
                                     ))}
                                 </div>
@@ -680,7 +680,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {/* Redes sociais */}
                         {(bioData.redeSocial?.length ?? 0) > 0 && (
-                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                            <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                 <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">REDES SOCIAIS</p>
                                 <div className="flex flex-col gap-1.5">
                                     {(bioData.redeSocial || []).map((url, i) => {
@@ -691,8 +691,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             : 'Web';
                                         return (
                                             <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                                className="text-zinc-400 hover:text-[#FFD700] text-xs truncate transition-colors flex items-center gap-2">
-                                                <span className="text-zinc-700 font-bebas text-[10px] tracking-widest w-16 shrink-0">{rede}</span>
+                                                className="text-gray-400 hover:text-[#FFD700] text-xs truncate transition-colors flex items-center gap-2">
+                                                <span className="text-gray-700 font-bebas text-[10px] tracking-widest w-16 shrink-0">{rede}</span>
                                                 <span className="truncate">{url.replace('https://', '').replace('http://', '')}</span>
                                             </a>
                                         );
@@ -706,11 +706,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             {/* ── ATUAÇÃO LEGISLATIVA ─────────────────────────────────────── */}
             <div className="max-w-7xl mx-auto mb-10">
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-5 gap-4 flex-wrap">
+                <div className="bg-[#0a0a0a] border border-[#1a1a1a] overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-[#1a1a1a] px-6 py-5 gap-4 flex-wrap">
                         <div>
                             <p className="font-bebas text-[#FFD700] text-xl tracking-widest">ATUAÇÃO LEGISLATIVA</p>
-                            <p className="text-zinc-600 text-[10px] uppercase tracking-widest">
+                            <p className="text-gray-600 text-[10px] uppercase tracking-widest">
                                 {atividade
                                     ? `${atividade.pls.length} projetos · ${atividade.periodo.inicio} → ${atividade.periodo.fim} · Câmara API`
                                     : 'Carregando dados da Câmara...'}
@@ -720,22 +720,22 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                     <div className="p-6">
                         {loadingAtividade && !atividade && (
-                            <div className="flex flex-col items-center gap-3 text-zinc-500 py-10 justify-center">
-                                <div className="animate-spin w-6 h-6 border-2 border-zinc-700 border-t-[#FFD700] rounded-full" />
+                            <div className="flex flex-col items-center gap-3 text-gray-500 py-10 justify-center">
+                                <div className="animate-spin w-6 h-6 border-2 border-[#2a2a2a] border-t-[#FFD700]" />
                                 <span className="font-bebas tracking-widest text-sm">BUSCANDO NA CÂMARA DOS DEPUTADOS...</span>
-                                <span className="text-zinc-700 text-xs">pode levar até 30 segundos · dados em tempo real</span>
+                                <span className="text-gray-700 text-xs">pode levar até 30 segundos · dados em tempo real</span>
                             </div>
                         )}
 
                         {!loadingAtividade && !atividade && (
                             <div className="text-center py-10">
-                                <p className="text-zinc-500 font-bebas text-lg tracking-widest mb-1">PARLAMENTAR NÃO ENCONTRADO NA CÂMARA API</p>
-                                <p className="text-zinc-700 text-xs">Pode ser senador, ex-deputado ou nome com grafia diferente da Câmara dos Deputados.</p>
+                                <p className="text-gray-500 font-bebas text-lg tracking-widest mb-1">PARLAMENTAR NÃO ENCONTRADO NA CÂMARA API</p>
+                                <p className="text-gray-700 text-xs">Pode ser senador, ex-deputado ou nome com grafia diferente da Câmara dos Deputados.</p>
                             </div>
                         )}
 
                         {atividade && atividade.pls.length === 0 && (
-                            <p className="text-zinc-500 text-center py-8 font-bebas text-lg tracking-widest">NENHUM PROJETO ENCONTRADO</p>
+                            <p className="text-gray-500 text-center py-8 font-bebas text-lg tracking-widest">NENHUM PROJETO ENCONTRADO</p>
                         )}
 
                         {atividade && atividade.pls.length > 0 && (() => {
@@ -767,7 +767,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             ? (pl.status_data ? `${pl.status_orgao} · ${pl.status_data}` : pl.status_orgao)
                                             : (pl.status_data || 'situação atual');
                                         let votoCor = '#71717a';
-                                        let votoBorda = 'border-zinc-700';
+                                        let votoBorda = 'border-[#2a2a2a]';
 
                                         // Cor por palavra-chave do status
                                         if (statusLower.includes('aprovad') || statusLower.includes('transformad') || statusLower.includes('sanção')) {
@@ -788,19 +788,19 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             if (v === 'Sim')       { votoCor = '#4ade80'; votoBorda = 'border-green-800/60'; }
                                             else if (v === 'Não')  { votoCor = '#f87171'; votoBorda = 'border-red-800/60'; }
                                             else if (v === 'Abstenção') { votoCor = '#facc15'; votoBorda = 'border-yellow-800/60'; }
-                                            else                   { votoCor = '#94a3b8'; votoBorda = 'border-zinc-700'; }
+                                            else                   { votoCor = '#94a3b8'; votoBorda = 'border-[#2a2a2a]'; }
                                         }
 
                                         return (
-                                            <div key={i} className="bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
+                                            <div key={i} className="bg-[#0a0a0a]/40 border border-[#1a1a1a] overflow-hidden hover:border-[#333] transition-colors">
                                                 {/* Cabeçalho: PL + voto + data */}
-                                                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-zinc-800/60 flex-wrap">
+                                                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[#1a1a1a]/60 flex-wrap">
                                                     <div className="flex items-center gap-3 flex-wrap">
                                                         <span className="font-bebas text-[#FFD700] text-lg tracking-widest leading-none">
                                                             {pl.tipo} {pl.numero}/{pl.ano}
                                                         </span>
                                                         {tipoLabel[pl.tipo] && (
-                                                            <span className="text-zinc-600 text-[10px] hidden sm:block">{tipoLabel[pl.tipo]}</span>
+                                                            <span className="text-gray-600 text-[10px] hidden sm:block">{tipoLabel[pl.tipo]}</span>
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-3">
@@ -809,12 +809,12 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                             <span className="font-bebas text-sm leading-none tracking-widest" style={{ color: votoCor }}>
                                                                 {votoLabel}
                                                             </span>
-                                                            <span className="text-[10px] text-zinc-600 mt-0.5">{votoSub}</span>
+                                                            <span className="text-[10px] text-gray-600 mt-0.5">{votoSub}</span>
                                                         </div>
                                                         <div className="flex flex-col items-end shrink-0">
-                                                            <span className="text-zinc-600 text-[11px] font-mono">{pl.data}</span>
+                                                            <span className="text-gray-600 text-[11px] font-mono">{pl.data}</span>
                                                             {pl.data && String(pl.ano) !== pl.data.substring(0, 4) && (
-                                                                <span className="text-zinc-700 text-[9px] italic">apresentado em {pl.data.substring(0, 4)}</span>
+                                                                <span className="text-gray-700 text-[9px] italic">apresentado em {pl.data.substring(0, 4)}</span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -823,11 +823,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                 {/* Corpo: ementa + link */}
                                                 <div className="px-4 py-3 space-y-3">
                                                     <div className="border-l-2 border-[#FFD700]/30 pl-3">
-                                                        <p className="text-[10px] text-zinc-600 font-bebas tracking-widest mb-0.5">EM RESUMO</p>
-                                                        <p className="text-zinc-300 text-xs leading-relaxed">{pl.ementa}</p>
+                                                        <p className="text-[10px] text-gray-600 font-bebas tracking-widest mb-0.5">EM RESUMO</p>
+                                                        <p className="text-gray-300 text-xs leading-relaxed">{pl.ementa}</p>
                                                     </div>
                                                     <a href={pl.url} target="_blank" rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1.5 text-[#FFD700] hover:text-white text-[11px] font-bebas tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-1.5 rounded-sm transition-all">
+                                                        className="inline-flex items-center gap-1.5 text-[#FFD700] hover:text-white text-[11px] font-bebas tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-1.5 transition-all">
                                                         VER PROJETO NA CÂMARA →
                                                     </a>
                                                 </div>
@@ -843,7 +843,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 mb-12">
                 {/* 2. MUNICÍPIOS BENEFICIADOS */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6 relative overflow-hidden flex flex-col min-h-[400px]">
+                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6 relative overflow-hidden flex flex-col min-h-[400px]">
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#FFD700]"></div>
 
                     <h2 className="text-4xl font-bebas text-white mb-8 flex items-center gap-3">
@@ -861,9 +861,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 return (
                                     <div
                                         key={idx}
-                                        className={`relative group p-2 -mx-2 rounded-lg transition-colors cursor-pointer ${cidadeFiltro === mun.nome
+                                        className={`relative group p-2 -mx-2 transition-colors cursor-pointer ${cidadeFiltro === mun.nome
                                             ? 'bg-[#FFD700] text-black'
-                                            : 'hover:bg-zinc-800/50'
+                                            : 'hover:bg-[#111]/50'
                                             }`}
                                         onClick={() => {
                                             setCidadeFiltro(mun.nome);
@@ -893,10 +893,10 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             </div>
                                         </div>
                                         {/* Progress bar fundo */}
-                                        <div className={`w-full h-2 rounded-full overflow-hidden ${cidadeFiltro === mun.nome ? 'bg-black/20' : 'bg-zinc-900'}`}>
+                                        <div className={`w-full h-2 overflow-hidden ${cidadeFiltro === mun.nome ? 'bg-black/20' : 'bg-[#0a0a0a]'}`}>
                                             {/* Progress bar preenchimento */}
                                             <div
-                                                className={`h-full rounded-full transition-all ${cidadeFiltro === mun.nome ? 'bg-black' : 'bg-[#FFD700] group-hover:bg-yellow-400'}`}
+                                                className={`h-full transition-all ${cidadeFiltro === mun.nome ? 'bg-black' : 'bg-[#FFD700] group-hover:bg-yellow-400'}`}
                                                 style={{ width: `${Math.max(percent, 1)}%` }} // Minimum 1% to be visible
                                             ></div>
                                         </div>
@@ -909,19 +909,19 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                 {/* 3. COLUNA DIREITA: Atividade + Análise Comportamental */}
                 <div className="flex flex-col gap-5">
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-zinc-700 rounded-l-xl" />
+                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5 relative">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-[#333]" />
 
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp className="w-4 h-4 text-[#FFD700]" />
                         <h2 className="text-2xl font-bebas text-white tracking-widest">ATIVIDADE POR ANO</h2>
                     </div>
-                    <p className="text-zinc-600 text-[11px] font-sans mb-4 uppercase tracking-widest">
+                    <p className="text-gray-600 text-[11px] font-sans mb-4 uppercase tracking-widest">
                         Repasses históricos · clique para filtrar emendas
                     </p>
 
                     {data.emendas_por_ano.length === 0 ? (
-                        <p className="text-zinc-600 text-sm italic">Nenhum dado disponível.</p>
+                        <p className="text-gray-600 text-sm italic">Nenhum dado disponível.</p>
                     ) : (() => {
                         const maxVal = Math.max(...data.emendas_por_ano.map(a => a.valor_total), 1);
                         const sorted = [...data.emendas_por_ano].sort((a, b) => b.ano - a.ano);
@@ -944,25 +944,25 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             title={`${row.total} emenda${row.total !== 1 ? 's' : ''} em ${row.ano} — ${formatCurrency(row.valor_total)}`}
                                         >
                                             {/* Ano */}
-                                            <span className={`font-bebas text-sm w-10 shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-zinc-500 group-hover:text-[#FFD700]'}`}>
+                                            <span className={`font-bebas text-sm w-10 shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-gray-500 group-hover:text-[#FFD700]'}`}>
                                                 {row.ano}
                                             </span>
 
                                             {/* Barra */}
-                                            <div className="flex-1 bg-zinc-900 rounded-full h-4 overflow-hidden">
+                                            <div className="flex-1 bg-[#0a0a0a] h-4 overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full transition-all duration-500 group-hover:brightness-125 ${isMax ? 'bg-[#FFD700]' : 'bg-[#FFD700]/50'}`}
+                                                    className={`h-full transition-all duration-500 group-hover:brightness-125 ${isMax ? 'bg-[#FFD700]' : 'bg-[#FFD700]/50'}`}
                                                     style={{ width: `${pct}%` }}
                                                 />
                                             </div>
 
                                             {/* Valor */}
-                                            <span className={`font-bebas text-sm w-[72px] text-right shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-zinc-400 group-hover:text-white'}`}>
+                                            <span className={`font-bebas text-sm w-[72px] text-right shrink-0 transition-colors ${isMax ? 'text-[#FFD700]' : 'text-gray-400 group-hover:text-white'}`}>
                                                 {label}
                                             </span>
 
                                             {/* Qtd emendas */}
-                                            <span className="text-zinc-700 text-[10px] w-6 text-right shrink-0 font-mono group-hover:text-zinc-500">
+                                            <span className="text-gray-700 text-[10px] w-6 text-right shrink-0 font-mono group-hover:text-gray-500">
                                                 {row.total}×
                                             </span>
                                         </div>
@@ -1021,13 +1021,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {/* Donut + Insights lado a lado */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 {/* Donut */}
-                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                     <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">INVESTIMENTO POR ÁREA</p>
                                     <div className="flex items-center gap-5">
                                         <div className="shrink-0 relative" style={{ width: 110, height: 110 }}>
                                             <div style={{ width: 110, height: 110, borderRadius: '50%', background: totalArea > 0 ? `conic-gradient(${gradient})` : '#27272a' }} />
                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="bg-[#0a0a0a] rounded-full flex items-center justify-center text-center" style={{ width: 50, height: 50 }}>
+                                                <div className="bg-[#0a0a0a] flex items-center justify-center text-center" style={{ width: 50, height: 50 }}>
                                                     <span className="font-bebas text-[#FFD700] text-[10px] leading-tight">{fatias.length}<br/>ÁREAS</span>
                                                 </div>
                                             </div>
@@ -1035,9 +1035,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                         <div className="flex-1 space-y-1 min-w-0">
                                             {fatias.map(([area, val], i) => (
                                                 <div key={area} className="flex items-center gap-1.5">
-                                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CORES[i] }} />
-                                                    <span className="text-zinc-400 text-[11px] truncate flex-1">{area}</span>
-                                                    <span className="text-zinc-600 text-[10px] font-mono shrink-0">{(((val as number)/totalArea)*100).toFixed(0)}%</span>
+                                                    <div className="w-2 h-2 shrink-0" style={{ backgroundColor: CORES[i] }} />
+                                                    <span className="text-gray-400 text-[11px] truncate flex-1">{area}</span>
+                                                    <span className="text-gray-600 text-[10px] font-mono shrink-0">{(((val as number)/totalArea)*100).toFixed(0)}%</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -1045,7 +1045,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 </div>
 
                                 {/* Insights */}
-                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                     <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">PERFIL EM NÚMEROS</p>
                                     <div className="space-y-2">
                                         {[
@@ -1053,12 +1053,12 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             { emoji: '📍', label: 'MUNICÍPIO FAVORITO', value: topMun?.nome.replace(' - RJ','') || '—', detalhe: topMun ? `${(topMunPct*100).toFixed(0)}% · ${formatMillions(topMun.valor)}` : '' },
                                             { emoji: '📅', label: 'ANO MAIS ATIVO',     value: anoMaisAtivo ? String(anoMaisAtivo.ano) : '—', detalhe: anoMaisAtivo ? `R$ ${(anoMaisAtivo.valor_total/1e6).toFixed(1)}M · ${anoMaisAtivo.total} emendas` : '' },
                                         ].map(({ emoji, label, value, detalhe }) => (
-                                            <div key={label} className="flex items-center gap-2 bg-zinc-900/40 rounded-lg px-3 py-2 border border-zinc-800">
+                                            <div key={label} className="flex items-center gap-2 bg-[#0a0a0a]/40 px-3 py-2 border border-[#1a1a1a]">
                                                 <span className="text-lg shrink-0">{emoji}</span>
                                                 <div className="min-w-0">
-                                                    <p className="text-[9px] text-zinc-600 font-bebas tracking-widest">{label}</p>
+                                                    <p className="text-[9px] text-gray-600 font-bebas tracking-widest">{label}</p>
                                                     <p className="text-white font-bebas text-base leading-none truncate">{value}</p>
-                                                    <p className="text-zinc-500 text-[10px]">{detalhe}</p>
+                                                    <p className="text-gray-500 text-[10px]">{detalhe}</p>
                                                 </div>
                                             </div>
                                         ))}
@@ -1067,15 +1067,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             </div>
 
                             {/* Tags comportamentais */}
-                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                            <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                 <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">ANÁLISE DE COMPORTAMENTO</p>
                                 <div className="flex flex-wrap gap-2">
                                     {tags.map(t => (
-                                        <div key={t.label} className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-700 rounded-lg px-3 py-2 hover:border-zinc-500 transition-colors">
+                                        <div key={t.label} className="flex items-center gap-2 bg-[#0a0a0a]/60 border border-[#2a2a2a] px-3 py-2 hover:border-[#444] transition-colors">
                                             <span className="text-base shrink-0">{t.emoji}</span>
                                             <div>
                                                 <span className="font-bebas tracking-widest text-xs" style={{ color: t.cor }}>{t.label}</span>
-                                                <p className="text-zinc-500 text-[10px] leading-tight">{t.desc}</p>
+                                                <p className="text-gray-500 text-[10px] leading-tight">{t.desc}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -1113,12 +1113,12 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             {/* ── CRUZAMENTO EMENDAS × CONTRATOS ──────────────────────────── */}
             {cruzamento && cruzamento.tem_cruzamento && (
                 <div className="max-w-7xl mx-auto mt-8 mb-8">
-                    <div className="bg-[#0a0a0a] border border-red-900/40 rounded-xl overflow-hidden">
+                    <div className="bg-[#0a0a0a] border border-red-900/40 overflow-hidden">
                         <div className="bg-red-950/30 border-b border-red-900/40 px-5 py-3 flex items-center gap-3">
                             <span className="text-red-400 text-xl">🔍</span>
                             <div>
                                 <p className="font-bebas text-red-400 text-lg tracking-widest">CRUZAMENTO INVESTIGATIVO</p>
-                                <p className="text-zinc-500 text-[11px] font-sans">Emendas parlamentares × contratos federais nos mesmos municípios</p>
+                                <p className="text-gray-500 text-[11px] font-sans">Emendas parlamentares × contratos federais nos mesmos municípios</p>
                             </div>
                         </div>
 
@@ -1126,24 +1126,24 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {/* Camada 1: Geográfica */}
                             {cruzamento.camada_geografica.length > 0 && (
                                 <div>
-                                    <p className="font-bebas text-zinc-400 text-sm tracking-widest mb-3 flex items-center gap-2">
+                                    <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
                                         <span className="text-base">📍</span> MUNICÍPIOS COM EMENDAS E CONTRATOS
                                     </p>
                                     <div className="space-y-2">
                                         {cruzamento.camada_geografica.map((row, i) => (
-                                            <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+                                            <div key={i} className="bg-[#080808] border border-[#1a1a1a] p-3">
                                                 <p className="font-bebas text-white text-base tracking-wide mb-1">{row.municipio}</p>
                                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                                                     <div>
-                                                        <span className="text-zinc-600">EMENDAS</span>
+                                                        <span className="text-gray-600">EMENDAS</span>
                                                         <p className="text-[#FFD700] font-bebas text-sm">
-                                                            R$ {(row.valor_emendas/1e6).toFixed(1)}M <span className="text-zinc-600">({row.num_emendas}x)</span>
+                                                            R$ {(row.valor_emendas/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_emendas}x)</span>
                                                         </p>
                                                     </div>
                                                     <div>
-                                                        <span className="text-zinc-600">CONTRATOS</span>
+                                                        <span className="text-gray-600">CONTRATOS</span>
                                                         <p className="text-red-400 font-bebas text-sm">
-                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M <span className="text-zinc-600">({row.num_contratos}x)</span>
+                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_contratos}x)</span>
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1156,25 +1156,25 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {/* Camada 2: Financeira */}
                             {cruzamento.camada_financeira.length > 0 && (
                                 <div>
-                                    <p className="font-bebas text-zinc-400 text-sm tracking-widest mb-3 flex items-center gap-2">
+                                    <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
                                         <span className="text-base">💰</span> DOADORES QUE TAMBÉM SÃO CONTRATADOS
                                     </p>
                                     <div className="space-y-2">
                                         {cruzamento.camada_financeira.map((row, i) => (
-                                            <div key={i} className="bg-zinc-900/50 border border-red-900/30 rounded-lg p-3">
+                                            <div key={i} className="bg-[#080808] border border-red-900/30 p-3">
                                                 <p className="font-bebas text-white text-sm tracking-wide mb-1 truncate">{row.doador}</p>
                                                 {row.municipios && (
-                                                    <p className="text-zinc-600 text-[10px] mb-1 truncate">📍 {row.municipios}</p>
+                                                    <p className="text-gray-600 text-[10px] mb-1 truncate">📍 {row.municipios}</p>
                                                 )}
                                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                                                     <div>
-                                                        <span className="text-zinc-600">DOAÇÃO</span>
+                                                        <span className="text-gray-600">DOAÇÃO</span>
                                                         <p className="text-green-400 font-bebas text-sm">
                                                             R$ {(row.valor_doacao/1e3).toFixed(0)}K
                                                         </p>
                                                     </div>
                                                     <div>
-                                                        <span className="text-zinc-600">CONTRATOS</span>
+                                                        <span className="text-gray-600">CONTRATOS</span>
                                                         <p className="text-red-400 font-bebas text-sm">
                                                             R$ {(row.valor_contratos/1e6).toFixed(1)}M
                                                         </p>
@@ -1183,7 +1183,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-zinc-700 text-[10px] mt-3 font-sans italic">
+                                    <p className="text-gray-700 text-[10px] mt-3 font-sans italic">
                                         * Cruzamento por CNPJ e nome. Verificar antes de publicar.
                                     </p>
                                 </div>
@@ -1196,7 +1196,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             {/* 4. FINANÇAS DE CAMPANHA (TSE) */}
             {data.dados_campanha && (
                 <div className="max-w-7xl mx-auto mt-8 mb-12 animate-slide-up">
-                    <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl overflow-hidden relative">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-1 h-full bg-[#FFD700]"></div>
 
                         <div className="p-8">
@@ -1208,7 +1208,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     </h2>
                                     <p className="text-gray-400 font-medium">Cruzamento de dados oficiais do TSE: {data.dados_campanha.cargo}</p>
                                 </div>
-                                <div className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-lg">
+                                <div className="bg-[#0a0a0a] border border-[#1a1a1a] px-4 py-2">
                                     <span className="text-xs text-gray-500 uppercase font-bold tracking-widest block mb-1">Situação</span>
                                     <span className="text-[#FFD700] font-bebas text-2xl tracking-wide">{data.dados_campanha.situacao}</span>
                                 </div>
@@ -1218,11 +1218,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 {/* Comparativo Receitas/Despesas */}
                                 <div className="space-y-8">
                                     <div className="grid grid-cols-2 gap-6">
-                                        <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
+                                        <div className="bg-[#080808] p-6 border border-[#1a1a1a]">
                                             <span className="text-gray-400 text-xs uppercase font-bold tracking-widest block mb-2">Total Recebido</span>
                                             <span className="text-3xl font-bebas text-white">{formatCurrency(data.dados_campanha.total_receitas)}</span>
                                         </div>
-                                        <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
+                                        <div className="bg-[#080808] p-6 border border-[#1a1a1a]">
                                             <span className="text-gray-400 text-xs uppercase font-bold tracking-widest block mb-2">Total Gasto</span>
                                             <span className="text-3xl font-bebas text-white">{formatCurrency(data.dados_campanha.total_despesas)}</span>
                                         </div>
@@ -1236,21 +1236,21 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                 Saldo: {formatCurrency(data.dados_campanha.total_receitas - data.dados_campanha.total_despesas)}
                                             </span>
                                         </div>
-                                        <div className="h-4 w-full bg-zinc-900 rounded-full overflow-hidden flex">
+                                        <div className="h-4 w-full bg-[#0a0a0a] overflow-hidden flex">
                                             <div
                                                 className="h-full bg-[#FFD700] transition-all duration-1000"
                                                 style={{ width: `${Math.min((data.dados_campanha.total_despesas / data.dados_campanha.total_receitas) * 100, 100)}%` }}
                                             ></div>
                                         </div>
                                         <div className="flex justify-between mt-2">
-                                            <span className="text-[10px] text-zinc-600 font-bold">0</span>
-                                            <span className="text-[10px] text-zinc-600 font-bold">{formatMillions(data.dados_campanha.total_receitas)} (CAPACIDADE)</span>
+                                            <span className="text-[10px] text-gray-600 font-bold">0</span>
+                                            <span className="text-[10px] text-gray-600 font-bold">{formatMillions(data.dados_campanha.total_receitas)} (CAPACIDADE)</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Top 5 Doadores */}
-                                <div className="bg-zinc-900/30 p-6 rounded-xl border border-zinc-800">
+                                <div className="bg-[#0a0a0a]/30 p-6 border border-[#1a1a1a]">
                                     <h3 className="text-xl font-bebas text-white mb-6 tracking-widest">TOP 5 DOADORES (FINANCIADORES)</h3>
                                     <div className="space-y-4">
                                         {data.dados_campanha.top_doadores.length === 0 ? (
@@ -1259,7 +1259,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             data.dados_campanha.top_doadores.map((doador, idx) => (
                                                 <div key={idx} className="flex justify-between items-center group">
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-zinc-700 font-bebas text-xl">{idx + 1}.</span>
+                                                        <span className="text-gray-700 font-bebas text-xl">{idx + 1}.</span>
                                                         <span className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors uppercase truncate max-w-[200px] md:max-w-md">
                                                             {doador.nome}
                                                         </span>
@@ -1271,8 +1271,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             ))
                                         )}
                                     </div>
-                                    <div className="mt-8 pt-6 border-t border-zinc-800/50">
-                                        <p className="text-[10px] text-zinc-600 leading-relaxed">
+                                    <div className="mt-8 pt-6 border-t border-[#1a1a1a]/50">
+                                        <p className="text-[10px] text-gray-600 leading-relaxed">
                                             * Dados extraídos do portal **DivulgaCandContas (TSE)**. Os valores referem-se às receitas declaradas pelo candidato durante o pleito de 2022.
                                         </p>
                                     </div>
@@ -1299,16 +1299,16 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                     {/* Filtro pago / não pago */}
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-zinc-500 text-xs font-bebas tracking-widest">PAGAMENTO:</span>
+                        <span className="text-gray-500 text-xs font-bebas tracking-widest">PAGAMENTO:</span>
                         {(['todas', 'pagas', 'nao_pagas'] as const).map(op => {
                             const labels = { todas: 'TODAS', pagas: '✅ PAGAS', nao_pagas: '⏳ NÃO PAGAS' };
                             const ativo = filtroPagamento === op;
                             return (
                                 <button key={op}
                                     onClick={() => { setFiltroPagamento(op); setPaginaAtual(1); }}
-                                    className={`font-bebas tracking-widest text-sm px-3 py-1 rounded-sm border transition-all ${ativo
+                                    className={`font-bebas tracking-widest text-sm px-3 py-1 border transition-all ${ativo
                                         ? 'bg-[#FFD700] text-black border-[#FFD700]'
-                                        : 'text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-white'}`}
+                                        : 'text-gray-400 border-[#2a2a2a] hover:border-[#444] hover:text-white'}`}
                                 >
                                     {labels[op]}
                                 </button>
@@ -1317,13 +1317,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
 
                     {cidadeFiltro !== null && (
-                        <div className="flex items-center gap-4 mb-4 bg-[#FFD700]/10 border border-[#FFD700]/30 px-4 py-2 rounded-sm w-fit">
+                        <div className="flex items-center gap-4 mb-4 bg-[#FFD700]/10 border border-[#FFD700]/30 px-4 py-2 w-fit">
                             <span className="font-bebas text-[#FFD700] tracking-widest text-xl">
                                 FILTRANDO: {cidadeFiltro.replace(' - RJ', '')}
                             </span>
                             <button
                                 onClick={() => { setCidadeFiltro(null); setPaginaAtual(1); }}
-                                className="ml-auto font-bebas text-black bg-[#FFD700] px-3 py-1 text-sm tracking-wider hover:bg-yellow-400 transition-colors rounded-sm"
+                                className="ml-auto font-bebas text-black bg-[#FFD700] px-3 py-1 text-sm tracking-wider hover:bg-yellow-400 transition-colors"
                             >
                                 × LIMPAR FILTRO
                             </button>
@@ -1343,7 +1343,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     const pagina = emendasFiltradas.slice((paginaAtual - 1) * 20, paginaAtual * 20);
 
                     if (emendasFiltradas.length === 0) return (
-                        <div className="p-12 text-center text-gray-500 border border-zinc-800 rounded-lg">
+                        <div className="p-12 text-center text-gray-500 border border-[#1a1a1a]">
                             <p className="font-bebas text-2xl">
                                 {cidadeFiltro ? `Nenhuma emenda para ${cidadeFiltro}` : 'Nenhuma emenda registrada'}
                             </p>
@@ -1363,7 +1363,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     const municipio = emenda.municipio_destino?.replace(' - RJ', '') || '—';
 
                                     return (
-                                        <div key={idx} className="bg-[#0d0d0d] border border-zinc-800 hover:border-zinc-600 rounded-lg overflow-hidden transition-all">
+                                        <div key={idx} className="bg-[#0d0d0d] border border-[#1a1a1a] hover:border-[#333] overflow-hidden transition-all">
 
                                             {/* ── Faixa superior: área + ano + município ── */}
                                             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
@@ -1399,26 +1399,26 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                                                 {/* COLUNA 1: O que é essa emenda */}
                                                 <div className="md:col-span-1">
-                                                    <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-1">O QUE É</p>
+                                                    <p className="text-[10px] text-gray-500 font-bebas tracking-widest mb-1">O QUE É</p>
                                                     <p className="text-white font-semibold text-sm mb-1">{tipo.nome}</p>
-                                                    <p className="text-zinc-400 text-xs leading-relaxed">{tipo.explicacao}</p>
+                                                    <p className="text-gray-400 text-xs leading-relaxed">{tipo.explicacao}</p>
                                                 </div>
 
                                                 {/* COLUNA 2: Valores prometido vs pago */}
                                                 <div className="md:col-span-1">
-                                                    <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-2">VALORES</p>
+                                                    <p className="text-[10px] text-gray-500 font-bebas tracking-widest mb-2">VALORES</p>
                                                     <div className="space-y-2">
                                                         {/* Prometido */}
                                                         <div>
                                                             <div className="flex justify-between mb-0.5">
-                                                                <span className="text-[10px] text-zinc-500 font-sans">
+                                                                <span className="text-[10px] text-gray-500 font-sans">
                                                                     💰 RESERVADO (prometido)
                                                                 </span>
                                                                 <span className="text-[#FFD700] font-bebas text-base">
                                                                     {formatCurrency(empenhado)}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-[9px] text-zinc-600 font-sans">
+                                                            <p className="text-[9px] text-gray-600 font-sans">
                                                                 Valor que o governo federal reservou no orçamento.
                                                             </p>
                                                         </div>
@@ -1436,16 +1436,16 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                                 </span>
                                                             </div>
                                                             {/* Barra de execução */}
-                                                            <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                                                            <div className="w-full bg-[#111] h-2 overflow-hidden">
                                                                 <div
-                                                                    className="h-full rounded-full transition-all duration-500"
+                                                                    className="h-full transition-all duration-500"
                                                                     style={{
                                                                         width: `${execPct}%`,
                                                                         backgroundColor: execPct >= 90 ? '#4ade80' : execPct >= 50 ? '#facc15' : '#ef4444'
                                                                     }}
                                                                 />
                                                             </div>
-                                                            <p className="text-[9px] text-zinc-600 font-sans mt-0.5">
+                                                            <p className="text-[9px] text-gray-600 font-sans mt-0.5">
                                                                 {foiPago
                                                                     ? `${execPct.toFixed(0)}% do valor reservado foi efetivamente transferido.`
                                                                     : 'O dinheiro foi reservado mas ainda não chegou ao município.'}
@@ -1457,14 +1457,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                 {/* COLUNA 3: Para onde foi + link */}
                                                 <div className="md:col-span-1 flex flex-col justify-between">
                                                     <div>
-                                                        <p className="text-[10px] text-zinc-500 font-bebas tracking-widest mb-1">DESTINO</p>
+                                                        <p className="text-[10px] text-gray-500 font-bebas tracking-widest mb-1">DESTINO</p>
                                                         <button
                                                             onClick={() => onMunicipioClick?.(emenda.municipio_destino)}
                                                             className="text-white font-bebas text-xl tracking-wide hover:text-[#FFD700] transition-colors text-left"
                                                         >
                                                             {municipio}
                                                         </button>
-                                                        <p className="text-[9px] text-zinc-600 font-sans mt-0.5">
+                                                        <p className="text-[9px] text-gray-600 font-sans mt-0.5">
                                                             Clique para ver todas as emendas deste município.
                                                         </p>
                                                     </div>
@@ -1472,7 +1472,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                         href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/consulta?codigoEmenda=${emenda.codigo_emenda}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="mt-3 inline-flex items-center gap-2 text-zinc-500 hover:text-[#FFD700] text-[10px] font-bebas tracking-widest border border-zinc-700 hover:border-[#FFD700]/40 px-3 py-1.5 rounded-sm transition-all w-fit"
+                                                        className="mt-3 inline-flex items-center gap-2 text-gray-500 hover:text-[#FFD700] text-[10px] font-bebas tracking-widest border border-[#2a2a2a] hover:border-[#FFD700]/40 px-3 py-1.5 transition-all w-fit"
                                                     >
                                                         <ExternalLink className="w-3 h-3" />
                                                         VER COMPROVAÇÃO OFICIAL
@@ -1489,15 +1489,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 <div className="mt-6 flex justify-between items-center">
                                     <button onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
                                         disabled={paginaAtual === 1}
-                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all rounded-sm">
+                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all">
                                         ← ANTERIOR
                                     </button>
-                                    <span className="text-zinc-500 font-sans text-sm">
+                                    <span className="text-gray-500 font-sans text-sm">
                                         {emendasFiltradas.length} emendas · pág. {paginaAtual}/{totalPaginas}
                                     </span>
                                     <button onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
                                         disabled={paginaAtual >= totalPaginas}
-                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all rounded-sm">
+                                        className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all">
                                         PRÓXIMA →
                                     </button>
                                 </div>

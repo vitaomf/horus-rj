@@ -517,6 +517,64 @@ def proxy_foto_politico(politico_id: int):
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/api/busca/global")
+@limiter.limit("60/minute")
+def busca_global(request: Request, q: str = Query(..., min_length=2)):
+    """
+    Busca consolidada em 4 fontes: municípios, parlamentares, emendas, leis (futuro).
+    Substitui as 3 chamadas paralelas do SearchBar por uma única requisição.
+    """
+    q_like = f"%{q.strip()}%"
+    conn   = get_db_connection()
+    try:
+        # Municípios (até 5)
+        try:
+            mun_rows = conn.execute(
+                "SELECT id, nome FROM municipios WHERE UPPER(nome) LIKE UPPER(?) ORDER BY nome LIMIT 5", (q_like,)
+            ).fetchall()
+        except Exception:
+            mun_rows = conn.execute(
+                "SELECT ROW_NUMBER() OVER() as id, municipio_destino as nome FROM emendas "
+                "WHERE UPPER(municipio_destino) LIKE UPPER(?) GROUP BY municipio_destino ORDER BY municipio_destino LIMIT 5",
+                (q_like,)
+            ).fetchall()
+        municipios = [{"id": r["id"], "nome": r["nome"]} for r in mun_rows]
+
+        # Parlamentares (até 5)
+        NOT_COL = "NOT (nome LIKE '%BANCADA%' OR nome LIKE 'RELATOR%' OR nome = 'Sem informação' OR nome LIKE '%LÍDER%')"
+        pol_rows = conn.execute(
+            f"SELECT id, nome, partido, cargo FROM politicos WHERE UPPER(nome) LIKE UPPER(?) AND {NOT_COL} ORDER BY nome LIMIT 5",
+            (q_like,)
+        ).fetchall()
+        parlamentares = [{"id": r["id"], "nome": r["nome"], "partido": r["partido"], "cargo": r["cargo"]} for r in pol_rows]
+
+        # Emendas — busca em descrição e objetivo (até 4)
+        eme_rows = conn.execute("""
+            SELECT e.id, e.ano, e.valor, e.descricao, e.objetivo, e.municipio_destino,
+                   p.nome as politico_nome
+            FROM emendas e
+            LEFT JOIN politicos p ON p.id = e.politico_id
+            WHERE UPPER(e.descricao) LIKE UPPER(?) OR UPPER(e.objetivo) LIKE UPPER(?)
+            ORDER BY e.valor DESC LIMIT 4
+        """, (q_like, q_like)).fetchall()
+        emendas = [{
+            "id":             r["id"],
+            "ano":            r["ano"],
+            "valor":          float(r["valor"]) if r["valor"] else 0,
+            "descricao":      r["descricao"],
+            "objetivo":       r["objetivo"],
+            "municipio_destino": r["municipio_destino"],
+            "politico_nome":  r["politico_nome"],
+        } for r in eme_rows]
+
+        return {"municipios": municipios, "parlamentares": parlamentares, "emendas": emendas, "leis": []}
+    except Exception as e:
+        logger.error("Erro em /busca/global: %s", e, exc_info=True)
+        return {"municipios": [], "parlamentares": [], "emendas": [], "leis": []}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/busca")
 @limiter.limit("30/minute")
 def buscar_politicos(request: Request, q: str = Query(..., description="Termo de busca pelo nome")):
