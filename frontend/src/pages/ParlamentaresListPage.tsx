@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { ESTADOS, REGIOES, type SlugRegiao } from '../data/mockBrasil';
+import { API_BASE_URL } from '../config';
+
+interface ParlFederal { id: number; nome: string; partido: string | null; cargo: string | null; foto_url: string | null; }
 
 // ── Tipografia padrão do Horus ──
 const FONT_DECORATIVE = "'Cinzel Decorative', serif";
@@ -37,7 +40,24 @@ type Nivel = 'federal' | 'estadual' | 'municipal';
 export function ParlamentaresListPage() {
   const navigate = useNavigate();
   const [filtroRegiao, setFiltroRegiao] = useState<SlugRegiao | ''>('');
-  const [ufExpandida, setUfExpandida] = useState<string | null>(null);
+  const [ufExpandida, setUfExpandida]   = useState<string | null>(null);
+  const [parlCache, setParlCache]        = useState<Record<string, ParlFederal[]>>({});
+  const [loadingUf, setLoadingUf]        = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ufExpandida || parlCache[ufExpandida]) return;
+    setLoadingUf(ufExpandida);
+    Promise.all([
+      fetch(`${API_BASE_URL}/api/politicos?uf=${ufExpandida}&casa=camara&limite=200`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/api/politicos?uf=${ufExpandida}&casa=senado&limite=30`).then(r => r.json()),
+    ])
+      .then(([dep, sen]) => {
+        const lista = [...(dep.politicos ?? []), ...(sen.politicos ?? [])];
+        setParlCache(prev => ({ ...prev, [ufExpandida]: lista }));
+      })
+      .catch(() => setParlCache(prev => ({ ...prev, [ufExpandida]: [] })))
+      .finally(() => setLoadingUf(null));
+  }, [ufExpandida]);
 
   const ufsVisiveis = filtroRegiao
     ? ESTADOS.filter(e => e.slugRegiao === filtroRegiao)
@@ -167,18 +187,54 @@ export function ParlamentaresListPage() {
                     <span className="font-mono text-[8px] tracking-widest text-green-400/40">EM COLETA</span>
                   </button>
                   {expandido && (
-                    <div className="px-4 py-5 border-t border-[#111] bg-[#030303]">
-                      <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-px bg-[#111]">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                          <div key={i} className="bg-black p-3">
-                            <div className="w-full aspect-square bg-[#111] animate-pulse mb-2" />
-                            <div className="h-2 w-3/4 bg-[#0d0d0d] animate-pulse" />
-                          </div>
-                        ))}
-                      </div>
-                      <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase mt-3 text-center">
-                        DADOS DA ASSEMBLEIA DE {estado.nome.toUpperCase()} EM COLETA
-                      </p>
+                    <div className="border-t border-[#111] bg-[#030303]">
+                      {loadingUf === estado.uf ? (
+                        <div className="flex items-center justify-center py-10 gap-2">
+                          {[0,1,2].map(i => (
+                            <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/30 animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
+                          ))}
+                        </div>
+                      ) : (parlCache[estado.uf] ?? []).length === 0 ? (
+                        <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase py-8 text-center">
+                          PARLAMENTARES DE {estado.nome.toUpperCase()} EM COLETA
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
+                          {(parlCache[estado.uf] ?? []).map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => navigate(`/politicos/${p.id}`)}
+                              className="bg-[#030303] hover:bg-[#080808] transition-colors p-3 flex flex-col items-center text-center gap-2 group relative"
+                            >
+                              <div className="absolute top-0 left-0 right-0 h-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/20 transition-colors" />
+                              <div className="w-12 h-12 overflow-hidden border border-[#1a1a1a] group-hover:border-[#FFD700]/20 bg-[#0a0a0a] transition-colors relative shrink-0">
+                                {p.foto_url && (
+                                  <img
+                                    src={`${API_BASE_URL}/api/foto/${p.id}`}
+                                    alt={p.nome}
+                                    className="w-full h-full object-cover object-top"
+                                    loading="lazy"
+                                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                )}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="font-bebas text-sm text-[#FFD700]/30 group-hover:text-[#FFD700]/60 transition-colors">
+                                    {p.nome.split(' ').map(n => n[0]).slice(0,2).join('')}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="min-w-0 w-full">
+                                <p className="font-bebas text-[11px] tracking-wide text-white group-hover:text-[#FFD700] transition-colors leading-tight line-clamp-2">
+                                  {p.nome}
+                                </p>
+                                <p className="font-mono text-[7px] tracking-widest text-gray-700 mt-0.5">
+                                  {p.partido ?? '—'}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

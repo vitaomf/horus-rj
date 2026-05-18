@@ -229,7 +229,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     // Foto + Bio + Atividade: ativa loading IMEDIATAMENTE para o usuário ver feedback
     useEffect(() => {
         if (!data) return;
-        if (data.foto_url) setFotoUrl(data.foto_url);
+        // Usar proxy /api/foto/:id — resolve CORS, adiciona cache de 1h e fallback automático
+        if (data.foto_url) setFotoUrl(`${API_BASE_URL}/api/foto/${data.id}`);
 
         // Marca atividade como "carregando" desde já — o spinner aparece sem esperar bio
         setLoadingAtividade(true);
@@ -247,7 +248,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 if (cancelled) return;
                 if (!bio.encontrado) { setLoadingAtividade(false); return; }
 
-                if (!data.foto_url && bio.urlFoto) setFotoUrl(bio.urlFoto);
+                if (!data.foto_url && bio.urlFoto) setFotoUrl(`${API_BASE_URL}/api/foto/${data.id}`);
                 const depId = bio.id;
                 setBioData({
                     nomeCivil: bio.nomeCivil,

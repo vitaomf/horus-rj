@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -371,71 +371,116 @@ def listar_politicos_paginado(
     request: Request,
     pagina: int = Query(1, ge=1),
     limite: int = Query(20, ge=1, le=2000),
-    busca: Optional[str] = Query(None)
+    busca: Optional[str] = Query(None),
+    uf:   Optional[str] = Query(None),
+    casa: Optional[str] = Query(None),
 ):
     """
-    Lista políticos paginados com total de emendas e valor.
-    Suporta busca por nome.
+    Lista políticos paginados. Filtros: busca, uf, casa (camara|senado).
+    Retorna foto_url para uso direto no frontend.
     """
     conn = get_db_connection()
     try:
         where_parts = [NOT_AUTOR_COLETIVO_SQL]
-        params = []
+        params: list = []
 
         if busca and busca.strip():
             where_parts.append("UPPER(p.nome) LIKE UPPER(?)")
             params.append(f'%{busca.strip()}%')
 
+        if uf and uf.strip():
+            where_parts.append("UPPER(p.uf) = UPPER(?)")
+            params.append(uf.strip())
+
+        if casa and casa.strip():
+            where_parts.append("p.casa = ?")
+            params.append(casa.strip().lower())
+
         where_clause = "WHERE " + " AND ".join(where_parts)
 
-        # Contar total
-        count_query = f"""
-            SELECT COUNT(DISTINCT p.id) as total
-            FROM politicos p
-            {where_clause}
-        """
-        total = conn.execute(count_query, params).fetchone()["total"]
+        total = conn.execute(
+            f"SELECT COUNT(DISTINCT p.id) FROM politicos p {where_clause}", params
+        ).fetchone()[0]
         total_paginas = max(1, math.ceil(total / limite))
-        
-        # Buscar página
+
+        # Quando filtrando por uf/casa, ordenar por nome; caso contrário por valor de emendas
+        order = "p.nome ASC" if (uf or casa) else "valor_total DESC"
+
         offset = (pagina - 1) * limite
-        data_query = f"""
-            SELECT p.id, p.nome, p.partido, p.cargo,
+        rows = conn.execute(f"""
+            SELECT p.id, p.nome, p.partido, p.cargo, p.uf, p.casa, p.foto_url,
                    COUNT(e.id) as total_emendas,
-                   SUM(e.valor) as valor_total
+                   COALESCE(SUM(e.valor), 0) as valor_total
             FROM politicos p
             LEFT JOIN emendas e ON p.id = e.politico_id
             {where_clause}
             GROUP BY p.id
-            ORDER BY valor_total DESC
+            ORDER BY {order}
             LIMIT ? OFFSET ?
-        """
-        data_params = params + [limite, offset]
-        rows = conn.execute(data_query, data_params).fetchall()
-        
+        """, params + [limite, offset]).fetchall()
+
         politicos = [
             {
-                "id": r["id"],
-                "nome": r["nome"],
-                "partido": r["partido"],
-                "cargo": r["cargo"],
+                "id":           r["id"],
+                "nome":         r["nome"],
+                "partido":      r["partido"],
+                "cargo":        r["cargo"],
+                "uf":           r["uf"],
+                "casa":         r["casa"],
+                "foto_url":     r["foto_url"],
                 "total_emendas": r["total_emendas"] or 0,
-                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0
+                "valor_total":  float(r["valor_total"]) if r["valor_total"] else 0,
             }
             for r in rows
         ]
-        
-        return {
-            "politicos": politicos,
-            "total": total,
-            "pagina": pagina,
-            "total_paginas": total_paginas
-        }
+
+        return {"politicos": politicos, "total": total, "pagina": pagina, "total_paginas": total_paginas}
     except Exception as e:
         logger.error("Erro em /politicos paginado: %s", e, exc_info=True)
         return {"politicos": [], "total": 0, "pagina": 1, "total_paginas": 1}
     finally:
         conn.close()
+
+@app.get("/api/foto/{politico_id}")
+def proxy_foto_politico(politico_id: int):
+    """
+    Proxy leve de foto: busca o URL do DB, faz fetch externo (com cache in-memory de 1h),
+    retorna a imagem com headers de cache. Resolve CORS e hotlink sem baixar tudo de uma vez.
+    """
+    import time, urllib.request
+
+    _cache = getattr(proxy_foto_politico, "_cache", {})
+    proxy_foto_politico._cache = _cache
+
+    now = time.time()
+    if politico_id in _cache:
+        ts, ct, data = _cache[politico_id]
+        if now - ts < 3600:
+            return Response(content=data, media_type=ct,
+                            headers={"Cache-Control": "public, max-age=3600"})
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute("SELECT foto_url FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row or not row["foto_url"]:
+        raise HTTPException(status_code=404, detail="Sem foto")
+
+    url = row["foto_url"]
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            ct   = resp.headers.get("Content-Type", "image/jpeg")
+            data = resp.read()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Foto indisponível")
+
+    _cache[politico_id] = (now, ct, data)
+    return Response(content=data, media_type=ct,
+                    headers={"Cache-Control": "public, max-age=3600"})
+
 
 @app.get("/api/politicos/busca")
 @limiter.limit("30/minute")
