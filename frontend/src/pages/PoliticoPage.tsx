@@ -1087,22 +1087,50 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>{/* fim flex flex-col direita */}
             </div>{/* fim grid */}
 
-            {/* Mini-mapa full-width */}
-            <div className="max-w-7xl mx-auto mt-5 mb-8">
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
-                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-1">MAPA DE ATUAÇÃO</p>
-                    <p className="text-zinc-600 text-[11px] uppercase tracking-widest mb-3">
-                        Municípios beneficiados · clique para filtrar emendas
-                    </p>
-                    <div className="rounded-lg overflow-hidden border border-zinc-800">
-                        <Suspense fallback={<div className="h-[240px] flex items-center justify-center text-[#FFD700]/30 font-bebas text-xl animate-pulse">CARREGANDO MAPA...</div>}>
-                            <MapaRJMini
-                                municipalities={data.municipios_beneficiados.map(m => m.nome.replace(' - RJ',''))}
-                                onMunicipioClick={(nome) => onMunicipioClick?.(nome + ' - RJ')}
-                                height={240}
-                            />
-                        </Suspense>
+            {/* ── MAPA DE ATUAÇÃO ── */}
+            <div className="max-w-7xl mx-auto mt-5 mb-8 border border-[#1a1a1a]">
+                {/* header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[#1a1a1a] bg-[#050505]">
+                    <div>
+                        <p className="font-mono text-[8px] tracking-[0.45em] text-[#FFD700]/40 uppercase">
+                            Zona de Atuação · Municípios Beneficiados
+                        </p>
+                        <p className="font-bebas text-lg tracking-widest text-white leading-tight">
+                            MAPA DE ATUAÇÃO
+                        </p>
                     </div>
+                    {data.municipios_beneficiados.length > 0 && (
+                        <div className="text-right border-l border-[#1a1a1a] pl-4">
+                            <p className="font-bebas text-2xl text-[#FFD700] leading-none">
+                                {data.municipios_beneficiados.length}
+                            </p>
+                            <p className="font-mono text-[8px] tracking-widest text-gray-700 uppercase">municípios</p>
+                        </div>
+                    )}
+                </div>
+                {/* mapa */}
+                <Suspense fallback={
+                    <div className="h-[260px] flex flex-col items-center justify-center gap-3 bg-black">
+                        <div className="flex gap-1.5">
+                            {[0,1,2].map(i => (
+                                <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/30 animate-bounce"
+                                    style={{ animationDelay: `${i * 100}ms` }} />
+                            ))}
+                        </div>
+                        <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase">Carregando mapa</p>
+                    </div>
+                }>
+                    <MapaRJMini
+                        municipalities={data.municipios_beneficiados.map(m => m.nome.replace(' - RJ', ''))}
+                        onMunicipioClick={(nome) => onMunicipioClick?.(nome + ' - RJ')}
+                        height={260}
+                    />
+                </Suspense>
+                {/* footer hint */}
+                <div className="border-t border-[#1a1a1a] bg-[#050505] px-5 py-2">
+                    <p className="font-mono text-[7px] tracking-[0.4em] text-gray-800 uppercase">
+                        Clique em um município para filtrar emendas · Heatmap por volume empenhado
+                    </p>
                 </div>
             </div>
 
