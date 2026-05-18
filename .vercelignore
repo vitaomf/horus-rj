@@ -1,1 +1,17 @@
-﻿*
+# Exclui arquivos pesados/locais — Vercel só precisa do main.py + requirements.txt
+# para detecção FastAPI. Todo o tráfego vai via rewrites para o ngrok.
+backend/
+scheduler/
+cache/
+logs/
+scripts/
+tests/
+frontend/
+.venv/
+__pycache__/
+*.db
+*.db-*
+.env
+*.log
+transparencia_rj*.db
+ngrok.yml
