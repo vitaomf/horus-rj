@@ -139,19 +139,19 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
         <div className="min-h-screen text-white relative z-10 pb-20 px-0 md:px-0">
 
             {/* HEADER DA PÁGINA */}
-            <header className="bg-black border-b-4 border-[#FFD700] pt-6 pb-4 px-4 md:px-6 sticky top-16 z-[40] shadow-2xl">
+            <header className="bg-black border-b border-[#FFD700]/30 pt-5 pb-4 px-4 md:px-6 sticky top-16 z-[40] shadow-2xl">
                 <div className="max-w-7xl mx-auto">
                     <button
                         onClick={onVoltar}
-                        className="flex items-center text-[#FFD700] hover:text-white transition-colors mb-4 md:mb-3 group cursor-pointer"
+                        className="flex items-center gap-2 font-mono text-[9px] tracking-[0.3em] text-gray-600 hover:text-[#FFD700] transition-colors mb-4 md:mb-3 group"
                     >
-                        <ArrowLeft className="w-4 h-4 mr-2 transform group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-bebas text-xl tracking-widest mt-1">VOLTAR AO DIRETÓRIO</span>
+                        <ArrowLeft className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" />
+                        VOLTAR AO DIRETÓRIO
                     </button>
 
                     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 md:gap-8">
                         <div>
-                            <p className="text-gray-400 font-semibold tracking-[0.15em] uppercase mb-1 text-[10px] md:text-xs">RELATÓRIO MUNICIPAL DE TRANSPARÊNCIA</p>
+                            <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-1">Relatório Municipal · Transparência</p>
 
                             <div className="flex items-center flex-wrap gap-4 mt-2">
                                 <div className="flex items-center gap-2 order-2 md:order-1">
@@ -172,7 +172,8 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                     </button>
                                 </div>
 
-                                <h1 className="text-3xl md:text-5xl text-[#FFD700] font-bebas tracking-wide leading-none uppercase m-0 order-1 md:order-2">
+                                <h1 style={{ fontFamily: "'Cinzel Decorative', serif" }}
+                                    className="text-xl md:text-3xl text-[#FFD700] leading-none uppercase m-0 order-1 md:order-2 tracking-wide">
                                     {data.municipio.replace(' - RJ', '').trim()}
                                 </h1>
                             </div>
@@ -216,11 +217,12 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                 {/* RANKING DE POLÍTICOS */}
                 <section>
                     <div className="flex flex-col mb-8">
-                        <h2 className="text-[36px] text-[#FFD700] m-0 tracking-wider font-bebas flex items-center">
-                            <UserRound className="w-8 h-8 mr-3" /> POLÍTICOS QUE DESTINARAM VERBAS
+                        <p className="font-mono text-[8px] tracking-[0.5em] text-[#FFD700]/40 uppercase mb-2">Distribuição de Verbas</p>
+                        <h2 className="font-bebas text-[32px] text-white m-0 tracking-wider flex items-center gap-3">
+                            <UserRound className="w-7 h-7 text-[#FFD700]" /> POLÍTICOS QUE DESTINARAM VERBAS
                         </h2>
-                        <div className="h-[3px] w-[40px] bg-[#FFD700] mt-1 mb-2"></div>
-                        <p className="text-gray-400 text-lg">Ranking dos parlamentares que mais alocaram recursos para este município.</p>
+                        <div className="h-px w-10 bg-[#FFD700]/40 mt-2 mb-3"></div>
+                        <p className="font-mono text-[10px] text-gray-600 tracking-wide">Ranking dos parlamentares que mais alocaram recursos para este município.</p>
                     </div>
 
                     <div className="bg-[#111] border border-[#333] rounded-sm p-6 space-y-4">
@@ -270,11 +272,12 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                 {/* TABELA DE EMENDAS */}
                 <section>
                     <div className="flex flex-col mb-8">
-                        <h2 className="text-[36px] text-[#FFD700] m-0 tracking-wider font-bebas flex items-center">
-                            <FileText className="w-8 h-8 mr-3" /> EMENDAS REGISTRADAS
+                        <p className="font-mono text-[8px] tracking-[0.5em] text-[#FFD700]/40 uppercase mb-2">Histórico de Repasses</p>
+                        <h2 className="font-bebas text-[32px] text-white m-0 tracking-wider flex items-center gap-3">
+                            <FileText className="w-7 h-7 text-[#FFD700]" /> EMENDAS REGISTRADAS
                         </h2>
-                        <div className="h-[3px] w-[40px] bg-[#FFD700] mt-1 mb-2"></div>
-                        <p className="text-gray-400 text-lg">Histórico completo dos repasses federais identificados.</p>
+                        <div className="h-px w-10 bg-[#FFD700]/40 mt-2 mb-3"></div>
+                        <p className="font-mono text-[10px] text-gray-600 tracking-wide">Histórico completo dos repasses federais identificados.</p>
                     </div>
 
                     {data.emendas.length === 0 ? (
@@ -386,11 +389,12 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                 {/* CONTRATOS PÚBLICOS */}
                 <section>
                     <div className="flex flex-col mb-8">
-                        <h2 className="text-[36px] text-[#FFD700] m-0 tracking-wider font-bebas flex items-center">
-                            <Building2 className="w-8 h-8 mr-3" /> CONTRATOS PÚBLICOS ALAVANCADOS
+                        <p className="font-mono text-[8px] tracking-[0.5em] text-[#FFD700]/40 uppercase mb-2">Contratos Públicos</p>
+                        <h2 className="font-bebas text-[32px] text-white m-0 tracking-wider flex items-center gap-3">
+                            <Building2 className="w-7 h-7 text-[#FFD700]" /> CONTRATOS PÚBLICOS ALAVANCADOS
                         </h2>
-                        <div className="h-[3px] w-[40px] bg-[#FFD700] mt-1 mb-2"></div>
-                        <p className="text-gray-400 text-lg">Histórico de contratos celebrados neste ano.</p>
+                        <div className="h-px w-10 bg-[#FFD700]/40 mt-2 mb-3"></div>
+                        <p className="font-mono text-[10px] text-gray-600 tracking-wide">Histórico de contratos celebrados neste ano.</p>
                     </div>
 
                     {(!data.contratos || data.contratos.length === 0) ? (

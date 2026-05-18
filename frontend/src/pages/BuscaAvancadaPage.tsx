@@ -9,11 +9,11 @@ const FONT_CINZEL     = "'Cinzel', serif";
 
 type TabBusca = 'municipios' | 'parlamentares' | 'emendas' | 'leis';
 
-const TABS: { key: TabBusca; label: string; icon: string }[] = [
-  { key: 'municipios',    label: 'MUNICÍPIOS',    icon: '📍' },
-  { key: 'parlamentares', label: 'PARLAMENTARES', icon: '👤' },
-  { key: 'emendas',       label: 'EMENDAS',       icon: '💰' },
-  { key: 'leis',          label: 'LEIS',          icon: '⚖' },
+const TABS: { key: TabBusca; label: string }[] = [
+  { key: 'municipios',    label: 'MUNICÍPIOS'    },
+  { key: 'parlamentares', label: 'PARLAMENTARES' },
+  { key: 'emendas',       label: 'EMENDAS'       },
+  { key: 'leis',          label: 'LEIS'          },
 ];
 
 export const BuscaAvancadaPage: React.FC = () => {
@@ -61,21 +61,23 @@ export const BuscaAvancadaPage: React.FC = () => {
       {/* ── TABS ── */}
       <div className="border-b border-[#1a1a1a] sticky top-16 bg-black/95 backdrop-blur-sm z-40">
         <div className="max-w-6xl mx-auto px-4 md:px-12">
-          <div className="flex overflow-x-auto scrollbar-thin">
+          <div className="flex overflow-x-auto">
             {TABS.map(t => {
               const ativo = tab === t.key;
               return (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex items-center gap-2 px-5 py-4 font-bebas tracking-[0.2em] text-sm md:text-base whitespace-nowrap border-b-2 transition-colors ${
+                  className={`relative px-5 py-4 font-mono text-[10px] tracking-[0.35em] whitespace-nowrap transition-colors ${
                     ativo
-                      ? 'text-[#FFD700] border-[#FFD700]'
-                      : 'text-gray-500 border-transparent hover:text-white hover:border-[#FFD700]/30'
+                      ? 'text-[#FFD700]'
+                      : 'text-gray-600 hover:text-gray-300'
                   }`}
                 >
-                  <span className="text-lg">{t.icon}</span>
                   {t.label}
+                  {ativo && (
+                    <div className="absolute bottom-0 left-0 right-0 h-px bg-[#FFD700]" />
+                  )}
                 </button>
               );
             })}
@@ -134,17 +136,18 @@ function TabMunicipios() {
         <span className="ml-2 text-gray-700">(RJ disponível · demais estados em coleta)</span>
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-px bg-[#111]">
         {resultados.map(m => (
           <button
             key={m.id}
             onClick={() => navigate(`/municipios/${encodeURIComponent(m.nome)}`)}
-            className="border border-[#1a1a1a] bg-[#0a0a0a] p-3 rounded-sm text-left hover:bg-[#111] hover:border-[#FFD700]/40 transition-all group"
+            className="bg-black p-4 text-left hover:bg-[#080808] transition-colors group relative"
           >
-            <p className="font-bebas text-base tracking-widest text-white group-hover:text-[#FFD700] transition-colors leading-tight">
+            <div className="absolute top-0 left-0 right-0 h-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
+            <p className="font-bebas text-base tracking-wider text-white group-hover:text-[#FFD700] transition-colors leading-tight">
               {m.nome.replace(' - RJ', '')}
             </p>
-            <p className="text-gray-600 text-[10px] tracking-widest mt-1">RJ</p>
+            <p className="font-mono text-[8px] tracking-widest text-gray-800 mt-1">RJ</p>
           </button>
         ))}
       </div>
@@ -186,40 +189,40 @@ function TabParlamentares() {
     <div className="space-y-5">
       <SearchInput value={q} setValue={setQ} placeholder="Buscar parlamentar pelo nome..." />
 
-      <div className="bg-[#FFD700]/[0.03] border border-[#FFD700]/20 rounded-sm p-3 flex items-center gap-3">
-        <span className="text-[#FFD700]">ℹ</span>
-        <p className="text-gray-400 text-xs">
-          <span className="font-bebas text-[#FFD700]/80 tracking-widest mr-1">EM CONSTRUÇÃO:</span>
-          Hoje a busca cobre parlamentares com emendas no RJ. Em breve: todos os 594 parlamentares federais.
+      <div className="border border-[#FFD700]/15 bg-[#FFD700]/[0.02] px-4 py-3 flex items-center gap-3">
+        <div className="w-1.5 h-1.5 bg-[#FFD700]/40 shrink-0" />
+        <p className="font-mono text-[9px] tracking-widest text-gray-600">
+          <span className="text-[#FFD700]/60 mr-2">EM CONSTRUÇÃO</span>
+          Busca cobre parlamentares com emendas no RJ. Em breve: 594 federais completos.
         </p>
       </div>
 
-      <p className="text-gray-500 text-xs font-bebas tracking-widest">
-        {loading
-          ? 'BUSCANDO...'
-          : q.trim()
-            ? `${resultados.length} PARLAMENTAR${resultados.length !== 1 ? 'ES' : ''} ENCONTRADO${resultados.length !== 1 ? 'S' : ''}`
-            : 'DIGITE PARA BUSCAR'}
+      <p className="font-mono text-[9px] tracking-widest text-gray-700">
+        {loading ? 'BUSCANDO...' : q.trim() ? `${resultados.length} RESULTADO${resultados.length !== 1 ? 'S' : ''}` : 'DIGITE PARA BUSCAR'}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="divide-y divide-[#111]">
         {resultados.map(p => (
           <button
             key={p.id}
             onClick={() => navigate(`/politicos/${p.id}`)}
-            className="text-left border border-[#1a1a1a] bg-[#0a0a0a] p-4 rounded-sm hover:bg-[#111] hover:border-[#FFD700]/40 transition-all group flex items-center gap-3"
+            className="w-full flex items-center gap-3 px-0 py-3.5 text-left hover:bg-[#080808] transition-colors group relative"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/30 flex items-center justify-center font-bebas text-[#FFD700] text-lg flex-shrink-0">
-              {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+            <div className="absolute left-0 top-0 bottom-0 w-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
+            <div className="w-9 h-9 bg-[#0a0a0a] border border-[#2a2a2a] group-hover:border-[#FFD700]/30 flex items-center justify-center shrink-0 transition-colors">
+              <span className="font-bebas text-sm text-[#FFD700]/60 group-hover:text-[#FFD700] transition-colors">
+                {p.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bebas text-base tracking-widest text-white group-hover:text-[#FFD700] transition-colors truncate">
+              <p className="font-bebas text-base tracking-wider text-white group-hover:text-[#FFD700] transition-colors truncate">
                 {p.nome.toUpperCase()}
               </p>
-              <p className="text-gray-600 text-[10px] tracking-widest font-bebas">
+              <p className="font-mono text-[8px] tracking-widest text-gray-700">
                 {p.partido ?? '—'} · {p.cargo ?? 'PARLAMENTAR'}
               </p>
             </div>
+            <span className="text-[#333] group-hover:text-[#FFD700]/40 transition-colors shrink-0">›</span>
           </button>
         ))}
       </div>
@@ -345,26 +348,35 @@ function TabEmendas() {
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <div className="bg-[#0a0a0a] border border-zinc-800 p-4 md:p-6 rounded-lg">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="border border-[#1a1a1a] bg-[#050505]">
+        <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+          <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/40 uppercase">Filtros de Busca</p>
+          <button
+            onClick={() => { setQ(''); setAno(''); setMunicipio(''); setPoliticoId(''); setPaginaAtual(1); }}
+            className="font-mono text-[8px] tracking-widest text-gray-700 hover:text-[#FFD700] transition-colors"
+          >
+            LIMPAR
+          </button>
+        </div>
+        <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2">
-            <label className="block font-bebas text-[#FFD700] text-xs tracking-widest mb-2 flex items-center gap-2">
-              <Search className="w-3 h-3" /> TERMO DE BUSCA
+            <label className="block font-mono text-[8px] tracking-[0.35em] text-[#FFD700]/50 uppercase mb-2 flex items-center gap-2">
+              <Search className="w-3 h-3" /> Termo de Busca
             </label>
             <input
               type="text"
               placeholder={placeholder}
-              className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-2.5 rounded-sm focus:border-[#FFD700] outline-none text-sm placeholder:italic placeholder:text-zinc-500"
+              className="w-full bg-black border border-[#1a1a1a] text-white p-2.5 font-mono text-xs tracking-wide focus:border-[#FFD700]/40 outline-none placeholder:italic placeholder:text-[#333] hover:border-[#FFD700]/20 transition-colors"
               value={q}
               onChange={e => { setQ(e.target.value); setPaginaAtual(1); }}
             />
             {q === '' && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-1.5 mt-2">
                 {SUGESTOES_RAPIDAS.map(s => (
                   <button
                     key={s.q}
                     onClick={() => { setQ(s.q); setPaginaAtual(1); }}
-                    className="text-[10px] font-bebas tracking-widest px-2 py-0.5 border border-zinc-700 text-zinc-400 hover:border-[#FFD700] hover:text-[#FFD700] rounded-sm transition-all"
+                    className="font-mono text-[8px] tracking-widest px-2 py-1 border border-[#1a1a1a] text-gray-700 hover:border-[#FFD700]/30 hover:text-gray-400 transition-colors"
                   >
                     {s.label}
                   </button>
@@ -374,12 +386,12 @@ function TabEmendas() {
           </div>
 
           <div>
-            <label className="block font-bebas text-[#FFD700] text-xs tracking-widest mb-2 flex items-center gap-2">
-              <Calendar className="w-3 h-3" /> ANO
+            <label className="block font-mono text-[8px] tracking-[0.35em] text-[#FFD700]/50 uppercase mb-2 flex items-center gap-2">
+              <Calendar className="w-3 h-3" /> Ano
             </label>
             <select
               title="Ano"
-              className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-2.5 rounded-sm focus:border-[#FFD700] outline-none text-sm"
+              className="w-full bg-black border border-[#1a1a1a] text-white p-2.5 font-mono text-xs focus:border-[#FFD700]/40 outline-none hover:border-[#FFD700]/20 transition-colors"
               value={ano}
               onChange={e => { setAno(e.target.value); setPaginaAtual(1); }}
             >
@@ -389,12 +401,12 @@ function TabEmendas() {
           </div>
 
           <div>
-            <label className="block font-bebas text-[#FFD700] text-xs tracking-widest mb-2 flex items-center gap-2">
-              <MapPin className="w-3 h-3" /> MUNICÍPIO
+            <label className="block font-mono text-[8px] tracking-[0.35em] text-[#FFD700]/50 uppercase mb-2 flex items-center gap-2">
+              <MapPin className="w-3 h-3" /> Município
             </label>
             <select
               title="Município"
-              className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-2.5 rounded-sm focus:border-[#FFD700] outline-none text-sm"
+              className="w-full bg-black border border-[#1a1a1a] text-white p-2.5 font-mono text-xs focus:border-[#FFD700]/40 outline-none hover:border-[#FFD700]/20 transition-colors"
               value={municipio}
               onChange={e => { setMunicipio(e.target.value); setPaginaAtual(1); }}
             >
@@ -406,12 +418,12 @@ function TabEmendas() {
           </div>
 
           <div className="md:col-span-2">
-            <label className="block font-bebas text-[#FFD700] text-xs tracking-widest mb-2 flex items-center gap-2">
-              <User className="w-3 h-3" /> AUTOR
+            <label className="block font-mono text-[8px] tracking-[0.35em] text-[#FFD700]/50 uppercase mb-2 flex items-center gap-2">
+              <User className="w-3 h-3" /> Autor
             </label>
             <select
               title="Autor"
-              className="w-full bg-zinc-900/50 border border-zinc-700 text-white p-2.5 rounded-sm focus:border-[#FFD700] outline-none text-sm"
+              className="w-full bg-black border border-[#1a1a1a] text-white p-2.5 font-mono text-xs focus:border-[#FFD700]/40 outline-none hover:border-[#FFD700]/20 transition-colors"
               value={politicoId}
               onChange={e => { setPoliticoId(e.target.value); setPaginaAtual(1); }}
             >
@@ -423,58 +435,57 @@ function TabEmendas() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3 border-t border-zinc-800 pt-4">
-          <p className="text-zinc-500 text-[10px] font-bebas tracking-[0.2em]">
-            {loading ? 'BUSCANDO...' : `${totalResultados.toLocaleString('pt-BR')} EMENDAS`}
+        <div className="border-t border-[#1a1a1a] px-4 py-3">
+          <p className="font-mono text-[9px] tracking-widest text-gray-700">
+            {loading ? 'BUSCANDO...' : `${totalResultados.toLocaleString('pt-BR')} EMENDAS ENCONTRADAS`}
           </p>
-          <button
-            onClick={() => { setQ(''); setAno(''); setMunicipio(''); setPoliticoId(''); setPaginaAtual(1); }}
-            className="text-zinc-400 hover:text-white text-xs font-bebas tracking-widest underline underline-offset-4"
-          >
-            LIMPAR FILTROS
-          </button>
         </div>
       </div>
 
       {/* Resultados */}
       {emendas.length === 0 && !loading ? (
-        <div className="border-2 border-dashed border-zinc-800 rounded-lg py-16 text-center">
-          <p className="font-bebas text-3xl text-zinc-600 tracking-widest">NENHUMA EMENDA ENCONTRADA</p>
+        <div className="border border-[#1a1a1a] py-20 text-center">
+          <p className="font-bebas text-2xl tracking-[0.3em] text-gray-700">NENHUMA EMENDA ENCONTRADA</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-[#111]">
           {emendas.map(emenda => (
-            <div key={emenda.id} className="bg-[#0f0f0f] border border-zinc-800/50 hover:border-[#FFD700]/40 p-4 md:p-5 rounded-lg transition-all group">
-              <div className="flex flex-col md:flex-row md:items-center gap-4">
-                <div className="shrink-0 flex md:flex-col items-center justify-center bg-zinc-900 border border-zinc-700 md:w-16 md:h-16 px-3 py-1 md:p-0 rounded-lg">
-                  <span className="text-[#FFD700] font-bebas text-xl md:text-2xl">{emenda.ano}</span>
+            <div key={emenda.id} className="flex flex-col md:flex-row md:items-center gap-4 px-0 py-4 hover:bg-[#080808] transition-colors group relative">
+              <div className="absolute left-0 top-0 bottom-0 w-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
+
+              {/* ano */}
+              <div className="shrink-0 border border-[#1a1a1a] group-hover:border-[#FFD700]/20 transition-colors bg-[#050505] w-16 h-14 flex items-center justify-center">
+                <span className="text-[#FFD700] font-bebas text-xl leading-none">{emenda.ano}</span>
+              </div>
+
+              {/* conteúdo */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border border-[#FFD700]/20 text-[#FFD700]/70 bg-[#FFD700]/[0.04] uppercase">
+                    {emenda.municipio_destino || 'ESTADUAL'}
+                  </span>
+                  <span className="font-bebas text-base tracking-widest text-white group-hover:text-[#FFD700]/80 transition-colors truncate">
+                    {emenda.politico_nome || emenda.autor}
+                  </span>
+                  {emenda.politico_partido && (
+                    <span className="font-mono text-[8px] tracking-widest text-gray-700">({emenda.politico_partido})</span>
+                  )}
                 </div>
-                <div className="flex-grow min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="bg-[#FFD700]/10 text-[#FFD700] text-[9px] px-1.5 py-0.5 rounded-sm font-bold tracking-widest border border-[#FFD700]/20 uppercase">
-                      {emenda.municipio_destino || 'ESTADUAL'}
-                    </span>
-                    <span className="text-zinc-300 font-bebas text-sm md:text-base tracking-widest uppercase truncate">
-                      {emenda.politico_nome || emenda.autor}
-                    </span>
-                    {emenda.politico_partido && (
-                      <span className="text-zinc-600 text-[9px] font-bold uppercase">({emenda.politico_partido})</span>
-                    )}
-                  </div>
-                  <p className="text-white text-sm leading-relaxed group-hover:text-[#FFD700] transition-colors line-clamp-2">
-                    {emenda.descricao || emenda.objetivo}
-                  </p>
-                  <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500 font-bold tracking-wider mt-2">
-                    <span className="flex items-center gap-1"><LayoutGrid className="w-3 h-3 text-[#FFD700]/50" /> {emenda.funcao || 'N/A'}</span>
-                    <span className="flex items-center gap-1"><ListIcon className="w-3 h-3 text-[#FFD700]/50" /> {emenda.subfuncao || 'N/A'}</span>
-                  </div>
+                <p className="font-mono text-[10px] text-gray-600 leading-relaxed line-clamp-2">
+                  {emenda.descricao || emenda.objetivo}
+                </p>
+                <div className="flex flex-wrap gap-4 font-mono text-[8px] tracking-widest text-gray-800 mt-1.5">
+                  <span className="flex items-center gap-1"><LayoutGrid className="w-2.5 h-2.5" /> {emenda.funcao || '—'}</span>
+                  <span className="flex items-center gap-1"><ListIcon className="w-2.5 h-2.5" /> {emenda.subfuncao || '—'}</span>
                 </div>
-                <div className="shrink-0 flex md:flex-col items-center md:items-end justify-between pt-3 md:pt-0 border-t md:border-t-0 border-zinc-800/50">
-                  <span className="text-[#FFD700] font-bebas text-xl md:text-3xl">{formatCurrency(emenda.valor)}</span>
-                  <button className="flex items-center gap-1 text-zinc-500 group-hover:text-white text-[10px] font-bold tracking-[0.2em] mt-1">
-                    DETALHES <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
+              </div>
+
+              {/* valor */}
+              <div className="shrink-0 flex md:flex-col items-center md:items-end gap-3 md:gap-1">
+                <span className="text-[#FFD700] font-bebas text-2xl leading-none">{formatCurrency(emenda.valor)}</span>
+                <button className="flex items-center gap-1 font-mono text-[8px] tracking-widest text-gray-700 group-hover:text-gray-400 transition-colors">
+                  DETALHES <ArrowRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
           ))}
@@ -483,23 +494,23 @@ function TabEmendas() {
 
       {/* Paginação */}
       {totalPaginas > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-8">
+        <div className="flex justify-center items-center gap-2 mt-8 border-t border-[#1a1a1a] pt-8">
           <button
             disabled={paginaAtual === 1}
             onClick={() => { setPaginaAtual(p => p - 1); window.scrollTo(0, 0); }}
-            className="px-3 py-2 border border-[#FFD700] text-[#FFD700] font-bebas tracking-widest disabled:opacity-20 hover:bg-[#FFD700] hover:text-black rounded-sm text-sm"
+            className="font-mono text-[9px] tracking-widest px-4 py-2 border border-[#2a2a2a] text-gray-600 disabled:opacity-20 hover:border-[#FFD700]/40 hover:text-white transition-colors"
           >
-            ANTERIOR
+            ← ANTERIOR
           </button>
-          <div className="flex items-center px-4 h-9 bg-zinc-900 border border-zinc-800 font-bebas text-[#FFD700] tracking-[0.2em] text-sm">
+          <div className="font-mono text-[9px] tracking-widest px-4 py-2 border border-[#FFD700]/20 text-[#FFD700]">
             {paginaAtual} / {totalPaginas}
           </div>
           <button
             disabled={paginaAtual === totalPaginas}
             onClick={() => { setPaginaAtual(p => p + 1); window.scrollTo(0, 0); }}
-            className="px-3 py-2 border border-[#FFD700] text-[#FFD700] font-bebas tracking-widest disabled:opacity-20 hover:bg-[#FFD700] hover:text-black rounded-sm text-sm"
+            className="font-mono text-[9px] tracking-widest px-4 py-2 border border-[#2a2a2a] text-gray-600 disabled:opacity-20 hover:border-[#FFD700]/40 hover:text-white transition-colors"
           >
-            PRÓXIMA
+            PRÓXIMA →
           </button>
         </div>
       )}
@@ -513,21 +524,30 @@ function TabEmendas() {
 
 function TabLeis() {
   return (
-    <div className="border-2 border-dashed border-zinc-800 rounded-lg py-20 px-6 text-center">
-      <Scale className="w-16 h-16 text-[#FFD700]/30 mx-auto mb-5" />
-      <p className="font-bebas text-3xl md:text-4xl text-zinc-500 tracking-widest mb-2">
-        BUSCA DE LEIS — EM BREVE
-      </p>
-      <p className="text-zinc-600 text-sm max-w-md mx-auto leading-relaxed">
-        Integração com proposições do Congresso Nacional (Câmara e Senado) e câmaras locais.
-        Você poderá pesquisar leis por tema, autor, status de tramitação e período.
-      </p>
-      <div className="mt-6 flex flex-wrap gap-2 justify-center">
-        {['Projeto de Lei (PL)', 'PEC', 'Medida Provisória', 'Decreto', 'Lei Municipal'].map(t => (
-          <span key={t} className="text-[10px] font-bebas tracking-widest px-2 py-0.5 border border-zinc-700 text-zinc-500 rounded-sm">
-            {t}
-          </span>
-        ))}
+    <div className="border border-[#1a1a1a] py-20 px-6 text-center relative overflow-hidden">
+      {/* grade decorativa */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.015]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,215,0,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,215,0,1) 1px,transparent 1px)',
+          backgroundSize: '30px 30px',
+        }} />
+      <div className="relative z-10">
+        <Scale className="w-12 h-12 text-[#FFD700]/15 mx-auto mb-5" />
+        <p className="font-mono text-[8px] tracking-[0.5em] text-[#FFD700]/30 uppercase mb-3">Em desenvolvimento</p>
+        <p className="font-bebas text-3xl md:text-4xl tracking-[0.2em] text-gray-600 mb-4">
+          BUSCA DE LEIS
+        </p>
+        <p className="font-mono text-[10px] text-gray-700 max-w-md mx-auto leading-relaxed mb-6">
+          Integração com proposições do Congresso Nacional (Câmara e Senado) e câmaras locais.
+          Pesquisa por tema, autor, tramitação e período.
+        </p>
+        <div className="flex flex-wrap gap-2 justify-center">
+          {['Projeto de Lei (PL)', 'PEC', 'Medida Provisória', 'Decreto', 'Lei Municipal'].map(t => (
+            <span key={t} className="font-mono text-[8px] tracking-widest px-3 py-1.5 border border-[#1a1a1a] text-gray-700">
+              {t}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -540,13 +560,13 @@ function TabLeis() {
 function SearchInput({ value, setValue, placeholder }: { value: string; setValue: (v: string) => void; placeholder: string }) {
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFD700]/50" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#FFD700]/30 pointer-events-none" />
       <input
         type="text"
         value={value}
         onChange={e => setValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-[#0d0d0d] border border-zinc-700 text-white pl-10 pr-3 py-3 rounded-sm focus:border-[#FFD700] outline-none text-sm font-sans"
+        className="w-full bg-black border border-[#1a1a1a] text-white pl-9 pr-3 py-2.5 font-mono text-xs tracking-[0.15em] placeholder-[#333] focus:border-[#FFD700]/40 outline-none hover:border-[#FFD700]/20 transition-colors"
       />
     </div>
   );

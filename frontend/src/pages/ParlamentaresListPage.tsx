@@ -84,12 +84,12 @@ export function ParlamentaresListPage() {
       </div>
 
       {/* ── Banner ── */}
-      <div className="border-b border-[#1a1a1a] bg-[#FFD700]/[0.03] px-6 py-3 md:px-12">
+      <div className="border-b border-[#1a1a1a] bg-[#050505] px-6 py-3 md:px-12">
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
-          <span className="text-[#FFD700] text-sm">⏳</span>
-          <p className="text-gray-400 text-xs md:text-sm">
-            <span className="font-bebas text-[#FFD700]/80 tracking-widest mr-2">EM CONSTRUÇÃO:</span>
-            Federal disponível com dados parciais (RJ). Demais níveis em coleta.
+          <div className="w-1.5 h-1.5 bg-[#FFD700]/40 animate-pulse shrink-0" />
+          <p className="font-mono text-[9px] tracking-widest text-gray-600">
+            <span className="text-[#FFD700]/60 mr-2">EM CONSTRUÇÃO</span>
+            Federal disponível com dados parciais (RJ). Demais níveis em coleta progressiva.
           </p>
         </div>
       </div>
@@ -136,7 +136,7 @@ export function ParlamentaresListPage() {
               <select
                 value={filtroRegiao}
                 onChange={e => setFiltroRegiao(e.target.value as SlugRegiao | '')}
-                className="bg-[#0d0d0d] border border-[#333] text-gray-400 px-3 py-1.5 text-xs font-bebas tracking-widest focus:outline-none focus:border-green-500/50 rounded-sm"
+                className="bg-black border border-[#1a1a1a] text-gray-500 px-3 py-1.5 font-mono text-[9px] tracking-widest focus:outline-none focus:border-green-500/30 hover:border-green-500/20 transition-colors"
               >
                 <option value="">TODAS AS REGIÕES</option>
                 {REGIOES.map(r => (
@@ -146,38 +146,38 @@ export function ParlamentaresListPage() {
             </div>
           }
         >
-          <div className="space-y-1 pl-4">
+          <div className="space-y-px">
             {ufsVisiveis.map(estado => {
               const expandido = ufExpandida === estado.uf;
               return (
-                <div key={estado.uf} className="border border-[#1a1a1a] rounded-sm overflow-hidden">
+                <div key={estado.uf} className="border border-[#111] overflow-hidden">
                   <button
                     onClick={() => setUfExpandida(expandido ? null : estado.uf)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#111] transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#080808] transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
                       <ChevronRight
-                        className="w-4 h-4 text-green-400/50 transition-transform"
+                        className="w-3 h-3 text-green-400/40 transition-transform shrink-0"
                         style={{ transform: expandido ? 'rotate(90deg)' : 'rotate(0deg)' }}
                       />
-                      <span className="font-bebas text-green-400 text-sm tracking-widest">{estado.uf}</span>
-                      <span className="text-gray-400 text-sm">{estado.nome}</span>
-                      <span className="text-gray-600 text-[10px] tracking-widest">— Assembleia Legislativa</span>
+                      <span className="font-bebas text-sm tracking-widest text-green-400">{estado.uf}</span>
+                      <span className="font-mono text-[10px] text-gray-500">{estado.nome}</span>
+                      <span className="font-mono text-[9px] text-gray-700 hidden md:inline">Assembleia Legislativa</span>
                     </div>
-                    <span className="font-bebas text-green-400/60 text-xs tracking-widest">EM COLETA</span>
+                    <span className="font-mono text-[8px] tracking-widest text-green-400/40">EM COLETA</span>
                   </button>
                   {expandido && (
-                    <div className="px-4 py-4 border-t border-[#1a1a1a] bg-black/40">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                    <div className="px-4 py-5 border-t border-[#111] bg-[#030303]">
+                      <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-px bg-[#111]">
                         {Array.from({ length: 8 }).map((_, i) => (
-                          <div key={i} className="border border-[#1a1a1a] bg-[#0a0a0a] p-2 rounded-sm">
-                            <div className="w-full aspect-square bg-[#1a1a1a] rounded-sm animate-pulse mb-1" />
-                            <div className="h-2 w-3/4 bg-[#1a1a1a] rounded animate-pulse" />
+                          <div key={i} className="bg-black p-3">
+                            <div className="w-full aspect-square bg-[#111] animate-pulse mb-2" />
+                            <div className="h-2 w-3/4 bg-[#0d0d0d] animate-pulse" />
                           </div>
                         ))}
                       </div>
-                      <p className="text-gray-700 text-[10px] tracking-widest font-bebas mt-3 text-center">
-                        DADOS DA ASSEMBLEIA LEGISLATIVA DE {estado.nome.toUpperCase()} EM COLETA
+                      <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase mt-3 text-center">
+                        DADOS DA ASSEMBLEIA DE {estado.nome.toUpperCase()} EM COLETA
                       </p>
                     </div>
                   )}
@@ -196,25 +196,27 @@ export function ParlamentaresListPage() {
           cor="#03A9F4"
           icone="🏙"
         >
-          <div className="space-y-1 pl-4">
-            <p className="font-bebas text-blue-400/50 text-xs tracking-widest mb-2">CAPITAIS PRINCIPAIS</p>
-            {CAPITAIS_PRINCIPAIS.map(cap => (
-              <div
-                key={cap.nome}
-                className="flex items-center justify-between px-4 py-2.5 border border-[#1a1a1a] rounded-sm hover:bg-[#111] transition-colors cursor-default"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-bebas text-blue-400 text-sm tracking-widest">{cap.uf}</span>
-                  <span className="text-gray-400 text-sm">{cap.nome}</span>
-                  <span className="text-gray-600 text-[10px] tracking-widest">— Câmara Municipal</span>
+          <div>
+            <p className="font-mono text-[8px] tracking-[0.4em] text-[#03A9F4]/30 uppercase mb-2">Capitais Principais</p>
+            <div className="divide-y divide-[#111]">
+              {CAPITAIS_PRINCIPAIS.map(cap => (
+                <div
+                  key={cap.nome}
+                  className="flex items-center justify-between px-2 py-2.5 hover:bg-[#080808] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-bebas text-sm tracking-widest text-[#03A9F4]">{cap.uf}</span>
+                    <span className="font-mono text-[10px] text-gray-500">{cap.nome}</span>
+                    <span className="font-mono text-[8px] text-gray-700 hidden md:inline">Câmara Municipal</span>
+                  </div>
+                  <span className="font-mono text-[8px] tracking-widest text-[#03A9F4]/40">
+                    {cap.vereadores} vereadores
+                  </span>
                 </div>
-                <span className="font-bebas text-blue-400/60 text-xs tracking-widest">
-                  {cap.vereadores} vereadores
-                </span>
-              </div>
-            ))}
-            <p className="text-gray-700 text-[10px] tracking-widest font-bebas mt-4 text-center">
-              + 5.560 OUTROS MUNICÍPIOS — EM COLETA PROGRESSIVA
+              ))}
+            </div>
+            <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase mt-4 text-center">
+              + 5.560 outros municípios — em coleta progressiva
             </p>
           </div>
         </NivelBlock>
@@ -237,28 +239,28 @@ interface NivelBlockProps {
   children: React.ReactNode;
 }
 
-function NivelBlock({ titulo, subtitulo, total, cor, icone, extra, children }: NivelBlockProps) {
+function NivelBlock({ titulo, subtitulo, total, cor, extra, children }: NivelBlockProps) {
   return (
-    <section>
-      <div className="flex items-end justify-between mb-4 pb-3 border-b" style={{ borderColor: `${cor}33` }}>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{icone}</span>
-          <div>
-            <h2 className="font-bebas text-3xl tracking-[0.15em]" style={{ color: cor }}>
-              {titulo}
-            </h2>
-            <p className="text-gray-500 text-xs tracking-widest font-bebas">{subtitulo.toUpperCase()}</p>
-          </div>
+    <section className="border border-[#111]">
+      <div className="flex items-center justify-between px-5 py-4 border-b"
+        style={{ borderColor: `${cor}22`, backgroundColor: `${cor}05` }}>
+        <div>
+          <p className="font-mono text-[8px] tracking-[0.4em] uppercase mb-1" style={{ color: `${cor}66` }}>
+            {subtitulo}
+          </p>
+          <h2 className="font-bebas text-2xl tracking-[0.15em]" style={{ color: cor }}>
+            {titulo}
+          </h2>
         </div>
-        <div className="text-right">
-          <p className="font-bebas text-2xl tabular-nums" style={{ color: cor }}>
+        <div className="text-right border-l pl-4" style={{ borderColor: `${cor}22` }}>
+          <p className="font-bebas text-3xl tabular-nums leading-none" style={{ color: cor }}>
             {total.toLocaleString('pt-BR')}
           </p>
-          <p className="text-gray-600 text-[10px] tracking-widest font-bebas">PARLAMENTARES</p>
+          <p className="font-mono text-[8px] tracking-widest text-gray-700">PARLAMENTARES</p>
         </div>
       </div>
-      {extra}
-      <div className="mt-4">{children}</div>
+      {extra && <div className="px-5 py-3 border-b" style={{ borderColor: '#1a1a1a' }}>{extra}</div>}
+      <div className="p-4">{children}</div>
     </section>
   );
 }
@@ -275,20 +277,22 @@ function CasaCard({ nome, qtd, descricao, cor, onClick }: CasaCardProps) {
   return (
     <button
       onClick={onClick}
-      className="text-left border bg-[#0a0a0a] rounded-sm p-4 hover:bg-[#111] transition-all group"
-      style={{ borderColor: `${cor}33` }}
-      onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.borderColor = cor)}
-      onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.borderColor = `${cor}33`)}
+      className="text-left bg-black p-4 hover:bg-[#080808] transition-colors group relative overflow-hidden"
+      style={{ border: `1px solid ${cor}22` }}
+      onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.borderColor = `${cor}66`)}
+      onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.borderColor = `${cor}22`)}
     >
-      <div className="flex items-start justify-between mb-2">
-        <p className="font-bebas text-lg tracking-widest" style={{ color: cor }}>
+      <div className="absolute top-0 left-0 right-0 h-px transition-opacity opacity-0 group-hover:opacity-100"
+        style={{ backgroundColor: cor }} />
+      <div className="flex items-start justify-between mb-3">
+        <p className="font-bebas text-lg tracking-[0.15em]" style={{ color: cor }}>
           {nome.toUpperCase()}
         </p>
-        <span className="font-bebas text-2xl tabular-nums" style={{ color: cor }}>{qtd}</span>
+        <span className="font-bebas text-3xl tabular-nums leading-none" style={{ color: cor }}>{qtd}</span>
       </div>
-      <p className="text-gray-400 text-xs leading-relaxed">{descricao}</p>
-      <p className="font-bebas text-[10px] tracking-widest mt-3 flex items-center gap-1" style={{ color: `${cor}80` }}>
-        VER LISTA <span className="transition-transform group-hover:translate-x-1">→</span>
+      <p className="font-mono text-[9px] text-gray-600 leading-relaxed">{descricao}</p>
+      <p className="font-mono text-[8px] tracking-widest mt-4 flex items-center gap-1 transition-colors" style={{ color: `${cor}60` }}>
+        VER LISTA <span className="transition-transform group-hover:translate-x-1 inline-block">→</span>
       </p>
     </button>
   );

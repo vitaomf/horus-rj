@@ -139,12 +139,12 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
             <div className="max-w-7xl mx-auto space-y-12">
 
                 {/* General Metrics Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-[#111] border border-[#FFD700]/30 p-6 md:p-8 rounded-sm relative overflow-hidden group">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#1a1a1a]">
+                    <div className="bg-[#0a0a0a] border-t-2 border-[#FFD700]/30 p-6 md:p-8 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                             <BarChart4 className="w-20 md:w-24 h-20 md:h-24 text-[#FFD700]" />
                         </div>
-                        <h3 className="text-gray-400 font-bebas tracking-widest text-lg md:text-xl mb-2 relative z-10">VOLUME TOTAL DE REPASSES</h3>
+                        <h3 className="font-mono text-[9px] tracking-[0.35em] text-gray-600 uppercase mb-3 relative z-10">Volume Total de Repasses</h3>
                         <div className="text-4xl md:text-6xl lg:text-7xl font-bebas text-[#FFD700] tracking-wider relative z-10">
                             {valor_total_geral >= 1e9
                                 ? <>R$ <CountUp end={valor_total_geral / 1e9} duration={2} decimals={2} suffix=" BILHÕES" /></>
@@ -153,11 +153,11 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                         </div>
                     </div>
 
-                    <div className="bg-[#111] border border-[#FFD700]/30 p-6 md:p-8 rounded-sm relative overflow-hidden group">
+                    <div className="bg-[#0a0a0a] border-t-2 border-[#FFD700]/10 p-6 md:p-8 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                             <Receipt className="w-20 md:w-24 h-20 md:h-24 text-[#FFD700]" />
                         </div>
-                        <h3 className="text-gray-400 font-bebas tracking-widest text-lg md:text-xl mb-2 relative z-10">TICKET MÉDIO POR EMENDA</h3>
+                        <h3 className="font-mono text-[9px] tracking-[0.35em] text-gray-600 uppercase mb-3 relative z-10">Ticket Médio por Emenda</h3>
                         <div className="text-4xl md:text-6xl lg:text-7xl font-bebas text-white tracking-wider relative z-10">
                             R$ <CountUp end={media_por_emenda / 1e3} duration={2} decimals={1} suffix="K" />
                         </div>
@@ -165,7 +165,7 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                 </div>
 
                 {/* Line Chart Section */}
-                <div className="bg-[#0a0a0a] border border-[#222] p-4 md:p-6 rounded-sm overflow-hidden">
+                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-4 md:p-6 overflow-hidden">
                     <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 flex items-center gap-3">
                         <ArrowUpRight className="w-6 h-6 text-[#FFD700]" /> EVOLUÇÃO HISTÓRICA DE REPASSES
                     </h2>
@@ -279,8 +279,8 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                     {/* TOP 10 Politicos */}
-                    <div className="bg-[#111] border border-[#222] p-6 rounded-sm">
-                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#333] pb-4 flex items-center gap-3">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
+                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#1a1a1a] pb-4 flex items-center gap-3">
                             <User className="text-[#FFD700]" /> TOP 10 POLÍTICOS MAIS ATIVOS
                         </h2>
                         <div className="space-y-4">
@@ -311,8 +311,8 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                     </div>
 
                     {/* TOP 10 Municipios */}
-                    <div className="bg-[#111] border border-[#222] p-6 rounded-sm">
-                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#333] pb-4 flex items-center gap-3">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
+                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#1a1a1a] pb-4 flex items-center gap-3">
                             <MapPin className="text-[#FFD700]" /> TOP 10 CIDADES DESTINATÁRIAS
                         </h2>
                         <div className="space-y-4">
@@ -353,11 +353,11 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                         {por_objetivo.map((obj: any, idx: number) => {
                             const pct = ((obj.valor_total / valor_total_geral) * 100).toFixed(1);
                             return (
-                                <div key={`obj-${idx}`} className="bg-[#111] border border-[#FFD700]/20 p-6 rounded-sm hover:border-[#FFD700] transition-colors relative group">
+                                <div key={`obj-${idx}`} className="bg-[#0a0a0a] border border-[#FFD700]/10 p-6 hover:border-[#FFD700]/40 transition-colors relative group">
                                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                                         {getObjectiveIcon(obj.objetivo)}
                                     </div>
-                                    <div className="w-12 h-12 rounded-full bg-black border border-[#FFD700]/30 flex items-center justify-center mb-4 text-[#FFD700] group-hover:scale-110 transition-transform">
+                                    <div className="w-12 h-12 bg-black border border-[#FFD700]/15 flex items-center justify-center mb-4 text-[#FFD700] group-hover:border-[#FFD700]/40 transition-colors">
                                         {getObjectiveIcon(obj.objetivo)}
                                     </div>
                                     <h4 className="text-xl font-bebas text-gray-300 mb-4 h-14 line-clamp-2 uppercase tracking-wide">{obj.objetivo || "NÃO ESPECIFICADO NA ORIGEM"}</h4>

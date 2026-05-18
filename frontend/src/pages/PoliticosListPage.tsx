@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, TrendingUp } from 'lucide-react';
+import { Search, TrendingUp, ChevronRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 interface PoliticoResumo {
@@ -15,236 +15,236 @@ interface PoliticosListPageProps {
     onPoliticoClick: (id: number) => void;
 }
 
-const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const FONT_DECO   = "'Cinzel Decorative', serif";
+const FONT_CINZEL = "'Cinzel', serif";
 
-const formatMillions = (value: number) =>
-    `R$ ${(value / 1_000_000).toFixed(1)}M`;
+const formatMillions = (v: number) => `R$ ${(v / 1_000_000).toFixed(1)}M`;
+const formatK        = (v: number) => `R$ ${(v / 1_000).toFixed(0)}K`;
+const formatVal      = (v: number) => v >= 1_000_000 ? formatMillions(v) : v >= 1_000 ? formatK(v) : `R$ ${v}`;
 
 const LIMITE = 20;
 
 export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPoliticoClick }) => {
-    const [politicos, setPoliticos] = useState<PoliticoResumo[]>([]);
-    const [busca, setBusca] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [paginaAtual, setPaginaAtual] = useState(1);
+    const [politicos, setPoliticos]       = useState<PoliticoResumo[]>([]);
+    const [busca, setBusca]               = useState('');
+    const [loading, setLoading]           = useState(true);
+    const [paginaAtual, setPaginaAtual]   = useState(1);
     const [totalPaginas, setTotalPaginas] = useState(1);
     const [totalPoliticos, setTotalPoliticos] = useState(0);
 
-    const fetchPoliticos = useCallback(async (pagina: number, termoBusca: string) => {
+    const fetchPoliticos = useCallback(async (pagina: number, termo: string) => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({
-                pagina: String(pagina),
-                limite: String(LIMITE),
-            });
-            if (termoBusca.trim()) {
-                params.set('busca', termoBusca.trim());
-            }
-            const res = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
+            const params = new URLSearchParams({ pagina: String(pagina), limite: String(LIMITE) });
+            if (termo.trim()) params.set('busca', termo.trim());
+            const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
                 headers: { 'ngrok-skip-browser-warning': '69420' }
             });
             const data = await res.json();
             setPoliticos(data.politicos || []);
             setTotalPaginas(data.total_paginas || 1);
             setTotalPoliticos(data.total || 0);
-        } catch (err) {
-            console.error('Erro ao carregar políticos:', err);
+        } catch {
+            // silencioso
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Debounce na busca (400ms)
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            fetchPoliticos(paginaAtual, busca);
-        }, busca ? 400 : 0);
-        return () => clearTimeout(timeout);
+        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca), busca ? 400 : 0);
+        return () => clearTimeout(t);
     }, [paginaAtual, busca, fetchPoliticos]);
 
-    const handleBuscaChange = (valor: string) => {
-        setBusca(valor);
-        setPaginaAtual(1);
-    };
+    const handleBusca = (v: string) => { setBusca(v); setPaginaAtual(1); };
 
     const getInitials = (name: string) => {
-        const parts = name.trim().split(' ');
-        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        const p = name.trim().split(' ');
+        return p.length === 1 ? p[0].slice(0, 2).toUpperCase() : (p[0][0] + p[p.length - 1][0]).toUpperCase();
     };
 
-    // Gerar números de página visíveis (máximo 5)
-    const getPaginasVisiveis = () => {
-        const paginas: number[] = [];
-        let inicio = Math.max(1, paginaAtual - 2);
-        let fim = Math.min(totalPaginas, inicio + 4);
-        inicio = Math.max(1, fim - 4);
-
-        for (let i = inicio; i <= fim; i++) {
-            paginas.push(i);
-        }
-        return paginas;
+    const paginasVisiveis = () => {
+        const arr: number[] = [];
+        let ini = Math.max(1, paginaAtual - 2);
+        let fim = Math.min(totalPaginas, ini + 4);
+        ini = Math.max(1, fim - 4);
+        for (let i = ini; i <= fim; i++) arr.push(i);
+        return arr;
     };
 
     return (
-        <div className="animate-fade-in pb-12 px-6 pt-8 max-w-[1400px] mx-auto">
-            {/* Header */}
-            <div className="text-center mb-12">
-                <h1 style={{ fontFamily: "'Cinzel', serif" }} className="text-5xl text-[#FFD700] mb-2">
-                    Políticos
-                </h1>
-                <div className="h-[3px] w-[80px] bg-[#FFD700] mx-auto mt-3 mb-4"></div>
-                <p className="text-gray-400 text-lg">
-                    {totalPoliticos} parlamentares com emendas destinadas ao Rio de Janeiro.
-                </p>
-            </div>
+        <div className="min-h-screen bg-black text-white">
 
-            {/* Busca */}
-            <div className="max-w-xl mx-auto mb-12">
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#FFD700] w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="BUSCAR POLÍTICO POR NOME..."
-                        value={busca}
-                        onChange={(e) => handleBuscaChange(e.target.value)}
-                        className="w-full bg-[#0a0a0a] border-2 border-[#FFD700]/40 text-white py-3 pl-12 pr-4 font-bebas text-xl tracking-widest focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/20 placeholder-[#FFD700]/25 rounded-sm transition-all"
-                    />
-                    {loading && (
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                            <div className="animate-spin h-5 w-5 border-2 border-[#FFD700] border-t-transparent rounded-full"></div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {/* ── HERO ── */}
+            <div className="relative border-b border-[#FFD700]/20 overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.025]"
+                    style={{
+                        backgroundImage: 'linear-gradient(rgba(255,215,0,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,215,0,1) 1px,transparent 1px)',
+                        backgroundSize: '40px 40px',
+                    }} />
+                <div className="absolute inset-0 pointer-events-none opacity-[0.05]"
+                    style={{ backgroundImage: 'url(/olhos_bg.jpg)', backgroundSize: 'cover', filter: 'grayscale(1)' }} />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black pointer-events-none" />
 
-            {/* Subtítulo */}
-            <div className="flex items-center gap-3 mb-6">
-                <TrendingUp className="w-5 h-5 text-[#FFD700]" />
-                <h2 className="font-bebas text-2xl text-white tracking-widest">
-                    {busca.trim()
-                        ? `RESULTADOS PARA "${busca.toUpperCase()}"`
-                        : 'RANKING POR VOLUME DE REPASSES'}
-                </h2>
-            </div>
-
-            {/* Lista */}
-            {loading ? (
-                <div className="flex justify-center py-16">
-                    <div className="animate-spin h-12 w-12 border-4 border-[#FFD700] border-t-transparent rounded-full"></div>
-                </div>
-            ) : politicos.length === 0 ? (
-                <div className="py-16 text-center border-2 border-dashed border-zinc-800 bg-[#0f0f0f] rounded-sm">
-                    <p className="text-gray-500 font-bebas text-4xl tracking-widest">NENHUM POLÍTICO ENCONTRADO</p>
-                    <p className="text-gray-600 mt-2 text-lg">Tente buscar por outro nome.</p>
-                </div>
-            ) : (
-                <>
-                    <div className="space-y-3">
-                        {politicos.map((pol, idx) => {
-                            const posicaoGlobal = (paginaAtual - 1) * LIMITE + idx + 1;
-                            return (
-                                <div
-                                    key={pol.id}
-                                    onClick={() => onPoliticoClick(pol.id)}
-                                    className="bg-[#0a0a0a] border border-zinc-800 rounded-lg p-5 flex items-center gap-5 cursor-pointer hover:border-[#FFD700]/50 hover:bg-[#FFD700]/5 transition-all duration-200 group"
-                                >
-                                    {/* Posição */}
-                                    <span className="text-[#FFD700]/30 font-bebas text-4xl w-12 text-center shrink-0 group-hover:text-[#FFD700]/60 transition-colors">
-                                        {String(posicaoGlobal).padStart(2, '0')}
-                                    </span>
-
-                                    {/* Avatar */}
-                                    <div className="w-14 h-14 rounded-full bg-zinc-800 border-2 border-[#FFD700]/30 flex items-center justify-center shrink-0 group-hover:border-[#FFD700] transition-colors">
-                                        <span className="font-bebas text-xl text-[#FFD700]">{getInitials(pol.nome)}</span>
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="flex-grow min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bebas text-2xl text-white group-hover:text-[#FFD700] transition-colors tracking-wider truncate">
-                                                {pol.nome}
-                                            </span>
-                                            {pol.partido && (
-                                                <span className="bg-zinc-800 text-[#FFD700] text-xs px-2 py-0.5 rounded font-bold shrink-0">
-                                                    {pol.partido}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                                            <span>{pol.total_emendas} emendas</span>
-                                            {pol.cargo && <span>• {pol.cargo}</span>}
-                                        </div>
-                                    </div>
-
-                                    {/* Valor */}
-                                    <div className="text-right shrink-0">
-                                        <span className="font-bebas text-3xl text-[#FFD700] block leading-none">
-                                            {pol.valor_total >= 1_000_000 ? formatMillions(pol.valor_total) : formatCurrency(pol.valor_total)}
-                                        </span>
-                                        <span className="text-xs text-gray-500">total repassado</span>
-                                    </div>
-
-                                    {/* Seta */}
-                                    <span className="text-[#FFD700] opacity-0 group-hover:opacity-100 transition-opacity text-xl ml-2">→</span>
-                                </div>
-                            );
-                        })}
+                <div className="relative z-10 px-6 py-10 md:px-12 md:py-14">
+                    <p style={{ fontFamily: FONT_CINZEL }}
+                        className="text-[#FFD700]/50 text-[9px] tracking-[0.6em] uppercase mb-3">
+                        Horus · Diretório de Agentes
+                    </p>
+                    <h1 style={{ fontFamily: FONT_DECO }}
+                        className="text-[44px] md:text-[72px] leading-none text-white tracking-wide mb-4">
+                        POLÍTICOS
+                    </h1>
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="h-px w-8 bg-[#FFD700]/40" />
+                        <div className="w-1 h-1 bg-[#FFD700]" />
+                        <div className="h-px w-8 bg-[#FFD700]/40" />
                     </div>
+                    <p className="font-mono text-[9px] tracking-[0.35em] text-gray-700 uppercase">
+                        {totalPoliticos} parlamentares · emendas destinadas ao Rio de Janeiro
+                    </p>
+                </div>
+            </div>
 
-                    {/* PAGINAÇÃO */}
-                    {totalPaginas > 1 && (
-                        <div className="mt-10 flex flex-col items-center gap-4">
-                            {/* Info da página */}
-                            <p className="text-gray-500 text-sm tracking-wider uppercase">
-                                Página {paginaAtual} de {totalPaginas} — {totalPoliticos} políticos
-                            </p>
+            {/* ── CONTROLES ── */}
+            <div className="border-b border-[#1a1a1a] bg-[#050505] px-6 md:px-12 py-4 sticky top-16 z-40 backdrop-blur-sm">
+                <div className="max-w-7xl mx-auto flex items-center gap-3">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#FFD700]/30 pointer-events-none" />
+                        {loading && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 border border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />
+                        )}
+                        <input
+                            type="text"
+                            placeholder="BUSCAR POLÍTICO..."
+                            value={busca}
+                            onChange={e => handleBusca(e.target.value)}
+                            className="w-full bg-black border border-[#FFD700]/15 text-white py-2 pl-9 pr-8 font-mono text-xs tracking-[0.2em] placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/40 hover:border-[#FFD700]/25 transition-colors"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <TrendingUp className="w-3.5 h-3.5 text-[#FFD700]/40" />
+                        <p className="font-mono text-[9px] tracking-widest text-gray-600 hidden sm:block">
+                            {busca.trim() ? `BUSCA: "${busca.toUpperCase()}"` : 'RANKING · VOLUME DE REPASSES'}
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-                            {/* Botões */}
-                            <div className="flex items-center gap-2">
-                                {/* Anterior */}
-                                <button
-                                    onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
-                                    disabled={paginaAtual === 1}
-                                    className={`font-bebas tracking-widest px-4 py-2 text-sm border transition-all duration-200 ${paginaAtual === 1
-                                            ? 'border-zinc-700 text-zinc-700 cursor-not-allowed'
-                                            : 'border-[#FFD700] text-white hover:bg-[#FFD700] hover:text-black'
-                                        }`}
-                                >
-                                    ← ANTERIOR
-                                </button>
+            <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
 
-                                {/* Números */}
-                                {getPaginasVisiveis().map(num => (
-                                    <button
-                                        key={num}
-                                        onClick={() => setPaginaAtual(num)}
-                                        className={`font-bebas w-10 h-10 text-lg transition-all duration-200 ${num === paginaAtual
-                                                ? 'bg-[#FFD700] text-black font-bold'
-                                                : 'border border-[#FFD700] text-white hover:bg-[#FFD700]/20'
-                                            }`}
-                                    >
-                                        {num}
-                                    </button>
-                                ))}
-
-                                {/* Próximo */}
-                                <button
-                                    onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
-                                    disabled={paginaAtual === totalPaginas}
-                                    className={`font-bebas tracking-widest px-4 py-2 text-sm border transition-all duration-200 ${paginaAtual === totalPaginas
-                                            ? 'border-zinc-700 text-zinc-700 cursor-not-allowed'
-                                            : 'border-[#FFD700] text-white hover:bg-[#FFD700] hover:text-black'
-                                        }`}
-                                >
-                                    PRÓXIMO →
-                                </button>
-                            </div>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-24 gap-4">
+                        <div className="flex gap-1.5">
+                            {[0,1,2].map(i => (
+                                <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
+                            ))}
                         </div>
-                    )}
-                </>
-            )}
+                        <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700">CARREGANDO REGISTROS</p>
+                    </div>
+                ) : politicos.length === 0 ? (
+                    <div className="border border-[#1a1a1a] py-24 text-center">
+                        <p className="font-bebas text-2xl tracking-[0.3em] text-gray-700">NENHUM POLÍTICO ENCONTRADO</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* ── LISTA ── */}
+                        <div className="divide-y divide-[#111]">
+                            {politicos.map((pol, idx) => {
+                                const pos = (paginaAtual - 1) * LIMITE + idx + 1;
+                                return (
+                                    <button
+                                        key={pol.id}
+                                        onClick={() => onPoliticoClick(pol.id)}
+                                        className="w-full flex items-center gap-4 px-0 py-4 text-left hover:bg-[#080808] transition-colors group relative border-0"
+                                    >
+                                        {/* linha de acento no hover */}
+                                        <div className="absolute left-0 top-0 bottom-0 w-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/40 transition-colors" />
+
+                                        {/* posição */}
+                                        <span className="font-bebas text-3xl text-[#222] group-hover:text-[#FFD700]/30 transition-colors w-12 text-center shrink-0 tabular-nums leading-none">
+                                            {String(pos).padStart(2, '0')}
+                                        </span>
+
+                                        {/* badge de iniciais */}
+                                        <div className="w-10 h-10 bg-[#0a0a0a] border border-[#2a2a2a] group-hover:border-[#FFD700]/30 transition-colors flex items-center justify-center shrink-0">
+                                            <span className="font-bebas text-sm text-[#FFD700]/60 group-hover:text-[#FFD700] transition-colors">
+                                                {getInitials(pol.nome)}
+                                            </span>
+                                        </div>
+
+                                        {/* info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bebas text-xl tracking-wider text-white group-hover:text-[#FFD700] transition-colors truncate">
+                                                    {pol.nome}
+                                                </span>
+                                                {pol.partido && (
+                                                    <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border border-[#333] text-gray-600 shrink-0">
+                                                        {pol.partido}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="font-mono text-[9px] tracking-widest text-gray-700 mt-0.5">
+                                                {pol.total_emendas} emendas
+                                                {pol.cargo && ` · ${pol.cargo}`}
+                                            </p>
+                                        </div>
+
+                                        {/* valor */}
+                                        <div className="text-right shrink-0">
+                                            <span className="font-bebas text-2xl text-[#FFD700] leading-none block">
+                                                {formatVal(pol.valor_total)}
+                                            </span>
+                                            <span className="font-mono text-[8px] tracking-widest text-gray-700">total repassado</span>
+                                        </div>
+
+                                        <ChevronRight className="w-4 h-4 text-[#333] group-hover:text-[#FFD700]/40 transition-colors shrink-0" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* ── PAGINAÇÃO ── */}
+                        {totalPaginas > 1 && (
+                            <div className="mt-12 flex flex-col items-center gap-4 border-t border-[#1a1a1a] pt-8">
+                                <p className="font-mono text-[9px] tracking-[0.3em] text-gray-700">
+                                    PÁG {paginaAtual} / {totalPaginas} · {totalPoliticos} POLÍTICOS
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                                        disabled={paginaAtual === 1}
+                                        className="font-mono text-[9px] tracking-widest px-3 py-2 border border-[#2a2a2a] text-gray-600 disabled:opacity-20 hover:border-[#FFD700]/40 hover:text-white transition-colors"
+                                    >
+                                        ← ANTERIOR
+                                    </button>
+                                    {paginasVisiveis().map(n => (
+                                        <button
+                                            key={n}
+                                            onClick={() => setPaginaAtual(n)}
+                                            className={`font-mono text-[9px] tracking-widest w-9 h-9 border transition-colors ${
+                                                n === paginaAtual
+                                                    ? 'border-[#FFD700] text-[#FFD700] bg-[#FFD700]/[0.06]'
+                                                    : 'border-[#2a2a2a] text-gray-600 hover:border-[#FFD700]/40 hover:text-white'
+                                            }`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                                        disabled={paginaAtual === totalPaginas}
+                                        className="font-mono text-[9px] tracking-widest px-3 py-2 border border-[#2a2a2a] text-gray-600 disabled:opacity-20 hover:border-[#FFD700]/40 hover:text-white transition-colors"
+                                    >
+                                        PRÓXIMO →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };
