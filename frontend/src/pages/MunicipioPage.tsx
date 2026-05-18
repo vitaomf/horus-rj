@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ArrowLeft, Database, Banknote, UserRound, FileText, ExternalLink, Building2 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
+import { HierarquiaCargos } from '../components/HierarquiaCargos';
 
 interface Politico {
     id: number;
@@ -204,6 +205,11 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                     </div>
                 </div>
             </header>
+
+            {/* Hierarquia visual de cargos municipais */}
+            <div className="max-w-7xl mx-auto">
+                <HierarquiaCargos nivel="municipal" uf="RJ" municipio={nome} />
+            </div>
 
             <main className="max-w-7xl mx-auto px-6 mt-16 space-y-16">
 

@@ -12,7 +12,6 @@ const HomePage          = lazy(() => import('./pages/HomePage').then(m => ({ def
 const MunicipioPage     = lazy(() => import('./pages/MunicipioPage'));
 const PoliticoPage      = lazy(() => import('./pages/PoliticoPage').then(m => ({ default: m.PoliticoPage })));
 const EstatisticasPage  = lazy(() => import('./pages/EstatisticasPage').then(m => ({ default: m.EstatisticasPage })));
-const MunicipiosListPage = lazy(() => import('./pages/MunicipiosListPage').then(m => ({ default: m.MunicipiosListPage })));
 const PoliticosListPage  = lazy(() => import('./pages/PoliticosListPage').then(m => ({ default: m.PoliticosListPage })));
 const BuscaAvancadaPage  = lazy(() => import('./pages/BuscaAvancadaPage').then(m => ({ default: m.BuscaAvancadaPage })));
 // Novas páginas nacionais
@@ -36,26 +35,24 @@ const PageSpinner = () => (
 );
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-type NavKey = 'brasil' | 'rj' | 'municipios' | 'politicos' | 'parlamentares' | 'busca' | 'painel';
+type NavKey = 'inicio' | 'brasil' | 'politicos' | 'parlamentares' | 'busca' | 'painel';
 
 const ABAS: { key: NavKey; label: string; path: string }[] = [
-  { key: 'brasil',       label: 'BRASIL',        path: '/' },
-  { key: 'rj',          label: 'RJ',             path: '/rj' },
-  { key: 'municipios',  label: 'MUNICÍPIOS',     path: '/municipios' },
-  { key: 'parlamentares', label: 'PARLAMENTARES', path: '/parlamentares' },
-  { key: 'busca',       label: 'BUSCA',          path: '/busca' },
-  { key: 'painel',      label: 'PAINEL',         path: '/painel' },
+  { key: 'inicio',       label: 'INÍCIO',         path: '/' },
+  { key: 'brasil',       label: 'BRASIL',         path: '/brasil' },
+  { key: 'parlamentares',label: 'PARLAMENTARES',  path: '/parlamentares' },
+  { key: 'busca',        label: 'BUSCA',          path: '/busca' },
+  { key: 'painel',       label: 'PAINEL',         path: '/painel' },
 ];
 
 function pathToKey(path: string): NavKey {
-  if (path === '/' || path.startsWith('/regiao') || path.startsWith('/estado')) return 'brasil';
-  if (path === '/rj') return 'rj';
-  if (path.startsWith('/municipios')) return 'municipios';
+  if (path === '/') return 'inicio';
+  if (path === '/brasil' || path.startsWith('/regiao') || path.startsWith('/estado')) return 'brasil';
   if (path.startsWith('/parlamentares')) return 'parlamentares';
   if (path.startsWith('/politicos')) return 'politicos';
   if (path === '/busca') return 'busca';
   if (path === '/painel') return 'painel';
-  return 'brasil';
+  return 'inicio';
 }
 
 function Navbar({
@@ -217,14 +214,8 @@ function App() {
 
         <Suspense fallback={<PageSpinner />}>
           <Routes>
-            {/* ── Nacional ── */}
-            <Route path="/" element={<BrasilPage />} />
-            <Route path="/regiao/:slugRegiao" element={<RegiaoPage />} />
-            <Route path="/estado/:uf" element={<EstadoPage />} />
-            <Route path="/parlamentares" element={<ParlamentaresListPage />} />
-
-            {/* ── RJ (homepage antiga) ── */}
-            <Route path="/rj" element={
+            {/* ── RJ = homepage ── */}
+            <Route path="/" element={
               <HomePage
                 municipios={municipios}
                 metricas={metricas}
@@ -238,10 +229,17 @@ function App() {
               />
             } />
 
-            {/* ── Municípios RJ ── */}
-            <Route path="/municipios" element={
-              <MunicipiosListPage municipios={municipios} onMunicipioClick={navMunicipio} />
-            } />
+            {/* ── Nacional ── */}
+            <Route path="/brasil" element={<BrasilPage />} />
+            <Route path="/regiao/:slugRegiao" element={<RegiaoPage />} />
+            <Route path="/estado/:uf" element={<EstadoPage />} />
+            <Route path="/parlamentares" element={<ParlamentaresListPage />} />
+
+            {/* Redirect legado /rj */}
+            <Route path="/rj" element={<Navigate to="/" replace />} />
+
+            {/* ── Municípios — deep link só (lista removida; navegar via Brasil > Estado) ── */}
+            <Route path="/municipios" element={<Navigate to="/brasil" replace />} />
             <Route path="/municipios/:nome" element={
               <MunicipioPageWrapper
                 municipios={munOrdenados}

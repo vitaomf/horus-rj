@@ -1,15 +1,16 @@
 /**
- * HomePage.tsx — Conteúdo da aba "Início" do Horus RJ.
- * Extraído de App.tsx para manter o arquivo principal enxuto.
+ * HomePage.tsx — Aba "Início" do Horus (nacional).
  */
 import React, { Suspense } from 'react';
-import { Search, Database, Users, MapPin, Link as LinkIcon, Eye } from 'lucide-react';
+import { Database, Link as LinkIcon, Eye } from 'lucide-react';
 import { ScrollReveal, StaggerText, TypeWriter, SentinelEye } from '../components/Animations';
 import { CountUp } from '../components/CountUp';
 import logoHorus from '../assets/logo_amarelo.png';
 
-// Lazy load do mapa (D3 ~200KB) — só carrega quando a HomePage é exibida
-const MapaRJ = React.lazy(() => import('../components/MapaRJ'));
+// Lazy load do mapa do Brasil
+const MapaBrasil = React.lazy(() =>
+  import('../components/MapaBrasil').then(m => ({ default: m.MapaBrasil }))
+);
 
 interface Municipio { id: number; nome: string; }
 interface Metricas { totalEmendas: number; totalMunicipios: number; totalPoliticos: number; }
@@ -26,10 +27,11 @@ interface HomePageProps {
   onMunicipioClick: (nome: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({
-  municipios, metricas, loading, busca, setBusca,
-  filtrados, getMunName, onMunicipioClickFromMap, onMunicipioClick,
-}) => (
+// Constantes nacionais (mock até a coleta nacional estar completa)
+const TOTAL_MUNICIPIOS_BR = 5570;
+const TOTAL_PARLAMENTARES_FEDERAIS = 594;
+
+export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
   <>
     {/* HERO */}
     <header className="border-b-4 border-[#FFD700] pt-20 pb-16 relative overflow-hidden" style={{ background: 'transparent' }}>
@@ -42,22 +44,22 @@ export const HomePage: React.FC<HomePageProps> = ({
             <StaggerText text="HORUS" />
           </h1>
           <p style={{ fontFamily: "'Cinzel', serif" }} className="text-white text-lg md:text-xl tracking-[0.5em] mt-1 opacity-70 uppercase mb-6">
-            Est. Rio de Janeiro
+            Transparência Pública
           </p>
           <p className="text-xl md:text-3xl font-semibold tracking-widest font-bebas text-white mb-8 min-h-[40px]">
-            <TypeWriter text="Monitoramos o dinheiro público do Rio de Janeiro." delay={800} speed={40} />
+            <TypeWriter text="Monitoramos o serviço público brasileiro." delay={800} speed={40} />
           </p>
           <div className="bg-[#FFD700] text-black font-semibold px-6 py-2 rounded-sm text-lg md:text-xl transform -skew-x-6 mb-8 inline-block shadow-[0_0_15px_rgba(255,215,0,0.3)]">
             <span className="block transform skew-x-6 tracking-wide">
               <CountUp end={metricas.totalEmendas} /> emendas monitoradas.{' '}
-              <CountUp end={metricas.totalPoliticos} /> políticos rastreados.{' '}
-              <CountUp end={metricas.totalMunicipios} /> municípios fiscalizados.{' '}
+              <CountUp end={TOTAL_PARLAMENTARES_FEDERAIS} /> parlamentares federais.{' '}
+              <CountUp end={TOTAL_MUNICIPIOS_BR} /> municípios brasileiros.{' '}
               Dados: 2010–{new Date().getFullYear()}.
             </span>
           </div>
           <p className="text-gray-400 max-w-3xl mx-auto text-xl font-light leading-relaxed">
-            O diretório inabalável de transparência. Rastreamos emendas parlamentares, mapeamos políticos
-            e identificamos o destino final das verbas estruturais do cidadão fluminense.
+            O diretório inabalável de transparência. Rastreamos emendas parlamentares, mapeamos
+            políticos e identificamos o destino final das verbas estruturais do cidadão.
           </p>
         </div>
       </div>
@@ -65,7 +67,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
     <main className="max-w-[1400px] w-full mx-auto px-6 py-20 space-y-24">
 
-      {/* MÉTRICAS */}
+      {/* MÉTRICAS NACIONAIS */}
       {loading ? (
         <div className="flex justify-center p-12">
           <div className="animate-spin h-12 w-12 border-4 border-[#FFD700] border-t-transparent rounded-full" />
@@ -73,9 +75,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { icon: Database, end: metricas.totalEmendas,   label: 'Emendas Registradas',   delay: 0 },
-            { icon: MapPin,   end: metricas.totalMunicipios, label: 'Municípios Monitorados', delay: 150 },
-            { icon: Users,    end: metricas.totalPoliticos,  label: 'Políticos Identificados', delay: 300 },
+            { icon: Database, end: metricas.totalEmendas,        label: 'Emendas Monitoradas',     delay: 0 },
+            { icon: LinkIcon, end: TOTAL_MUNICIPIOS_BR,          label: 'Municípios no Brasil',    delay: 150 },
+            { icon: Eye,      end: TOTAL_PARLAMENTARES_FEDERAIS, label: 'Parlamentares Federais',  delay: 300 },
           ].map(({ icon: Icon, end, label, delay }) => (
             <ScrollReveal key={label} delay={delay}>
               <div className="bg-black border border-[#FFD700]/30 rounded-sm p-6 md:p-10 flex flex-col items-center justify-center text-center group hover:bg-[#FFD700]/5 transition-colors shadow-[0_0_15px_rgba(255,215,0,0.05)] hover:shadow-[0_0_25px_rgba(255,215,0,0.15)] relative overflow-hidden animate-fill-border">
@@ -90,102 +92,130 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {/* MAPA */}
+      {/* MAPA DO BRASIL */}
       <ScrollReveal delay={0}>
         <section className="space-y-6 w-full">
           <div className="flex flex-col mb-8 text-center items-center">
-            <h2 className="text-[40px] text-[#FFD700] m-0 tracking-wider font-bebas leading-none">DISTRIBUIÇÃO GEOGRÁFICA</h2>
+            <h2 className="text-[40px] text-[#FFD700] m-0 tracking-wider font-bebas leading-none">EXPLORE O BRASIL</h2>
             <div className="h-[3px] w-[60px] bg-[#FFD700] mt-3 mb-4" />
-            <p className="text-gray-400 text-lg">Passe o mouse sobre o município para revelar o capital injetado por localidade.</p>
+            <p className="text-gray-400 text-lg">Clique em uma região para descer no detalhe — estados, municípios e parlamentares.</p>
           </div>
           <div className="w-full border-2 border-[#FFD700]/50 rounded-sm overflow-hidden z-0 shadow-[0_0_30px_rgba(255,215,0,0.1)] bg-black/50">
             <Suspense fallback={<div className="h-[400px] flex items-center justify-center text-[#FFD700]/50 font-bebas text-2xl animate-pulse">CARREGANDO MAPA...</div>}>
-              <MapaRJ
-                municipalities={municipios.map(m => getMunName(m.nome))}
-                onMunicipioClick={onMunicipioClickFromMap}
-                height={typeof window !== 'undefined' && window.innerWidth < 768 ? 400 : 550}
-              />
+              <MapaBrasil nivel="regioes" height={typeof window !== 'undefined' && window.innerWidth < 768 ? 400 : 550} />
             </Suspense>
           </div>
         </section>
       </ScrollReveal>
 
-      {/* COMO FUNCIONA */}
+      {/* COMO FUNCIONA — redesenhado com mais qualidade visual */}
       <section className="py-12 border-y border-[#333]/50">
         <div className="flex flex-col items-center justify-center text-center mb-16">
           <h2 className="text-[40px] text-[#FFD700] tracking-wider font-bebas leading-none">COMO O HORUS FUNCIONA</h2>
           <div className="h-[3px] w-[60px] bg-[#FFD700] mt-3 mb-4" />
+          <p className="text-gray-400 text-lg max-w-2xl mt-2">
+            Três etapas para transformar dados públicos brutos em conhecimento acessível ao cidadão.
+          </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center max-w-5xl mx-auto">
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {[
-            { num: 1, icon: Database, title: 'COLETAMOS', desc: 'Acessamos diariamente as bases de dados oficiais do Governo Federal e Portal da Transparência.', delay: 0 },
-            { num: 2, icon: LinkIcon,  title: 'CRUZAMOS',   desc: 'Mapeamos as emendas, seus idealizadores e seu destino final em municípios e áreas de crise.', delay: 150 },
-            { num: 3, icon: Eye,       title: 'REVELAMOS',  desc: 'Organizamos tudo em um diretório livre, transparente e impossível de ser escondido.', delay: 300 },
-          ].map(({ num, icon: Icon, title, desc, delay }) => (
-            <ScrollReveal key={title} delay={delay}>
-              <div className="flex flex-col items-center bg-black border border-[#FFD700]/20 p-8 pt-4 rounded-sm relative group hover:border-[#FFD700] transition-colors duration-500 h-full">
-                <span className="text-[#FFD700]/5 text-[120px] font-bebas absolute top-0 -z-0 select-none group-hover:text-[#FFD700]/10 transition-colors duration-500 flex items-center h-40">
-                  <CountUp end={num} duration={1000} startOnView />
+            {
+              num: '01',
+              icon: Database,
+              title: 'COLETAMOS',
+              corBase: '#FFD700',
+              corBg:   'rgba(255,215,0,0.05)',
+              corShadow: 'rgba(255,215,0,0.25)',
+              o_que:  'Acessamos diariamente as APIs oficiais do Portal da Transparência, TSE e Câmara dos Deputados.',
+              impacto:'Garantimos que nenhum dado público fique escondido em planilhas que ninguém abre.',
+            },
+            {
+              num: '02',
+              icon: LinkIcon,
+              title: 'CRUZAMOS',
+              corBase: '#03A9F4',
+              corBg:   'rgba(3,169,244,0.06)',
+              corShadow: 'rgba(3,169,244,0.25)',
+              o_que:  'Conectamos cada emenda ao parlamentar autor, ao município destinatário e ao contrato federal correspondente.',
+              impacto:'Você consegue ver quem mandou, para onde foi e o que virou — em segundos.',
+            },
+            {
+              num: '03',
+              icon: Eye,
+              title: 'REVELAMOS',
+              corBase: '#4CAF50',
+              corBg:   'rgba(76,175,80,0.06)',
+              corShadow: 'rgba(76,175,80,0.25)',
+              o_que:  'Organizamos tudo em mapas interativos, rankings e perfis pesquisáveis de parlamentares, cidades e contratos.',
+              impacto:'Conhecimento público vira ferramenta de pressão cidadã e investigação jornalística.',
+            },
+          ].map(({ num, icon: Icon, title, corBase, corBg, corShadow, o_que, impacto }, idx) => (
+            <ScrollReveal key={title} delay={idx * 120}>
+              <div
+                className="relative h-full bg-black border rounded-sm p-7 transition-all duration-500 group overflow-hidden"
+                style={{
+                  borderColor: `${corBase}33`,
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = corBase;
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor = corBg;
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = `0 0 30px ${corShadow}`;
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = `${corBase}33`;
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+                }}
+              >
+                {/* Número gigante de fundo */}
+                <span
+                  className="absolute top-2 right-4 text-[140px] font-bebas leading-none select-none pointer-events-none transition-opacity duration-500"
+                  style={{ color: `${corBase}10` }}
+                >
+                  {num}
                 </span>
-                <div className="bg-transparent z-10 mb-6 mt-20 p-2 relative">
-                  <Icon className="w-12 h-12 text-[#FFD700]" />
+
+                <div className="relative z-10 flex flex-col h-full">
+                  {/* Ícone */}
+                  <div
+                    className="w-16 h-16 rounded-sm flex items-center justify-center mb-5 transition-transform duration-500 group-hover:scale-110"
+                    style={{ backgroundColor: `${corBase}15`, border: `1px solid ${corBase}40` }}
+                  >
+                    <Icon className="w-9 h-9" style={{ color: corBase }} />
+                  </div>
+
+                  {/* Título */}
+                  <h3
+                    className="font-bebas text-4xl tracking-wider mb-3 leading-none"
+                    style={{ color: corBase }}
+                  >
+                    {title}
+                  </h3>
+
+                  {/* Linha decorativa */}
+                  <div className="h-[2px] w-10 mb-4" style={{ backgroundColor: corBase }} />
+
+                  {/* O QUE */}
+                  <p className="text-gray-300 text-sm leading-relaxed mb-4 font-light">{o_que}</p>
+
+                  {/* IMPACTO */}
+                  <div className="mt-auto pt-4 border-t" style={{ borderColor: `${corBase}22` }}>
+                    <p className="font-bebas text-[10px] tracking-[0.3em] mb-1" style={{ color: `${corBase}aa` }}>
+                      IMPACTO
+                    </p>
+                    <p className="text-gray-400 text-sm leading-relaxed italic">{impacto}</p>
+                  </div>
                 </div>
-                <h3 className="text-3xl text-[#FFD700] mb-3 font-bebas tracking-wide z-10">{title}</h3>
-                <p className="text-gray-400 text-base z-10 font-light px-2">{desc}</p>
               </div>
             </ScrollReveal>
           ))}
         </div>
       </section>
-
-      {/* GRID DE MUNICÍPIOS */}
-      <section className="space-y-12 pb-12">
-        <div className="flex flex-col md:flex-row justify-between items-end pb-4 gap-6">
-          <div className="w-full">
-            <h2 className="text-[40px] text-[#FFD700] m-0 tracking-wider font-bebas leading-none">EXPLORE POR MUNICÍPIO</h2>
-            <div className="h-[3px] w-[60px] bg-[#FFD700] mt-3 mb-4" />
-            <p className="text-gray-400 text-lg">Selecione uma cidade para ver emendas, políticos e dados públicos.</p>
-            <p className="text-[#FFD700] text-sm mt-3 uppercase tracking-widest font-semibold">
-              <CountUp end={metricas.totalMunicipios} startOnView /> MUNICÍPIOS MONITORADOS
-            </p>
-          </div>
-          <div className="relative w-full md:w-[450px] shrink-0 transform transition-transform duration-300 hover:scale-[1.02]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#FFD700] w-6 h-6" />
-            <input
-              type="text"
-              placeholder="BUSCAR MUNICÍPIO..."
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              className="w-full bg-[#0a0a0a] border-2 border-[#FFD700] text-white py-4 pl-14 pr-4 font-bebas text-2xl tracking-widest focus:outline-none focus:ring-4 focus:ring-[#FFD700]/30 placeholder-[#FFD700]/30 rounded-sm transition-shadow"
-            />
-          </div>
-        </div>
-
-        {!loading && (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {filtrados.length > 0 ? filtrados.map((m, idx) => (
-              <ScrollReveal key={m.id} delay={(idx % 10) * 50} baseClass="reveal-grid">
-                <div
-                  onClick={() => onMunicipioClick(m.nome)}
-                  className="h-[60px] bg-black border border-[#FFD700]/20 border-l-[4px] border-l-[#FFD700] text-gray-200 hover:border-[#FFD700] hover:text-[#FFD700] transition-all duration-150 cursor-pointer flex items-center justify-between px-5 group rounded-r-sm w-full"
-                >
-                  <span className="font-bebas text-2xl tracking-wider truncate mr-2">{getMunName(m.nome)}</span>
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity font-bold transform group-hover:translate-x-1 duration-300">→</span>
-                </div>
-              </ScrollReveal>
-            )) : (
-              <div className="col-span-full py-16 text-center border-2 border-dashed border-[#333] bg-[#0f0f0f] rounded-sm">
-                <p className="text-gray-500 font-bebas text-4xl tracking-widest">NENHUM MUNICÍPIO ENCONTRADO</p>
-                <p className="text-gray-600 mt-2 text-lg">Tente buscar usando outro termo.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
     </main>
 
     <footer style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '11px', borderTop: '1px solid rgba(255,215,0,0.1)' }}>
-      HORUS RJ &copy; 2026 — Dados: Portal da Transparência Gov Federal
+      HORUS &copy; 2026 — Dados: Portal da Transparência, TSE, Câmara dos Deputados
     </footer>
   </>
 );

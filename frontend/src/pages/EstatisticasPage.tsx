@@ -56,7 +56,7 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
         );
     }
 
-    if (!data || data.erro) {
+    if (!data || (data as { erro?: unknown }).erro) {
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center pt-20">
                 <p className="text-red-500 font-bebas text-2xl">ERRO AO CARREGAR O PAINEL ESTATÍSTICO.</p>
@@ -88,25 +88,53 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
     const maxAnoValor = Math.max(...por_ano.map((a: any) => a.valor_total));
 
     return (
-        <div className="min-h-screen pt-28 pb-20 px-4 md:px-8 relative z-10">
-            {/* Header Controls */}
-            <div className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
+        <div className="min-h-screen pb-20 relative z-10">
+            {/* Hero com textura */}
+            <div className="relative border-b border-[#FFD700]/30 overflow-hidden">
+                <div
+                    className="absolute inset-0 opacity-[0.06] pointer-events-none"
+                    style={{
+                        backgroundImage: 'url(/olhos_bg.jpg)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: 'grayscale(1)',
+                    }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/85 to-black pointer-events-none" />
+
+                <div className="relative z-10 px-6 py-10 md:px-12 md:py-14 max-w-5xl mx-auto text-center">
                     <button
                         onClick={onVoltar}
-                        className="flex items-center gap-2 text-gray-400 hover:text-[#FFD700] transition-colors mb-4 font-bebas tracking-wider uppercase"
+                        className="flex items-center gap-2 text-gray-500 hover:text-[#FFD700] transition-colors mb-6 font-bebas tracking-wider uppercase mx-auto"
                     >
-                        <ArrowLeft className="w-5 h-5" />
-                        VOLTAR AO INÍCIO
+                        <ArrowLeft className="w-4 h-4" />
+                        VOLTAR
                     </button>
-                    <h1 className="text-5xl lg:text-7xl font-bebas text-white tracking-widest leading-none">
-                        PAINEL <span className="text-[#FFD700]">INVESTIGATIVO</span>
+
+                    <p
+                        style={{ fontFamily: "'Cinzel', serif" }}
+                        className="text-[#FFD700]/60 text-xs md:text-sm tracking-[0.5em] uppercase mb-3"
+                    >
+                        Distribuição Orçamentária
+                    </p>
+                    <h1
+                        style={{ fontFamily: "'Cinzel Decorative', serif" }}
+                        className="text-[44px] md:text-[80px] leading-none tracking-wide text-white"
+                    >
+                        PAINEL DE <span className="text-[#FFD700]">EVIDÊNCIAS</span>
                     </h1>
-                    <p className="text-gray-400 text-sm md:text-lg mt-4 max-w-2xl border-l-2 border-[#FFD700] pl-4 italic">
-                        Análise macro-econômica em tempo real de toda a distribuição orçamentária mapeada no estado do Rio de Janeiro.
+                    <div className="flex items-center justify-center gap-3 mt-5">
+                        <div className="h-[1px] w-10 bg-[#FFD700]/40" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#FFD700]" />
+                        <div className="h-[1px] w-10 bg-[#FFD700]/40" />
+                    </div>
+                    <p className="text-gray-400 text-sm md:text-base mt-5 max-w-2xl mx-auto leading-relaxed">
+                        Análise da distribuição orçamentária — emendas parlamentares, repasses por município e concentração por objetivo.
                     </p>
                 </div>
             </div>
+
+            <div className="px-4 md:px-8 pt-12">
 
             <div className="max-w-7xl mx-auto space-y-12">
 
@@ -346,6 +374,7 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
                     </div>
                 </div>
 
+            </div>
             </div>
         </div>
     );

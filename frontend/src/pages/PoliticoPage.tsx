@@ -115,6 +115,65 @@ interface PoliticoData {
     ultimas_emendas: UltimaEmenda[];
 }
 
+interface MandatoHistorico {
+    idLegislatura: number;
+    anoInicio?: number;
+    anoFim?: number;
+    partidos: string[];
+}
+
+interface OrgaoCamara {
+    nome: string;
+    titulo: string;
+}
+
+interface BioCamara {
+    nomeCivil?: string;
+    nomeEleitoral?: string;
+    dataNascimento?: string;
+    municipioNascimento?: string;
+    ufNascimento?: string;
+    escolaridade?: string;
+    profissao?: string;
+    urlWebsite?: string;
+    redeSocial?: string[];
+    historico?: MandatoHistorico[];
+    orgaos?: OrgaoCamara[];
+}
+
+interface Votacao {
+    data: string;
+    hora: string;
+    voto: string;
+    descricao: string;
+    aprovado: number | null;
+    pl_tipo: string;
+    pl_numero: string | number;
+    pl_ano: string | number;
+    pl_ementa: string;
+    url: string;
+}
+
+interface PlAutoral {
+    id: number;
+    tipo: string;
+    numero: string | number;
+    ano: string | number;
+    ementa: string;
+    data: string;
+    status: string;
+    status_orgao: string;
+    status_data: string;
+    url: string;
+}
+
+interface AtividadeLegislativa {
+    dep_id: number;
+    periodo: { inicio: string; fim: string };
+    votacoes: Votacao[];
+    pls: PlAutoral[];
+}
+
 export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar, onMunicipioClick }) => {
     const [data, setData] = useState<PoliticoData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -124,6 +183,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [cidadeFiltro, setCidadeFiltro] = useState<string | null>(null);
     const [filtroPagamento, setFiltroPagamento] = useState<'todas' | 'pagas' | 'nao_pagas'>('todas');
     const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+    const [bioData, setBioData] = useState<BioCamara | null>(null);
+    const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
+    const [loadingAtividade, setLoadingAtividade] = useState(false);
     const [cruzamento, setCruzamento] = useState<{
         camada_geografica: { municipio: string; valor_emendas: number; num_emendas: number; valor_contratos: number; num_contratos: number }[];
         camada_financeira: { doador: string; documento: string; valor_doacao: number; valor_contratos: number; num_contratos: number; municipios: string }[];
@@ -145,7 +207,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get(`${API_BASE_URL}/api/politicos/${politicoId}`);
+                const res = await axios.get(`${API_BASE_URL}/api/politicos/${politicoId}`, {
+                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                });
                 setData(res.data);
             } catch (err: any) {
                 setError(err.response?.data?.detail || err.message || 'Erro desconhecido');
@@ -162,28 +226,63 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             .catch(() => {});
     }, [politicoId]);
 
-    // Foto: prefere a já enriquecida no backend; fallback para Câmara API ao vivo
+    // Foto + Bio + Atividade: ativa loading IMEDIATAMENTE para o usuário ver feedback
     useEffect(() => {
         if (!data) return;
+        if (data.foto_url) setFotoUrl(data.foto_url);
 
-        // Caminho rápido: foto já está no banco
-        if (data.foto_url) {
-            setFotoUrl(data.foto_url);
-            return;
-        }
+        // Marca atividade como "carregando" desde já — o spinner aparece sem esperar bio
+        setLoadingAtividade(true);
+        setAtividade(null);
 
-        // Fallback: busca na Câmara dos Deputados em tempo real
-        const primeiroNome = data.nome.split(' ')[0];
-        fetch(`https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(data.nome)}&itens=5`)
-            .then(r => r.ok ? r.json() : null)
-            .then(result => {
-                const dep = result?.dados?.find((d: any) => {
-                    const nomeCamara = d.nome?.toUpperCase() || '';
-                    return nomeCamara.includes(primeiroNome.toUpperCase());
-                }) || result?.dados?.[0];
-                if (dep?.id) setFotoUrl(`https://www.camara.leg.br/internet/deputado/bandep/${dep.id}.jpg`);
-            })
-            .catch(() => { /* silencioso */ });
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const r = await fetch(
+                    `${API_BASE_URL}/api/camara/bio?nome=${encodeURIComponent(data.nome)}`
+                );
+                if (!r.ok || cancelled) { setLoadingAtividade(false); return; }
+                const bio = await r.json();
+                if (cancelled) return;
+                if (!bio.encontrado) { setLoadingAtividade(false); return; }
+
+                if (!data.foto_url && bio.urlFoto) setFotoUrl(bio.urlFoto);
+                const depId = bio.id;
+                setBioData({
+                    nomeCivil: bio.nomeCivil,
+                    nomeEleitoral: bio.nomeEleitoral,
+                    dataNascimento: bio.dataNascimento,
+                    municipioNascimento: bio.municipioNascimento,
+                    ufNascimento: bio.ufNascimento,
+                    escolaridade: bio.escolaridade,
+                    profissao: bio.profissao || undefined,
+                    redeSocial: bio.redeSocial || [],
+                    historico: bio.historico || [],
+                    orgaos: bio.orgaos || [],
+                });
+
+                // Atividade legislativa — com timeout próprio (30s) para não travar a UI
+                if (depId) {
+                    const ctrl = new AbortController();
+                    const tid = setTimeout(() => ctrl.abort(), 60000);
+                    try {
+                        const ar = await fetch(
+                            `${API_BASE_URL}/api/camara/atividade?dep_id=${depId}`,
+                            { headers: { 'Cache-Control': 'no-cache' }, signal: ctrl.signal }
+                        );
+                        clearTimeout(tid);
+                        if (ar.ok && !cancelled) {
+                            const a = await ar.json();
+                            if (!cancelled) setAtividade(a);
+                        }
+                    } catch { /* timeout ou abort */ }
+                }
+            } catch { /* silencioso */ }
+            if (!cancelled) setLoadingAtividade(false);
+        })();
+
+        return () => { cancelled = true; };
     }, [data]);
 
     const formatCurrency = (value: number) => {
@@ -253,6 +352,27 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         return bio;
     };
 
+    const getBioReal = (): string => {
+        if (!bioData) return '';
+        const partes: string[] = [];
+        if (bioData.municipioNascimento && bioData.ufNascimento) {
+            let s = `Natural de ${bioData.municipioNascimento} (${bioData.ufNascimento})`;
+            if (bioData.dataNascimento) {
+                const ano = new Date(bioData.dataNascimento + 'T00:00:00').getFullYear();
+                const idade = new Date().getFullYear() - ano;
+                s += `, nascido em ${ano} (${idade} anos)`;
+            }
+            partes.push(s + '.');
+        }
+        if (bioData.profissao) {
+            partes.push(`Profissão declarada: ${bioData.profissao}.`);
+        }
+        if (bioData.escolaridade) {
+            partes.push(`Escolaridade: ${bioData.escolaridade}.`);
+        }
+        return partes.join(' ');
+    };
+
     if (loading) {
         return (
             <div className="w-full flex justify-center items-center py-24">
@@ -279,111 +399,427 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
     return (
         <div className="animate-fade-in pb-12 px-4 md:px-12 pt-8 relative z-10">
-            {/* 1. HEADER */}
-            <div className={`sticky top-16 z-[40] transition-all duration-300 border-b-2 border-[#FFD700] mb-12 ${isScrolled ? 'bg-black/95 backdrop-blur-[10px] py-4 px-4 md:px-8 -mx-4 md:-mx-12 shadow-[0_4px_20px_rgba(0,0,0,0.8)]' : 'pb-8 bg-transparent'}`}>
-                <div className={`flex flex-col lg:flex-row ${isScrolled ? 'lg:items-center' : 'lg:items-end'} justify-between gap-8`}>
-                    <div className="flex items-center gap-6">
-                        {/* Avatar — foto real ou iniciais */}
-                        <div className={`${isScrolled ? 'w-[40px] h-[40px]' : 'w-[80px] h-[80px]'} rounded-full border-2 border-[#FFD700] shrink-0 shadow-[0_0_15px_rgba(255,215,0,0.2)] transition-all duration-300 overflow-hidden`}>
-                            {fotoUrl ? (
-                                <img src={fotoUrl} alt={data.nome}
-                                    className="w-full h-full object-cover object-top"
-                                    onError={() => setFotoUrl(null)} />
-                            ) : (
-                                <div className="w-full h-full bg-[#1a1a00] flex items-center justify-center">
-                                    <span className={`font-bebas text-[#FFD700] pt-1 transition-all duration-300 ${isScrolled ? 'text-xl' : 'text-4xl'}`}>
-                                        {getInitials(data.nome)}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
 
-                        <div>
-                            {!isScrolled && (
-                                <p className="text-[#FFD700] font-semibold tracking-widest text-sm uppercase mb-1 transition-opacity duration-300">
-                                    PARLAMENTAR FEDERAL
-                                </p>
-                            )}
-                            <h1 className={`text-white font-bebas tracking-wide leading-none uppercase transition-all duration-300 ${isScrolled ? 'text-2xl mb-0 mt-1' : 'text-6xl md:text-[56px] mb-2'}`}>
-                                {data.nome}
-                            </h1>
-                            {!isScrolled && (
-                                <p className="text-gray-400 font-medium text-lg transition-opacity duration-300">
-                                    <span className="text-[#FFD700] font-bold">{data.partido}</span> <span className="mx-2">|</span> {data.cargo}
-                                </p>
-                            )}
+            {/* ── HEADER COMPACT (sticky, só aparece ao rolar) ── */}
+            <div className={`sticky top-16 z-[40] transition-all duration-300 border-b border-[#FFD700]/40
+                ${isScrolled
+                    ? 'bg-black/95 backdrop-blur-[10px] py-3 px-4 md:px-8 -mx-4 md:-mx-12 shadow-[0_4px_20px_rgba(0,0,0,0.8)] mb-8'
+                    : 'pointer-events-none opacity-0 h-0 overflow-hidden mb-0'}`}>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onVoltar}
+                            className="flex items-center gap-1 text-[#FFD700] hover:text-white transition-colors group cursor-pointer shrink-0">
+                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        </button>
+                        <div className="w-9 h-9 rounded-full border border-[#FFD700] overflow-hidden shrink-0">
+                            {fotoUrl
+                                ? <img src={fotoUrl} alt={data.nome} className="w-full h-full object-cover object-top" onError={() => setFotoUrl(null)} />
+                                : <div className="w-full h-full bg-[#1a1a00] flex items-center justify-center">
+                                    <span className="font-bebas text-[#FFD700] text-lg">{getInitials(data.nome)}</span>
+                                  </div>
+                            }
+                        </div>
+                        <h1 className="font-bebas text-white text-2xl leading-none tracking-wide uppercase">{data.nome}</h1>
+                        <span className="text-[#FFD700] font-bold text-sm hidden sm:block">{data.partido}</span>
+                    </div>
+                    <div className="flex gap-3 shrink-0">
+                        <div className="bg-[#111] border border-[#FFD700]/30 px-3 py-1 rounded-sm text-center">
+                            <div className="font-bebas text-white text-xl leading-none">{data.total_emendas}</div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">emendas</div>
+                        </div>
+                        <div className="bg-[#111] border border-[#FFD700]/30 px-3 py-1 rounded-sm text-center">
+                            <div className="font-bebas text-[#FFD700] text-xl leading-none">{formatMillions(data.valor_total)}</div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">total</div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div className="flex flex-col sm:flex-row gap-4 shrink-0">
-                        {/* Card Total Emendas */}
-                        <div className="bg-[#111] border border-[#FFD700]/30 p-3 rounded-sm max-w-[180px]">
-                            <div className="flex items-center text-gray-400 mb-1">
-                                <FileText className="w-3 h-3 mr-2" />
-                                <span className="text-xs font-bold tracking-[0.15em] uppercase">Emendas Totais</span>
+            {/* ── HERO: Foto grande + Nome + Bio ── */}
+            <div className="max-w-7xl mx-auto mb-10">
+                <button onClick={onVoltar}
+                    className="flex items-center gap-2 text-[#FFD700] hover:text-white transition-colors group w-fit cursor-pointer mb-6">
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                    <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
+                </button>
+
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
+                    {/* Foto portrait grande */}
+                    <div className="shrink-0 w-52 h-[272px] lg:w-60 lg:h-[312px] rounded-xl overflow-hidden border-2 border-[#FFD700] shadow-[0_0_40px_rgba(255,215,0,0.15)] bg-[#111]">
+                        {fotoUrl ? (
+                            <img src={fotoUrl} alt={data.nome}
+                                className="w-full h-full object-cover object-top"
+                                onError={() => setFotoUrl(null)} />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <span className="font-bebas text-[#FFD700] text-7xl">{getInitials(data.nome)}</span>
                             </div>
-                            <div className="text-3xl font-bebas text-white">
-                                {data.total_emendas}
-                            </div>
+                        )}
+                    </div>
+
+                    {/* Info + Bio */}
+                    <div className="flex-1 min-w-0 pt-1">
+                        <p className="text-[#FFD700] font-semibold tracking-[0.2em] text-xs uppercase mb-2">
+                            PARLAMENTAR FEDERAL · DOSSIÊ
+                        </p>
+                        <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-6xl md:text-7xl lg:text-8xl mb-3">
+                            {data.nome}
+                        </h1>
+                        <p className="text-gray-400 font-medium text-lg mb-5">
+                            <span className="text-[#FFD700] font-bold">{data.partido}</span>
+                            <span className="mx-3 text-zinc-700">|</span>
+                            {data.cargo}
+                        </p>
+
+                        {/* Linha separadora */}
+                        <div className="w-16 h-0.5 bg-[#FFD700] mb-5" />
+
+                        {/* Bio real (Câmara API) */}
+                        {getBioReal() && (
+                            <p className="text-zinc-300 text-sm font-sans leading-relaxed mb-4">
+                                {getBioReal()}
+                            </p>
+                        )}
+
+                        {/* Bio irônica (análise de gastos) */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 mb-5">
+                            <p className="font-bebas text-[10px] tracking-widest text-zinc-600 mb-2">
+                                ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
+                            </p>
+                            <p className="text-zinc-400 text-sm font-sans leading-relaxed">
+                                {getBioIronica()}
+                            </p>
                         </div>
 
-                        {/* Card Valor Total */}
-                        <div className="bg-[#111] border border-[#FFD700]/30 p-3 rounded-sm max-w-[180px]">
-                            <div className="flex items-center text-[#FFD700] mb-1">
-                                <TrendingUp className="w-3 h-3 mr-2" />
-                                <span className={`font-bold tracking-[0.15em] uppercase text-[#FFD700] transition-all duration-300 ${isScrolled ? 'text-xs' : 'text-xs'}`}>Verba Total Enviada</span>
+                        {/* Stat cards */}
+                        <div className="flex gap-4 flex-wrap">
+                            <div className="bg-[#111] border border-[#FFD700]/30 px-4 py-3 rounded-sm">
+                                <div className="flex items-center text-gray-400 mb-1 gap-1.5">
+                                    <FileText className="w-3 h-3" />
+                                    <span className="text-xs font-bold tracking-[0.15em] uppercase">Emendas Totais</span>
+                                </div>
+                                <div className="text-4xl font-bebas text-white leading-none">{data.total_emendas}</div>
                             </div>
-                            <div className={`font-bebas text-[#FFD700] transition-all duration-300 ${isScrolled ? 'text-2xl mt-1' : 'text-3xl'}`}>
-                                {formatMillions(data.valor_total)}
+                            <div className="bg-[#111] border border-[#FFD700]/30 px-4 py-3 rounded-sm">
+                                <div className="flex items-center text-[#FFD700] mb-1 gap-1.5">
+                                    <TrendingUp className="w-3 h-3" />
+                                    <span className="text-xs font-bold tracking-[0.15em] uppercase">Verba Total Enviada</span>
+                                </div>
+                                <div className="text-4xl font-bebas text-[#FFD700] leading-none">{formatMillions(data.valor_total)}</div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex items-center justify-between mb-6">
-                <button onClick={onVoltar}
-                    className="flex items-center gap-2 text-[#FFD700] hover:text-white transition-colors group w-fit cursor-pointer">
-                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                    <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
-                </button>
-            </div>
+            {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
+            {bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length) && (
+                <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
 
-            {/* ── DOSSIÊ: Bio irônica ───────────────────────────────────────── */}
-            <div className="max-w-7xl mx-auto mb-8">
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5 relative overflow-hidden">
-                    {/* Marca d'água "DOSSIÊ" */}
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bebas text-[80px] text-zinc-900 select-none pointer-events-none leading-none">
-                        DOSSIÊ
-                    </span>
-                    <div className="flex items-start gap-5 relative z-10">
-                        {/* Foto grande no dossiê */}
-                        <div className="shrink-0 w-20 h-24 rounded-md border border-zinc-700 overflow-hidden bg-zinc-900">
-                            {fotoUrl ? (
-                                <img src={fotoUrl} alt={data.nome}
-                                    className="w-full h-full object-cover object-top"
-                                    onError={() => setFotoUrl(null)} />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <span className="font-bebas text-zinc-500 text-3xl">{getInitials(data.nome)}</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="font-bebas text-[10px] tracking-widest text-zinc-600 border border-zinc-700 px-2 py-0.5 rounded-sm">
-                                    ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
-                                </span>
-                                {!fotoUrl && (
-                                    <span className="font-bebas text-[10px] tracking-widest text-zinc-700 border border-zinc-800 px-2 py-0.5 rounded-sm">
-                                        FOTO NÃO DISPONÍVEL
-                                    </span>
-                                )}
+                    {/* Linha do tempo */}
+                    <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-6">
+                        <p className="font-bebas text-[#FFD700] text-xl tracking-widest mb-1">TRAJETÓRIA POLÍTICA</p>
+                        <p className="text-zinc-600 text-[11px] uppercase tracking-widest mb-6">Linha do tempo · dados oficiais</p>
+
+                        <div className="relative">
+                            {/* Linha vertical */}
+                            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-800" />
+
+                            <div className="space-y-0">
+                                {(() => {
+                                    type Ev = { ano: number; tipo: string; titulo: string; desc?: string; cor: string; partido?: string };
+                                    const eventos: Ev[] = [];
+
+                                    // Nascimento
+                                    if (bioData.dataNascimento) {
+                                        const ano = new Date(bioData.dataNascimento + 'T00:00:00').getFullYear();
+                                        eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${bioData.municipioNascimento || ''}${bioData.ufNascimento ? ' (' + bioData.ufNascimento + ')' : ''}`, cor: '#94a3b8' });
+                                    }
+
+                                    // Mandatos legislativos
+                                    (bioData.historico || []).forEach(m => {
+                                        const ano = m.anoInicio || 0;
+                                        const partidoInicio = m.partidos[0] || '';
+                                        const partidoFim = m.partidos[m.partidos.length - 1] || partidoInicio;
+                                        const trocou = m.partidos.length > 1;
+                                        eventos.push({
+                                            ano,
+                                            tipo: 'mandato',
+                                            titulo: `${m.idLegislatura}ª Legislatura (${m.anoInicio}–${m.anoFim})`,
+                                            desc: trocou
+                                                ? `Iniciou pelo ${partidoInicio}, migrou para ${partidoFim}`
+                                                : `Deputado Federal pelo ${partidoInicio}-RJ`,
+                                            cor: '#FFD700',
+                                            partido: partidoFim,
+                                        });
+                                    });
+
+                                    // Campanha TSE
+                                    if (data.dados_campanha) {
+                                        const ano = 2022;
+                                        const receita = data.dados_campanha.total_receitas;
+                                        const fmt = receita >= 1e6 ? `R$ ${(receita/1e6).toFixed(1)}M` : `R$ ${(receita/1e3).toFixed(0)}K`;
+                                        eventos.push({ ano, tipo: 'campanha', titulo: `Campanha 2022`, desc: `${data.dados_campanha.situacao} · ${fmt} arrecadados`, cor: '#4ade80' });
+                                    }
+
+                                    // Ordena e renderiza
+                                    return eventos.sort((a, b) => a.ano - b.ano).map((ev, i) => (
+                                        <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
+                                            {/* Ponto */}
+                                            <div className="shrink-0 mt-1 w-[15px] h-[15px] rounded-full border-2 z-10 relative"
+                                                style={{ borderColor: ev.cor, backgroundColor: '#0a0a0a' }} />
+                                            {/* Conteúdo */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-baseline gap-3 flex-wrap">
+                                                    <span className="font-bebas text-2xl leading-none" style={{ color: ev.cor }}>{ev.ano}</span>
+                                                    <span className="font-bebas text-sm text-white tracking-wide">{ev.titulo}</span>
+                                                    {ev.partido && (
+                                                        <span className="text-[10px] font-bold tracking-widest text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded-sm">{ev.partido}</span>
+                                                    )}
+                                                </div>
+                                                {ev.desc && (
+                                                    <p className="text-zinc-500 text-xs mt-0.5 leading-relaxed">{ev.desc}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
                             </div>
-                            <p className="text-zinc-300 text-sm font-sans leading-relaxed">
-                                {getBioIronica()}
+                        </div>
+                    </div>
+
+                    {/* Ligações políticas */}
+                    <div className="flex flex-col gap-4">
+
+                        {/* Partidos */}
+                        {(bioData.historico?.length ?? 0) > 0 && (() => {
+                            const todosPartidos: string[] = [];
+                            (bioData.historico || []).forEach(m => m.partidos.forEach(p => { if (!todosPartidos.includes(p)) todosPartidos.push(p); }));
+                            return (
+                                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">TRAJETÓRIA PARTIDÁRIA</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {todosPartidos.map((p, i) => (
+                                            <span key={p} className="font-bebas tracking-widest text-sm px-3 py-1 rounded-sm border"
+                                                style={{ borderColor: i === todosPartidos.length - 1 ? '#FFD700' : '#3f3f46', color: i === todosPartidos.length - 1 ? '#FFD700' : '#71717a' }}>
+                                                {p}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    {todosPartidos.length > 1 && (
+                                        <p className="text-zinc-600 text-[10px] mt-2">{todosPartidos.length - 1} mudança{todosPartidos.length > 2 ? 's' : ''} de partido ao longo do mandato</p>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Top 10 doadores — somente pessoas físicas */}
+                        {data.dados_campanha?.top_doadores?.length ? (
+                            <div className="bg-[#0a0a0a] border border-red-900/30 rounded-xl p-5">
+                                <p className="font-bebas text-red-400 text-base tracking-widest mb-0.5">QUEM FINANCIOU A CAMPANHA</p>
+                                <p className="text-zinc-600 text-[10px] mb-4 uppercase tracking-widest">Top 10 doadores · Eleição 2022 · Fonte: TSE</p>
+                                <div className="space-y-2.5">
+                                    {data.dados_campanha.top_doadores.map((d, i) => {
+                                        const pct = d.valor / data.dados_campanha!.top_doadores[0].valor * 100;
+                                        const fmt = d.valor >= 1e6
+                                            ? `R$ ${(d.valor/1e6).toFixed(2)}M`
+                                            : d.valor >= 1e3
+                                                ? `R$ ${(d.valor/1e3).toFixed(0)}K`
+                                                : `R$ ${d.valor.toFixed(0)}`;
+                                        return (
+                                            <div key={i}>
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="font-bebas text-zinc-600 text-sm w-5 shrink-0">{i+1}</span>
+                                                        <span className="text-zinc-300 text-xs truncate font-medium">{d.nome}</span>
+                                                    </div>
+                                                    <span className="font-bebas text-red-400 text-sm shrink-0">{fmt}</span>
+                                                </div>
+                                                <div className="w-full bg-zinc-900 rounded-full h-1 overflow-hidden ml-7">
+                                                    <div className="h-full bg-red-900/70 rounded-full" style={{ width: `${Math.max(pct, 3)}%` }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-zinc-700 text-[10px] mt-4 italic">Dados extraídos do portal DivulgaCandContas (TSE).</p>
+                            </div>
+                        ) : null}
+
+                        {/* Órgãos / Comissões */}
+                        {(bioData.orgaos?.length ?? 0) > 0 && (
+                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">CARGOS E COMISSÕES</p>
+                                <div className="space-y-2">
+                                    {(bioData.orgaos || []).map((o, i) => (
+                                        <div key={i} className="flex flex-col">
+                                            <span className="text-white text-xs font-medium leading-snug">{o.nome}</span>
+                                            {o.titulo && <span className="text-zinc-600 text-[10px]">{o.titulo}</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Redes sociais */}
+                        {(bioData.redeSocial?.length ?? 0) > 0 && (
+                            <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl p-5">
+                                <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">REDES SOCIAIS</p>
+                                <div className="flex flex-col gap-1.5">
+                                    {(bioData.redeSocial || []).map((url, i) => {
+                                        const rede = url.includes('twitter') || url.includes('x.com') ? 'Twitter/X'
+                                            : url.includes('facebook') ? 'Facebook'
+                                            : url.includes('instagram') ? 'Instagram'
+                                            : url.includes('youtube') ? 'YouTube'
+                                            : 'Web';
+                                        return (
+                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                                className="text-zinc-400 hover:text-[#FFD700] text-xs truncate transition-colors flex items-center gap-2">
+                                                <span className="text-zinc-700 font-bebas text-[10px] tracking-widest w-16 shrink-0">{rede}</span>
+                                                <span className="truncate">{url.replace('https://', '').replace('http://', '')}</span>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── ATUAÇÃO LEGISLATIVA ─────────────────────────────────────── */}
+            <div className="max-w-7xl mx-auto mb-10">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-5 gap-4 flex-wrap">
+                        <div>
+                            <p className="font-bebas text-[#FFD700] text-xl tracking-widest">ATUAÇÃO LEGISLATIVA</p>
+                            <p className="text-zinc-600 text-[10px] uppercase tracking-widest">
+                                {atividade
+                                    ? `${atividade.pls.length} projetos · ${atividade.periodo.inicio} → ${atividade.periodo.fim} · Câmara API`
+                                    : 'Carregando dados da Câmara...'}
                             </p>
                         </div>
+                    </div>
+
+                    <div className="p-6">
+                        {loadingAtividade && !atividade && (
+                            <div className="flex flex-col items-center gap-3 text-zinc-500 py-10 justify-center">
+                                <div className="animate-spin w-6 h-6 border-2 border-zinc-700 border-t-[#FFD700] rounded-full" />
+                                <span className="font-bebas tracking-widest text-sm">BUSCANDO NA CÂMARA DOS DEPUTADOS...</span>
+                                <span className="text-zinc-700 text-xs">pode levar até 30 segundos · dados em tempo real</span>
+                            </div>
+                        )}
+
+                        {!loadingAtividade && !atividade && (
+                            <div className="text-center py-10">
+                                <p className="text-zinc-500 font-bebas text-lg tracking-widest mb-1">PARLAMENTAR NÃO ENCONTRADO NA CÂMARA API</p>
+                                <p className="text-zinc-700 text-xs">Pode ser senador, ex-deputado ou nome com grafia diferente da Câmara dos Deputados.</p>
+                            </div>
+                        )}
+
+                        {atividade && atividade.pls.length === 0 && (
+                            <p className="text-zinc-500 text-center py-8 font-bebas text-lg tracking-widest">NENHUM PROJETO ENCONTRADO</p>
+                        )}
+
+                        {atividade && atividade.pls.length > 0 && (() => {
+                            // Indexa votos por identificador do PL
+                            const votoPorPl = new Map<string, Votacao>();
+                            atividade.votacoes.forEach(v => {
+                                if (v.pl_tipo && v.pl_numero && v.pl_ano) {
+                                    votoPorPl.set(`${v.pl_tipo}-${v.pl_numero}-${v.pl_ano}`, v);
+                                }
+                            });
+
+                            const tipoLabel: Record<string, string> = {
+                                PEC: 'Proposta de Emenda Constitucional',
+                                PL:  'Projeto de Lei',
+                                PDL: 'Projeto de Decreto Legislativo',
+                                PLP: 'Projeto de Lei Complementar',
+                                REQ: 'Requerimento',
+                            };
+
+                            return (
+                                <div className="space-y-3">
+                                    {atividade.pls.map((pl, i) => {
+                                        const voto = votoPorPl.get(`${pl.tipo}-${pl.numero}-${pl.ano}`);
+
+                                        // Badge baseado no status real do PL (vindo da Câmara API)
+                                        const statusLower = (pl.status || '').toLowerCase();
+                                        let votoLabel = (pl.status || 'EM TRAMITAÇÃO').toUpperCase();
+                                        let votoSub = pl.status_orgao
+                                            ? (pl.status_data ? `${pl.status_orgao} · ${pl.status_data}` : pl.status_orgao)
+                                            : (pl.status_data || 'situação atual');
+                                        let votoCor = '#71717a';
+                                        let votoBorda = 'border-zinc-700';
+
+                                        // Cor por palavra-chave do status
+                                        if (statusLower.includes('aprovad') || statusLower.includes('transformad') || statusLower.includes('sanção')) {
+                                            votoCor = '#4ade80'; votoBorda = 'border-green-800/60';
+                                        } else if (statusLower.includes('rejeit') || statusLower.includes('arquiv') || statusLower.includes('retirad') || statusLower.includes('vetad')) {
+                                            votoCor = '#f87171'; votoBorda = 'border-red-800/60';
+                                        } else if (statusLower.includes('pronta para pauta') || statusLower.includes('plenário')) {
+                                            votoCor = '#facc15'; votoBorda = 'border-yellow-800/60';
+                                        }
+
+                                        // Voto nominal recente prevalece — substitui badge de status pelo voto
+                                        if (voto) {
+                                            const v = voto.voto;
+                                            votoLabel = `VOTOU ${v.toUpperCase()}`;
+                                            votoSub = voto.aprovado === 1 ? 'projeto aprovado'
+                                                : voto.aprovado === 0 ? 'projeto rejeitado'
+                                                : `em ${voto.data}`;
+                                            if (v === 'Sim')       { votoCor = '#4ade80'; votoBorda = 'border-green-800/60'; }
+                                            else if (v === 'Não')  { votoCor = '#f87171'; votoBorda = 'border-red-800/60'; }
+                                            else if (v === 'Abstenção') { votoCor = '#facc15'; votoBorda = 'border-yellow-800/60'; }
+                                            else                   { votoCor = '#94a3b8'; votoBorda = 'border-zinc-700'; }
+                                        }
+
+                                        return (
+                                            <div key={i} className="bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
+                                                {/* Cabeçalho: PL + voto + data */}
+                                                <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-zinc-800/60 flex-wrap">
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <span className="font-bebas text-[#FFD700] text-lg tracking-widest leading-none">
+                                                            {pl.tipo} {pl.numero}/{pl.ano}
+                                                        </span>
+                                                        {tipoLabel[pl.tipo] && (
+                                                            <span className="text-zinc-600 text-[10px] hidden sm:block">{tipoLabel[pl.tipo]}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        {/* Badge do voto */}
+                                                        <div className={`flex flex-col items-end border-l pl-3 ${votoBorda}`}>
+                                                            <span className="font-bebas text-sm leading-none tracking-widest" style={{ color: votoCor }}>
+                                                                {votoLabel}
+                                                            </span>
+                                                            <span className="text-[10px] text-zinc-600 mt-0.5">{votoSub}</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-end shrink-0">
+                                                            <span className="text-zinc-600 text-[11px] font-mono">{pl.data}</span>
+                                                            {pl.data && String(pl.ano) !== pl.data.substring(0, 4) && (
+                                                                <span className="text-zinc-700 text-[9px] italic">apresentado em {pl.data.substring(0, 4)}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Corpo: ementa + link */}
+                                                <div className="px-4 py-3 space-y-3">
+                                                    <div className="border-l-2 border-[#FFD700]/30 pl-3">
+                                                        <p className="text-[10px] text-zinc-600 font-bebas tracking-widest mb-0.5">EM RESUMO</p>
+                                                        <p className="text-zinc-300 text-xs leading-relaxed">{pl.ementa}</p>
+                                                    </div>
+                                                    <a href={pl.url} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-[#FFD700] hover:text-white text-[11px] font-bebas tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-1.5 rounded-sm transition-all">
+                                                        VER PROJETO NA CÂMARA →
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
