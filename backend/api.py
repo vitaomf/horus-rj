@@ -108,8 +108,9 @@ def get_db_connection():
         )
         conn.sync()
     else:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")   # leituras simultâneas com escrita
     conn.execute("PRAGMA foreign_keys = ON")
     conn.create_function("unaccent", 1, _unaccent)
     return conn
@@ -1193,6 +1194,84 @@ def bio_camara(request: Request, nome: str = Query(..., description="Nome do par
         }
     except Exception as e:
         return {"encontrado": False, "erro": str(e)}
+
+
+@app.get("/api/status/coleta")
+def status_coleta():
+    """Dashboard de monitoramento: emendas por UF, parlamentares, logs recentes."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Emendas por UF
+        cur.execute("""
+            SELECT uf, COUNT(*) as total, MIN(ano) as ano_min, MAX(ano) as ano_max
+            FROM emendas
+            WHERE uf IS NOT NULL AND uf != ''
+            GROUP BY uf ORDER BY total DESC
+        """)
+        emendas_por_uf = [
+            {"uf": r["uf"], "total": r["total"], "ano_min": r["ano_min"], "ano_max": r["ano_max"]}
+            for r in cur.fetchall()
+        ]
+
+        # Totais gerais
+        cur.execute("SELECT COUNT(*) FROM emendas")
+        total_emendas = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(DISTINCT uf) FROM emendas WHERE uf IS NOT NULL AND uf != ''")
+        ufs_com_dados = cur.fetchone()[0]
+
+        # Parlamentares por casa
+        cur.execute("""
+            SELECT COALESCE(casa, 'sem_casa') as casa, COUNT(*) as total
+            FROM politicos GROUP BY casa ORDER BY total DESC
+        """)
+        parlamentares = {r["casa"]: r["total"] for r in cur.fetchall()}
+
+        # Tamanho do banco
+        import os as _os
+        db_size_kb = round(_os.path.getsize(DB_PATH) / 1024, 1) if _os.path.exists(DB_PATH) else 0
+
+        conn.close()
+    except Exception as e:
+        logger.error("Erro em /api/status/coleta: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro interno")
+
+    # Log recente da coleta nacional
+    log_nacional = []
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "coleta_nacional.log")
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                linhas = f.readlines()
+            log_nacional = [l.rstrip() for l in linhas[-30:] if l.strip()]
+        except Exception:
+            pass
+
+    # Log de erros
+    erros = []
+    err_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "coleta_errors.log")
+    if os.path.exists(err_path):
+        try:
+            with open(err_path, encoding="utf-8", errors="replace") as f:
+                linhas = f.readlines()
+            erros = [l.rstrip() for l in linhas[-10:] if l.strip()]
+        except Exception:
+            pass
+
+    ufs_brasil = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+                  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+    ufs_coletadas = {e["uf"] for e in emendas_por_uf}
+    ufs_pendentes = [u for u in ufs_brasil if u not in ufs_coletadas]
+
+    return {
+        "banco": {"total_emendas": total_emendas, "ufs_com_dados": ufs_com_dados, "tamanho_kb": db_size_kb},
+        "emendas_por_uf": emendas_por_uf,
+        "ufs_pendentes": ufs_pendentes,
+        "parlamentares": parlamentares,
+        "log_coleta_nacional": log_nacional,
+        "erros_recentes": erros,
+    }
 
 
 @app.get("/api/health")

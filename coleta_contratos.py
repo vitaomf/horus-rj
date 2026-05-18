@@ -33,7 +33,8 @@ def iniciar_coleta():
 
     db_path = "transparencia_rj.db"
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
 

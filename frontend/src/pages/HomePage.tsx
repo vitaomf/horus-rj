@@ -1,20 +1,18 @@
 /**
- * HomePage.tsx — Aba "Início" do Horus (nacional).
+ * HomePage.tsx — Redesign editorial investigativo (frontend-design skill)
+ * Estética: dossier de inteligência × jornal de investigação × terminal de vigilância
  */
-import React, { Suspense } from 'react';
-import { Database, Link as LinkIcon, Eye } from 'lucide-react';
-import { ScrollReveal, StaggerText, TypeWriter, SentinelEye } from '../components/Animations';
+import React, { Suspense, useEffect, useState } from 'react';
+import { SentinelEye, ScrollReveal, TypeWriter } from '../components/Animations';
 import { CountUp } from '../components/CountUp';
 import logoHorus from '../assets/logo_amarelo.png';
 
-// Lazy load do mapa do Brasil
 const MapaBrasil = React.lazy(() =>
   import('../components/MapaBrasil').then(m => ({ default: m.MapaBrasil }))
 );
 
 interface Municipio { id: number; nome: string; }
 interface Metricas { totalEmendas: number; totalMunicipios: number; totalPoliticos: number; }
-
 interface HomePageProps {
   municipios: Municipio[];
   metricas: Metricas;
@@ -27,195 +25,333 @@ interface HomePageProps {
   onMunicipioClick: (nome: string) => void;
 }
 
-// Constantes nacionais (mock até a coleta nacional estar completa)
 const TOTAL_MUNICIPIOS_BR = 5570;
 const TOTAL_PARLAMENTARES_FEDERAIS = 594;
 
+/* Linha de código piscante — efeito terminal */
+function TerminalLine({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setVisible(true), delay); return () => clearTimeout(t); }, [delay]);
+  return (
+    <div className={`flex items-start gap-2 font-mono text-xs transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      <span className="text-[#FFD700]/40 select-none">›</span>
+      <span className="text-[#FFD700]/70">{children}</span>
+    </div>
+  );
+}
+
+/* Ticker horizontal de dados */
+function DataTicker() {
+  const items = [
+    'PORTAL DA TRANSPARÊNCIA',
+    'TSE 2022',
+    'CÂMARA DOS DEPUTADOS',
+    'SENADO FEDERAL',
+    'CONTRATOS FEDERAIS 2026',
+    'EMENDAS PARLAMENTARES 2010–2026',
+    'SISTEMA ATIVO',
+  ];
+  return (
+    <div className="overflow-hidden border-t border-b border-[#FFD700]/15 py-2 bg-black/40 backdrop-blur-sm">
+      <div className="flex whitespace-nowrap animate-[ticker_30s_linear_infinite]">
+        {[...items, ...items].map((item, i) => (
+          <span key={i} className="inline-flex items-center gap-4 px-6 font-mono text-[10px] tracking-[0.4em] text-[#FFD700]/40 uppercase">
+            <span className="w-1 h-1 rounded-full bg-[#FFD700]/30 inline-block" />
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Card de métrica estilo painel de controle */
+function MetricaCard({ value, label, sub, index }: { value: number; label: string; sub: string; index: number }) {
+  return (
+    <ScrollReveal delay={index * 100}>
+      <div className="relative group border border-[#FFD700]/15 bg-black hover:border-[#FFD700]/40 transition-all duration-500 overflow-hidden">
+        {/* Canto decorativo */}
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#FFD700]/60" />
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#FFD700]/60" />
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#FFD700]/60" />
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#FFD700]/60" />
+
+        {/* Scan line no hover */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#FFD700]/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+        <div className="p-8 text-center">
+          <p className="font-mono text-[9px] tracking-[0.4em] text-[#FFD700]/40 uppercase mb-3">{sub}</p>
+          <div className="font-bebas text-6xl md:text-7xl text-[#FFD700] leading-none tabular-nums">
+            <CountUp end={value} startOnView duration={1800} />
+          </div>
+          <p className="font-bebas text-sm tracking-[0.3em] text-white/60 mt-3 uppercase">{label}</p>
+        </div>
+      </div>
+    </ScrollReveal>
+  );
+}
+
 export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
   <>
-    {/* HERO */}
-    <header className="border-b-4 border-[#FFD700] pt-20 pb-16 relative overflow-hidden" style={{ background: 'transparent' }}>
-      <div className="max-w-7xl mx-auto px-6 flex flex-col items-center justify-center text-center gap-6 relative z-10">
-        <div className="shrink-0 flex items-center justify-center">
+    {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
+    <header className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-black">
+
+      {/* Grade de fundo */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,215,0,1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,215,0,1) 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px',
+        }}
+      />
+
+      {/* Vinheta nas bordas */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%)' }}
+      />
+
+      {/* Textura olhos */}
+      <div
+        className="absolute inset-0 opacity-[0.07] pointer-events-none"
+        style={{
+          backgroundImage: 'url(/olhos_bg.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'grayscale(1) contrast(1.4)',
+          mixBlendMode: 'luminosity',
+        }}
+      />
+
+      {/* Linha de código lateral — decorativa */}
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-1.5 opacity-30">
+        {['SYS.INIT', 'DB.CONN', 'API.SYNC', 'DATA.OK', 'WATCH.ON'].map((line, i) => (
+          <p key={i} className="font-mono text-[9px] text-[#FFD700]/60 tracking-widest">{line}</p>
+        ))}
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto px-6 flex flex-col items-center justify-center text-center py-24 gap-8">
+
+        {/* Olho */}
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full animate-ping opacity-10"
+            style={{ background: 'radial-gradient(circle, #FFD700 0%, transparent 70%)' }}
+          />
           <SentinelEye src={logoHorus} />
         </div>
-        <div className="flex flex-col items-center">
-          <h1 style={{ fontFamily: "'Cinzel Decorative', serif" }} className="text-[60px] md:text-[120px] text-[#FFD700] leading-none mb-0 tracking-wide flex justify-center flex-wrap">
-            <StaggerText text="HORUS" />
+
+        {/* Título */}
+        <div className="space-y-2">
+          <h1
+            style={{ fontFamily: "'Cinzel Decorative', serif" }}
+            className="text-[72px] md:text-[130px] text-[#FFD700] leading-none tracking-wide"
+          >
+            HORUS
           </h1>
-          <p style={{ fontFamily: "'Cinzel', serif" }} className="text-white text-lg md:text-xl tracking-[0.5em] mt-1 opacity-70 uppercase mb-6">
-            Transparência Pública
+          <p
+            style={{ fontFamily: "'Cinzel', serif" }}
+            className="text-white/50 text-sm md:text-base tracking-[0.8em] uppercase"
+          >
+            Sistema de Transparência Pública
           </p>
-          <p className="text-xl md:text-3xl font-semibold tracking-widest font-bebas text-white mb-8 min-h-[40px]">
-            <TypeWriter text="Monitoramos o serviço público brasileiro." delay={800} speed={40} />
-          </p>
-          <div className="bg-[#FFD700] text-black font-semibold px-6 py-2 rounded-sm text-lg md:text-xl transform -skew-x-6 mb-8 inline-block shadow-[0_0_15px_rgba(255,215,0,0.3)]">
-            <span className="block transform skew-x-6 tracking-wide">
-              <CountUp end={metricas.totalEmendas} /> emendas monitoradas.{' '}
-              <CountUp end={TOTAL_PARLAMENTARES_FEDERAIS} /> parlamentares federais.{' '}
-              <CountUp end={TOTAL_MUNICIPIOS_BR} /> municípios brasileiros.{' '}
-              Dados: 2010–{new Date().getFullYear()}.
-            </span>
+        </div>
+
+        {/* Linha divisória com texto */}
+        <div className="flex items-center gap-4 w-full max-w-lg">
+          <div className="flex-1 h-px bg-[#FFD700]/20" />
+          <span className="font-mono text-[9px] text-[#FFD700]/40 tracking-widest">BRASIL · 2010–{new Date().getFullYear()}</span>
+          <div className="flex-1 h-px bg-[#FFD700]/20" />
+        </div>
+
+        {/* Tagline */}
+        <p className="font-bebas text-xl md:text-3xl tracking-[0.15em] text-white/80 max-w-2xl leading-snug min-h-[40px]">
+          <TypeWriter text="Monitoramos o serviço público brasileiro." delay={600} speed={35} />
+        </p>
+
+        {/* Terminal de status */}
+        <div className="w-full max-w-sm border border-[#FFD700]/15 bg-black/60 backdrop-blur-sm p-4 rounded-sm text-left">
+          <div className="flex items-center gap-1.5 mb-3 pb-2 border-b border-[#FFD700]/10">
+            <div className="w-2 h-2 rounded-full bg-red-500/70" />
+            <div className="w-2 h-2 rounded-full bg-yellow-500/70" />
+            <div className="w-2 h-2 rounded-full bg-green-500/70" />
+            <span className="font-mono text-[9px] text-white/20 ml-2 tracking-widest">HORUS.SYS</span>
           </div>
-          <p className="text-gray-400 max-w-3xl mx-auto text-xl font-light leading-relaxed">
-            O diretório inabalável de transparência. Rastreamos emendas parlamentares, mapeamos
-            políticos e identificamos o destino final das verbas estruturais do cidadão.
-          </p>
+          <div className="space-y-1">
+            <TerminalLine delay={800}>API Portal da Transparência... OK</TerminalLine>
+            <TerminalLine delay={1200}>API TSE 2022... OK</TerminalLine>
+            <TerminalLine delay={1600}>API Câmara... OK</TerminalLine>
+            <TerminalLine delay={2000}>Banco de dados... {loading ? 'CARREGANDO' : 'OK'}</TerminalLine>
+            <TerminalLine delay={2400}>
+              {loading ? 'SISTEMA INICIANDO_' : `${metricas.totalEmendas.toLocaleString('pt-BR')} emendas indexadas_`}
+            </TerminalLine>
+          </div>
+        </div>
+
+        {/* Seta scroll */}
+        <div className="animate-bounce mt-4 opacity-40">
+          <div className="w-5 h-5 border-b-2 border-r-2 border-[#FFD700] transform rotate-45" />
         </div>
       </div>
     </header>
 
-    <main className="max-w-[1400px] w-full mx-auto px-6 py-20 space-y-24">
+    {/* Ticker de fontes */}
+    <DataTicker />
 
-      {/* MÉTRICAS NACIONAIS */}
-      {loading ? (
-        <div className="flex justify-center p-12">
-          <div className="animate-spin h-12 w-12 border-4 border-[#FFD700] border-t-transparent rounded-full" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { icon: Database, end: metricas.totalEmendas,        label: 'Emendas Monitoradas',     delay: 0 },
-            { icon: LinkIcon, end: TOTAL_MUNICIPIOS_BR,          label: 'Municípios no Brasil',    delay: 150 },
-            { icon: Eye,      end: TOTAL_PARLAMENTARES_FEDERAIS, label: 'Parlamentares Federais',  delay: 300 },
-          ].map(({ icon: Icon, end, label, delay }) => (
-            <ScrollReveal key={label} delay={delay}>
-              <div className="bg-black border border-[#FFD700]/30 rounded-sm p-6 md:p-10 flex flex-col items-center justify-center text-center group hover:bg-[#FFD700]/5 transition-colors shadow-[0_0_15px_rgba(255,215,0,0.05)] hover:shadow-[0_0_25px_rgba(255,215,0,0.15)] relative overflow-hidden animate-fill-border">
-                <Icon className="w-14 h-14 text-[#FFD700] mb-4 group-hover:scale-110 transition-transform duration-500" />
-                <div className="text-7xl font-bebas text-[#FFD700] my-2">
-                  <CountUp end={end} startOnView duration={1500} />
-                </div>
-                <p className="text-lg tracking-widest uppercase font-bold text-white mt-2">{label}</p>
-              </div>
-            </ScrollReveal>
-          ))}
-        </div>
+    <main className="max-w-[1400px] w-full mx-auto px-6 py-20 space-y-28">
+
+      {/* ══ MÉTRICAS ══════════════════════════════════════════════════════ */}
+      {!loading && (
+        <section>
+          <div className="flex items-center gap-4 mb-10">
+            <div className="h-px flex-1 bg-[#FFD700]/10" />
+            <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Situação Atual</h2>
+            <div className="h-px flex-1 bg-[#FFD700]/10" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricaCard value={metricas.totalEmendas}        label="Emendas Monitoradas"   sub="Total no banco"         index={0} />
+            <MetricaCard value={TOTAL_MUNICIPIOS_BR}          label="Municípios Brasileiros" sub="Cobertura nacional"     index={1} />
+            <MetricaCard value={TOTAL_PARLAMENTARES_FEDERAIS} label="Parlamentares Federais" sub="Câmara + Senado"        index={2} />
+          </div>
+        </section>
       )}
 
-      {/* MAPA DO BRASIL */}
+      {/* ══ MAPA ══════════════════════════════════════════════════════════ */}
       <ScrollReveal delay={0}>
-        <section className="space-y-6 w-full">
-          <div className="flex flex-col mb-8 text-center items-center">
-            <h2 className="text-[40px] text-[#FFD700] m-0 tracking-wider font-bebas leading-none">EXPLORE O BRASIL</h2>
-            <div className="h-[3px] w-[60px] bg-[#FFD700] mt-3 mb-4" />
-            <p className="text-gray-400 text-lg">Clique em uma região para descer no detalhe — estados, municípios e parlamentares.</p>
-          </div>
-          <div className="w-full border-2 border-[#FFD700]/50 rounded-sm overflow-hidden z-0 shadow-[0_0_30px_rgba(255,215,0,0.1)] bg-black/50">
-            <Suspense fallback={<div className="h-[400px] flex items-center justify-center text-[#FFD700]/50 font-bebas text-2xl animate-pulse">CARREGANDO MAPA...</div>}>
-              <MapaBrasil nivel="regioes" height={typeof window !== 'undefined' && window.innerWidth < 768 ? 400 : 550} />
-            </Suspense>
+        <section className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            {/* Título editorial */}
+            <div className="lg:col-span-1 space-y-4">
+              <p className="font-mono text-[9px] tracking-[0.5em] text-[#FFD700]/40 uppercase">Zona de Cobertura</p>
+              <h2
+                style={{ fontFamily: "'Cinzel Decorative', serif" }}
+                className="text-5xl md:text-6xl text-white leading-none"
+              >
+                BRASIL
+              </h2>
+              <div className="w-12 h-0.5 bg-[#FFD700]" />
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Clique em uma região para descer na hierarquia — estados, municípios, parlamentares e contratos federais.
+              </p>
+              <div className="space-y-2 pt-4 border-t border-[#1a1a1a]">
+                {[
+                  { label: '5 regiões', val: 'Norte · Nordeste · CO · Sudeste · Sul' },
+                  { label: '27 estados', val: 'Todos os entes federativos' },
+                  { label: '5.570 municípios', val: 'Cobertura total' },
+                ].map(({ label, val }) => (
+                  <div key={label} className="flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#FFD700]/40 mt-1.5 shrink-0" />
+                    <div>
+                      <span className="font-bebas text-[#FFD700]/80 text-sm tracking-widest">{label} </span>
+                      <span className="font-mono text-[10px] text-gray-600">{val}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Mapa */}
+            <div className="lg:col-span-2 relative border border-[#FFD700]/20 bg-black/50 overflow-hidden">
+              {/* Cantos */}
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-[#FFD700]/60 z-10" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-[#FFD700]/60 z-10" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-[#FFD700]/60 z-10" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-[#FFD700]/60 z-10" />
+              <p className="absolute top-3 left-1/2 -translate-x-1/2 font-mono text-[9px] tracking-[0.4em] text-[#FFD700]/30 z-10 uppercase">Mapa Interativo</p>
+              <Suspense fallback={
+                <div className="h-[420px] flex items-center justify-center">
+                  <p className="font-mono text-[10px] tracking-widest text-[#FFD700]/30 animate-pulse uppercase">Carregando...</p>
+                </div>
+              }>
+                <MapaBrasil nivel="regioes" height={typeof window !== 'undefined' && window.innerWidth < 768 ? 320 : 480} />
+              </Suspense>
+            </div>
           </div>
         </section>
       </ScrollReveal>
 
-      {/* COMO FUNCIONA — redesenhado com mais qualidade visual */}
-      <section className="py-12 border-y border-[#333]/50">
-        <div className="flex flex-col items-center justify-center text-center mb-16">
-          <h2 className="text-[40px] text-[#FFD700] tracking-wider font-bebas leading-none">COMO O HORUS FUNCIONA</h2>
-          <div className="h-[3px] w-[60px] bg-[#FFD700] mt-3 mb-4" />
-          <p className="text-gray-400 text-lg max-w-2xl mt-2">
-            Três etapas para transformar dados públicos brutos em conhecimento acessível ao cidadão.
-          </p>
+      {/* ══ COMO FUNCIONA ═════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-4 mb-14">
+          <div className="h-px flex-1 bg-[#FFD700]/10" />
+          <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Protocolo de Operação</h2>
+          <div className="h-px flex-1 bg-[#FFD700]/10" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#FFD700]/10">
           {[
             {
               num: '01',
-              icon: Database,
               title: 'COLETAMOS',
-              corBase: '#FFD700',
-              corBg:   'rgba(255,215,0,0.05)',
-              corShadow: 'rgba(255,215,0,0.25)',
-              o_que:  'Acessamos diariamente as APIs oficiais do Portal da Transparência, TSE e Câmara dos Deputados.',
-              impacto:'Garantimos que nenhum dado público fique escondido em planilhas que ninguém abre.',
+              cor: '#FFD700',
+              desc: 'Acessamos diariamente as APIs oficiais do Portal da Transparência, TSE e Câmara dos Deputados. Nenhum dado público permanece oculto em planilhas que ninguém abre.',
+              tag: 'Coleta automatizada · 24h',
             },
             {
               num: '02',
-              icon: LinkIcon,
               title: 'CRUZAMOS',
-              corBase: '#03A9F4',
-              corBg:   'rgba(3,169,244,0.06)',
-              corShadow: 'rgba(3,169,244,0.25)',
-              o_que:  'Conectamos cada emenda ao parlamentar autor, ao município destinatário e ao contrato federal correspondente.',
-              impacto:'Você consegue ver quem mandou, para onde foi e o que virou — em segundos.',
+              cor: '#03A9F4',
+              desc: 'Conectamos cada emenda ao parlamentar autor, ao município destinatário e ao contrato federal correspondente. Origem → destino → resultado em segundos.',
+              tag: 'Inteligência de dados',
             },
             {
               num: '03',
-              icon: Eye,
               title: 'REVELAMOS',
-              corBase: '#4CAF50',
-              corBg:   'rgba(76,175,80,0.06)',
-              corShadow: 'rgba(76,175,80,0.25)',
-              o_que:  'Organizamos tudo em mapas interativos, rankings e perfis pesquisáveis de parlamentares, cidades e contratos.',
-              impacto:'Conhecimento público vira ferramenta de pressão cidadã e investigação jornalística.',
+              cor: '#4CAF50',
+              desc: 'Organizamos em mapas, rankings e perfis pesquisáveis. Conhecimento público vira ferramenta de pressão cidadã e investigação jornalística.',
+              tag: 'Acesso público · Gratuito',
             },
-          ].map(({ num, icon: Icon, title, corBase, corBg, corShadow, o_que, impacto }, idx) => (
-            <ScrollReveal key={title} delay={idx * 120}>
-              <div
-                className="relative h-full bg-black border rounded-sm p-7 transition-all duration-500 group overflow-hidden"
-                style={{
-                  borderColor: `${corBase}33`,
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = corBase;
-                  (e.currentTarget as HTMLDivElement).style.backgroundColor = corBg;
-                  (e.currentTarget as HTMLDivElement).style.boxShadow = `0 0 30px ${corShadow}`;
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = `${corBase}33`;
-                  (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
-                  (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-                }}
-              >
+          ].map(({ num, title, cor, desc, tag }, i) => (
+            <ScrollReveal key={title} delay={i * 100}>
+              <div className="relative bg-black p-8 group overflow-hidden">
                 {/* Número gigante de fundo */}
                 <span
-                  className="absolute top-2 right-4 text-[140px] font-bebas leading-none select-none pointer-events-none transition-opacity duration-500"
-                  style={{ color: `${corBase}10` }}
+                  className="absolute -top-4 -right-2 font-bebas text-[160px] leading-none select-none pointer-events-none transition-all duration-700 group-hover:scale-110 group-hover:-translate-y-2"
+                  style={{ color: `${cor}08` }}
                 >
                   {num}
                 </span>
 
-                <div className="relative z-10 flex flex-col h-full">
-                  {/* Ícone */}
-                  <div
-                    className="w-16 h-16 rounded-sm flex items-center justify-center mb-5 transition-transform duration-500 group-hover:scale-110"
-                    style={{ backgroundColor: `${corBase}15`, border: `1px solid ${corBase}40` }}
-                  >
-                    <Icon className="w-9 h-9" style={{ color: corBase }} />
-                  </div>
+                {/* Linha de cor no topo */}
+                <div className="absolute top-0 left-0 right-0 h-0.5 transition-all duration-500" style={{ backgroundColor: `${cor}60` }} />
+                <div className="absolute top-0 left-0 h-0.5 w-0 group-hover:w-full transition-all duration-700" style={{ backgroundColor: cor }} />
 
-                  {/* Título */}
-                  <h3
-                    className="font-bebas text-4xl tracking-wider mb-3 leading-none"
-                    style={{ color: corBase }}
-                  >
-                    {title}
-                  </h3>
-
-                  {/* Linha decorativa */}
-                  <div className="h-[2px] w-10 mb-4" style={{ backgroundColor: corBase }} />
-
-                  {/* O QUE */}
-                  <p className="text-gray-300 text-sm leading-relaxed mb-4 font-light">{o_que}</p>
-
-                  {/* IMPACTO */}
-                  <div className="mt-auto pt-4 border-t" style={{ borderColor: `${corBase}22` }}>
-                    <p className="font-bebas text-[10px] tracking-[0.3em] mb-1" style={{ color: `${corBase}aa` }}>
-                      IMPACTO
-                    </p>
-                    <p className="text-gray-400 text-sm leading-relaxed italic">{impacto}</p>
-                  </div>
+                <div className="relative z-10 space-y-4">
+                  <p className="font-mono text-[9px] tracking-[0.4em] opacity-40" style={{ color: cor }}>
+                    ETAPA {num}
+                  </p>
+                  <h3 className="font-bebas text-4xl tracking-wider" style={{ color: cor }}>{title}</h3>
+                  <div className="h-px w-8" style={{ backgroundColor: cor }} />
+                  <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
+                  <p className="font-mono text-[9px] tracking-widest pt-2" style={{ color: `${cor}60` }}>{tag}</p>
                 </div>
               </div>
             </ScrollReveal>
           ))}
         </div>
       </section>
+
     </main>
 
-    <footer style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '11px', borderTop: '1px solid rgba(255,215,0,0.1)' }}>
-      HORUS &copy; 2026 — Dados: Portal da Transparência, TSE, Câmara dos Deputados
+    {/* ══ RODAPÉ ════════════════════════════════════════════════════════ */}
+    <footer className="border-t border-[#FFD700]/10 py-8 px-6">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+        <p className="font-mono text-[9px] tracking-[0.4em] text-white/20 uppercase">
+          HORUS © {new Date().getFullYear()}
+        </p>
+        <p className="font-mono text-[9px] tracking-[0.3em] text-white/15 uppercase">
+          Portal da Transparência · TSE · Câmara dos Deputados
+        </p>
+      </div>
     </footer>
+
+    {/* Animação do ticker */}
+    <style>{`
+      @keyframes ticker {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+    `}</style>
   </>
 );

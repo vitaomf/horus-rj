@@ -113,32 +113,30 @@ export function CargoCard({ cargo, tamanho, corDestaque = '#FFD700' }: CargoCard
   }
 
   // ── PEQUENO ──
+  const pastaAbrev = cargo.cargo
+    .replace(/^Ministério d[aoe]s? /i, '')
+    .replace(/^Secretaria d[aoe]s? /i, '')
+    .replace(/^Gabinete d[aoe]s? /i, '')
+    .split(' ').slice(0, 3).join(' ')
+    .toUpperCase();
+
+  const nomeAbrev = cargo.nome.split(' ').slice(0, 2).join(' ');
+
   return (
     <div
-      className="group relative flex flex-col items-center text-center gap-1.5 p-2 rounded-sm hover:bg-[#111] transition-colors cursor-default"
-      title={`${cargo.cargo} — ${cargo.funcao}`}
+      className="flex flex-col items-center text-center gap-1 p-2 rounded-sm hover:bg-[#111] transition-colors"
+      title={`${cargo.nome}\n${cargo.cargo}\n\n${cargo.funcao}`}
     >
       {Avatar}
-      <p className="font-bebas text-[10px] tracking-wider text-white leading-tight line-clamp-2">
-        {cargo.nome.split(' ').slice(0, 2).join(' ')}
+      <p className="font-bebas text-[10px] tracking-wide text-white leading-tight w-full truncate">
+        {nomeAbrev}
       </p>
       <p
-        className="text-[9px] tracking-widest line-clamp-1"
-        style={{ color: `${corDestaque}aa` }}
+        className="text-[8px] tracking-wide leading-tight w-full line-clamp-2"
+        style={{ color: `${corDestaque}99` }}
       >
-        {cargo.cargo.replace(/^Ministério d[aoe]s? /, '').replace(/^Secretaria d[aoe]s? /, '').toUpperCase()}
+        {pastaAbrev}
       </p>
-
-      {/* Tooltip ao hover */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 p-3 rounded-sm border bg-black z-30 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
-        style={{ borderColor: `${corDestaque}66` }}
-      >
-        <p className="font-bebas text-xs tracking-widest mb-1" style={{ color: corDestaque }}>
-          {cargo.cargo.toUpperCase()}
-        </p>
-        <p className="text-white text-sm font-bebas tracking-wide mb-1">{cargo.nome}</p>
-        <p className="text-gray-400 text-[10px] leading-relaxed">{cargo.funcao}</p>
-      </div>
     </div>
   );
 }
