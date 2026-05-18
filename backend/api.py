@@ -687,6 +687,39 @@ def _tem_coluna_foto() -> bool:
 _FOTO_COL = _tem_coluna_foto()
 
 
+@app.get("/api/politicos/{politico_id}/distribuicao")
+@limiter.limit("60/minute")
+def distribuicao_emendas_por_uf(request: Request, politico_id: int):
+    """
+    Retorna o volume de emendas de um parlamentar agregado por UF.
+    Usado para colorir o mapa de atuação nacional.
+    """
+    UFS_OFICIAIS = {'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+                    'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'}
+    conn = get_db_connection()
+    try:
+        rows = conn.execute("""
+            SELECT uf,
+                   COUNT(*)           AS total_emendas,
+                   COALESCE(SUM(valor), 0) AS valor_total
+            FROM emendas
+            WHERE politico_id = ?
+              AND uf IS NOT NULL AND uf != ''
+            GROUP BY uf
+            ORDER BY valor_total DESC
+        """, (politico_id,)).fetchall()
+        return [
+            {"uf": r["uf"], "total_emendas": r["total_emendas"], "valor_total": float(r["valor_total"])}
+            for r in rows
+            if r["uf"] in UFS_OFICIAIS
+        ]
+    except Exception as e:
+        logger.error("Erro em /distribuicao politico %s: %s", politico_id, e)
+        return []
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}")
 @limiter.limit("30/minute")
 def obter_detalhes_politico(request: Request, politico_id: int):
