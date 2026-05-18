@@ -2,7 +2,6 @@ import sqlite3
 import math
 import unicodedata
 import os
-import logging
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,18 +11,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from typing import Optional
-
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "api.log"), encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
-logger = logging.getLogger("horus-api")
 
 # Suporte Turso (libSQL): usado quando rodando na nuvem (Koyeb).
 # Localmente continua usando SQLite via sqlite3.
@@ -51,18 +38,18 @@ app = FastAPI(title="Transparência RJ API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Cache-Control: dados mudam raramente, então cacheia por 1h no browser.
+# /api/health nunca é cacheado (mostra estado em tempo real).
+from starlette.middleware.base import BaseHTTPMiddleware
+
 class CacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        try:
-            response = await call_next(request)
-        except Exception as exc:
-            logger.error("Unhandled exception in middleware: %s", exc, exc_info=True)
-            raise
+        response = await call_next(request)
         path = request.url.path
-        if path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
+        if path.startswith("/api/") and path != "/api/health":
+            response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hora
         elif path.startswith("/assets/"):
-            response.headers["Cache-Control"] = "public, max-age=86400"
+            response.headers["Cache-Control"] = "public, max-age=86400"  # 24h para assets
         return response
 
 app.add_middleware(CacheMiddleware)
@@ -73,9 +60,8 @@ app.add_middleware(CacheMiddleware)
 NOT_AUTOR_COLETIVO_SQL = "COALESCE(p.cargo, '') != 'Autor Coletivo'"
 
 # CORS: em produção definir ALLOWED_ORIGINS no .env (ex: "https://horus.dominio.com.br")
-# Padrão local: apenas localhost:5173 (Vite dev) e localhost:7291 (API próprio)
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:7291,http://127.0.0.1:5173,http://127.0.0.1:7291")
-_allow_origins = [o.strip() for o in _raw_origins.split(",")]
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+_allow_origins = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -110,7 +96,6 @@ def get_db_connection():
     else:
         conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
     conn.create_function("unaccent", 1, _unaccent)
     return conn
 
@@ -118,8 +103,7 @@ def get_db_connection():
 
 
 @app.get("/api/municipios/heatmap")
-@limiter.limit("30/minute")
-def obter_municipios_heatmap(request: Request):
+def obter_municipios_heatmap():
     """
     Retorna lista de municípios com valor total de emendas e contagem,
     usado para gerar o heatmap no mapa.
@@ -148,9 +132,7 @@ def obter_municipios_heatmap(request: Request):
 
 
 @app.get("/api/emendas/busca")
-@limiter.limit("30/minute")
 def buscar_emendas(
-    request: Request,
     q: Optional[str] = Query(None),
     ano: Optional[int] = Query(None),
     municipio: Optional[str] = Query(None),
@@ -220,8 +202,7 @@ def buscar_emendas(
 
 
 @app.get("/api/municipios")
-@limiter.limit("60/minute")
-def listar_municipios(request: Request, busca: Optional[str] = Query(None)):
+def listar_municipios(busca: Optional[str] = Query(None)):
     """
     Retorna lista de todos os municípios do RJ com id e nome.
     Se a tabela `municipios` ainda não existir, extrai unicamente do `municipio_destino` da tabela de `emendas`.
@@ -284,8 +265,7 @@ def listar_problemas(municipio_id: int, severidade_min: Optional[int] = Query(No
         # Caso a tabela problemas não exista
         if "no such table" in str(e):
             return []
-        logger.error("Erro em /problemas municipio_id=%s: %s", municipio_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro interno")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -324,8 +304,7 @@ def listar_emendas(municipio_id: int):
         return [dict(e) for e in emendas]
         
     except sqlite3.OperationalError as e:
-        logger.error("Erro em /emendas municipio_id=%s: %s", municipio_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro interno")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -365,9 +344,7 @@ def obter_total_politicos():
 
 
 @app.get("/api/politicos")
-@limiter.limit("60/minute")
 def listar_politicos_paginado(
-    request: Request,
     pagina: int = Query(1, ge=1),
     limite: int = Query(20, ge=1, le=2000),
     busca: Optional[str] = Query(None)
@@ -431,14 +408,13 @@ def listar_politicos_paginado(
             "total_paginas": total_paginas
         }
     except Exception as e:
-        logger.error("Erro em /politicos paginado: %s", e, exc_info=True)
+        print(f"Erro ao listar politicos paginado:", e)
         return {"politicos": [], "total": 0, "pagina": 1, "total_paginas": 1}
     finally:
         conn.close()
 
 @app.get("/api/politicos/busca")
-@limiter.limit("30/minute")
-def buscar_politicos(request: Request, q: str = Query(..., description="Termo de busca pelo nome")):
+def buscar_politicos(q: str = Query(..., description="Termo de busca pelo nome")):
     """
     Busca políticos individuais pelo nome (case-insensitive, exclui autores coletivos).
     Retorna até 8 resultados contendo id, nome, partido e cargo.
@@ -456,14 +432,12 @@ def buscar_politicos(request: Request, q: str = Query(..., description="Termo de
         politicos = conn.execute(query, (f'%{q}%',)).fetchall()
         return [dict(p) for p in politicos]
     except sqlite3.OperationalError as e:
-        logger.error("Erro em /politicos/busca q=%s: %s", q, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro interno")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
 @app.get("/api/municipios/{nome}/detalhes")
-@limiter.limit("30/minute")
-def obter_detalhes_municipio(request: Request, nome: str):
+def obter_detalhes_municipio(nome: str):
     conn = get_db_connection()
     try:
         # A query vai receber o nome COMPLETO do frontend (ex: "NITERÓI"),
@@ -545,7 +519,7 @@ def obter_detalhes_municipio(request: Request, nome: str):
         }
 
     except Exception as e:
-        logger.error("Erro em /municipios/%s/detalhes: %s", nome, e, exc_info=True)
+        print(f"Erro ao buscar detalhes do municipio {nome}:", e)
         return {
             "municipio": nome,
             "total_emendas": 0,
@@ -557,8 +531,7 @@ def obter_detalhes_municipio(request: Request, nome: str):
         conn.close()
 
 @app.get("/api/municipios/{nome}/contratos")
-@limiter.limit("30/minute")
-def obter_contratos_municipio(request: Request, nome: str):
+def obter_contratos_municipio(nome: str):
     conn = get_db_connection()
     try:
         termo_busca = f"%{nome.strip().upper()}%"
@@ -585,54 +558,27 @@ def obter_contratos_municipio(request: Request, nome: str):
     except sqlite3.OperationalError as e:
         if "no such table" in str(e):
             return []
-        logger.error("Erro em /municipios/%s/contratos: %s", nome, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro interno")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        logger.error("Erro em /municipios/%s/contratos: %s", nome, e, exc_info=True)
+        print(f"Erro ao buscar contratos do municipio {nome}:", e)
         return []
     finally:
         conn.close()
 
-def _tem_coluna_foto() -> bool:
-    """Verifica uma vez se a coluna foto_url existe (cache em módulo)."""
-    try:
-        conn = get_db_connection()
-        conn.execute("SELECT foto_url FROM politicos LIMIT 1").fetchone()
-        conn.close()
-        return True
-    except sqlite3.OperationalError:
-        return False
-
-_FOTO_COL = _tem_coluna_foto()
-
-
 @app.get("/api/politicos/{politico_id}")
-@limiter.limit("30/minute")
-def obter_detalhes_politico(request: Request, politico_id: int):
+def obter_detalhes_politico(politico_id: int):
     conn = get_db_connection()
     try:
-        tem_foto_col = _FOTO_COL
-
-        if tem_foto_col:
-            politico_info = conn.execute("""
-                SELECT p.id, p.nome, p.partido, p.cargo, p.foto_url,
-                       COUNT(e.id) as total_emendas,
-                       SUM(e.valor) as valor_total
-                FROM politicos p
-                LEFT JOIN emendas e ON p.id = e.politico_id
-                WHERE p.id = ?
-                GROUP BY p.id
-            """, (politico_id,)).fetchone()
-        else:
-            politico_info = conn.execute("""
-                SELECT p.id, p.nome, p.partido, p.cargo, NULL as foto_url,
-                       COUNT(e.id) as total_emendas,
-                       SUM(e.valor) as valor_total
-                FROM politicos p
-                LEFT JOIN emendas e ON p.id = e.politico_id
-                WHERE p.id = ?
-                GROUP BY p.id
-            """, (politico_id,)).fetchone()
+        # 1. Informações básicas do político e totais gerais
+        politico_info = conn.execute("""
+            SELECT p.id, p.nome, p.partido, p.cargo,
+                   COUNT(e.id) as total_emendas,
+                   SUM(e.valor) as valor_total
+            FROM politicos p
+            LEFT JOIN emendas e ON p.id = e.politico_id
+            WHERE p.id = ?
+            GROUP BY p.id
+        """, (politico_id,)).fetchone()
 
         if not politico_info:
             raise HTTPException(status_code=404, detail="Político não encontrado")
@@ -681,15 +627,14 @@ def obter_detalhes_politico(request: Request, politico_id: int):
 
         dados_campanha = None
         if campanha_row:
-            # Top 10 doadores — todos os tipos
+            # Buscar doadores desta campanha
             doadores_rows = conn.execute("""
-                SELECT nome_doador, valor
-                FROM doadores
-                WHERE campanha_id = ?
+                SELECT nome_doador, valor 
+                FROM doadores 
+                WHERE campanha_id = ? 
                 ORDER BY valor DESC
-                LIMIT 10
             """, (campanha_row["id"],)).fetchall()
-
+            
             dados_campanha = {
                 "cargo": campanha_row["cargo"],
                 "total_receitas": float(campanha_row["total_receitas"]),
@@ -733,7 +678,6 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             "nome": politico_info["nome"],
             "partido": politico_info["partido"],
             "cargo": politico_info["cargo"],
-            "foto_url": politico_info["foto_url"] if tem_foto_col else None,
             "total_emendas": politico_info["total_emendas"] or 0,
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "dados_campanha": dados_campanha,
@@ -745,14 +689,13 @@ def obter_detalhes_politico(request: Request, politico_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Erro em /politicos/%s: %s", politico_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro interno")
+        print(f"Erro ao buscar politico {politico_id}:", e)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
 @app.get("/api/estatisticas")
-@limiter.limit("20/minute")
-def obter_estatisticas(request: Request):
+def obter_estatisticas():
     conn = get_db_connection()
     try:
         # 1. Total Geral e Média
@@ -862,15 +805,14 @@ def obter_estatisticas(request: Request):
         }
 
     except Exception as e:
-        logger.error("Erro em /estatisticas: %s", e, exc_info=True)
-        return {"erro": "Erro interno"}
+        print(f"Erro ao buscar estatisticas gerais:", e)
+        return {"erro": str(e)}
     finally:
         conn.close()
 
 
 @app.get("/api/politicos/{politico_id}/cruzamento")
-@limiter.limit("20/minute")
-def cruzamento_emendas_contratos(request: Request, politico_id: int):
+def cruzamento_emendas_contratos(politico_id: int):
     """
     Cruzamento investigativo: emendas do político × contratos federais nos mesmos municípios.
     Camada 1 — geográfica: municípios que receberam emendas e também têm contratos federais.
@@ -950,249 +892,10 @@ def cruzamento_emendas_contratos(request: Request, politico_id: int):
         }
 
     except Exception as e:
-        logger.error("Erro em /politicos/%s/cruzamento: %s", politico_id, e, exc_info=True)
+        print(f"Erro no cruzamento politico {politico_id}:", e)
         return {"camada_geografica": [], "camada_financeira": [], "tem_cruzamento": False}
     finally:
         conn.close()
-
-
-@app.get("/api/camara/atividade")
-@limiter.limit("10/minute")
-def atividade_camara(request: Request, dep_id: int = Query(..., description="ID do deputado na Câmara API")):
-    """Retorna votações recentes + PLs autorais de um deputado.
-    Dados atualizados a cada requisição (mudanças diárias)."""
-    import requests as _req, concurrent.futures as _cf
-    from datetime import datetime as _dt, timedelta as _td
-
-    BASE = "https://dadosabertos.camara.leg.br/api/v2"
-    HDR  = {"Accept": "application/json", "User-Agent": "HorusRJ/1.0"}
-    SESS = _req.Session()
-    SESS.headers.update(HDR)
-
-    def _get(url, params=None):
-        r = SESS.get(url, params=params, timeout=10)
-        r.raise_for_status()
-        return r.json()
-
-    hoje   = _dt.now().strftime("%Y-%m-%d")
-    inicio = (_dt.now() - _td(days=90)).strftime("%Y-%m-%d")
-
-    # ── PLs autorais (só autoria principal + status real) ────────────────────
-    # Câmara API retorna por ordem de número (mais antigos primeiro), então
-    # pegamos até 100 por tipo para não perder os mais recentes.
-    pls_raw = []
-    for sigla in ("PL", "PEC", "PDL"):
-        try:
-            dados = _get(f"{BASE}/proposicoes",
-                         {"siglaTipo": sigla, "idDeputadoAutor": dep_id, "itens": 100}
-                        ).get("dados", [])
-            pls_raw.extend(dados)
-        except Exception:
-            pass
-
-    def _enriquecer_pl(p):
-        """Filtra por autoria principal e enriquece com status real."""
-        pid = p.get("id")
-        if not pid:
-            return None
-        try:
-            # /autores indica quem é o autor principal (ordemAssinatura=1 / proponente=1)
-            autores = _get(f"{BASE}/proposicoes/{pid}/autores").get("dados", []) or []
-            autor_principal = next(
-                (a for a in autores if a.get("ordemAssinatura") == 1
-                                    or str(a.get("proponente")) == "1"),
-                None
-            )
-            # Se não conseguimos identificar autor principal, fallback: assume é nosso (conservador)
-            if autor_principal:
-                uri = autor_principal.get("uri") or ""
-                if uri and str(dep_id) not in uri:
-                    return None  # outro deputado é o autor principal → é co-autoria
-
-            # /proposicoes/{id} → statusProposicao com descricaoSituacao, siglaOrgao etc.
-            detalhe = _get(f"{BASE}/proposicoes/{pid}").get("dados", {}) or {}
-            status = detalhe.get("statusProposicao") or {}
-            return {
-                "id":           pid,
-                "tipo":         p.get("siglaTipo"),
-                "numero":       p.get("numero"),
-                "ano":          p.get("ano"),
-                "ementa":       (p.get("ementa") or "")[:200],
-                "data":         (p.get("dataApresentacao") or "")[:10],
-                "status":       status.get("descricaoSituacao") or "Em tramitação",
-                "status_orgao": status.get("siglaOrgao") or "",
-                "status_data":  (status.get("dataHora") or "")[:10],
-                "url": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={pid}",
-            }
-        except Exception:
-            # Em caso de erro de rede/API, retorna o PL básico sem enriquecimento
-            # (melhor mostrar com status genérico do que perder o dado)
-            return {
-                "id":           pid,
-                "tipo":         p.get("siglaTipo"),
-                "numero":       p.get("numero"),
-                "ano":          p.get("ano"),
-                "ementa":       (p.get("ementa") or "")[:200],
-                "data":         (p.get("dataApresentacao") or "")[:10],
-                "status":       "Em tramitação",
-                "status_orgao": "",
-                "status_data":  "",
-                "url": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={pid}",
-            }
-
-    with _cf.ThreadPoolExecutor(max_workers=10) as pool:
-        pls = [r for r in pool.map(_enriquecer_pl, pls_raw) if r is not None]
-
-    pls.sort(key=lambda x: x.get("data", ""), reverse=True)
-
-    # ── Votações plenárias recentes (idOrgao=180 = Plenário) ─────────────────
-    votacoes_resultado = []
-    try:
-        sessoes = _get(f"{BASE}/votacoes",
-                       {"dataInicio": inicio, "dataFim": hoje, "idOrgao": 180, "itens": 40}
-                      ).get("dados", [])
-
-        def _check_voto(sessao):
-            vid = sessao.get("id")
-            if not vid:
-                return None
-            try:
-                votos = _get(f"{BASE}/votacoes/{vid}/votos").get("dados", [])
-                if not votos:
-                    return None
-                meu = next((v for v in votos if (v.get("deputado_") or {}).get("id") == dep_id), None)
-                if not meu:
-                    return None
-                prop = sessao.get("proposicaoObjeto") or {}
-                return {
-                    "data":      (sessao.get("data") or "")[:10],
-                    "hora":      ((sessao.get("dataHoraRegistro") or "")[11:16]),
-                    "voto":      meu.get("tipoVoto", "—"),
-                    "descricao": (sessao.get("descricao") or "")[:180],
-                    "aprovado":  sessao.get("aprovacao"),
-                    "pl_tipo":   prop.get("siglaTipo", ""),
-                    "pl_numero": prop.get("numero", ""),
-                    "pl_ano":    prop.get("ano", ""),
-                    "pl_ementa": (prop.get("ementa") or "")[:150],
-                    "url": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={prop.get('id')}" if prop.get("id") else "",
-                }
-            except Exception:
-                return None
-
-        with _cf.ThreadPoolExecutor(max_workers=8) as pool:
-            resultados = list(pool.map(_check_voto, sessoes))
-
-        votacoes_resultado = [r for r in resultados if r is not None]
-        votacoes_resultado.sort(key=lambda x: x.get("data", "") + x.get("hora", ""), reverse=True)
-    except Exception:
-        pass
-
-    return {
-        "dep_id":  dep_id,
-        "periodo": {"inicio": inicio, "fim": hoje},
-        "votacoes": votacoes_resultado,
-        "pls":      pls[:40],
-    }
-
-
-@app.get("/api/camara/bio")
-@limiter.limit("10/minute")
-def bio_camara(request: Request, nome: str = Query(..., description="Nome do parlamentar")):
-    """Proxy server-side para a Câmara API — evita CORS no browser.
-    Retorna bio, histórico de mandatos, profissão, órgãos e redes sociais."""
-    import urllib.request, urllib.parse, json as _json
-
-    LEGISLATURAS = {53:(2007,2011), 54:(2011,2015), 55:(2015,2019), 56:(2019,2023), 57:(2023,2027), 58:(2027,2031)}
-
-    def _fetch(url):
-        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "HorusRJ/1.0"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            return _json.loads(r.read())
-
-    try:
-        nome_enc = urllib.parse.quote(nome)
-        busca = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados?nome={nome_enc}&itens=5")
-        dados = busca.get("dados", [])
-        if not dados:
-            return {"encontrado": False}
-
-        primeiro_nome = nome.upper().split()[0]
-        dep = next((d for d in dados if primeiro_nome in (d.get("nome") or "").upper()), dados[0])
-        dep_id = dep.get("id")
-        if not dep_id:
-            return {"encontrado": False}
-
-        bio_raw = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}")
-        bio = bio_raw.get("dados", {})
-
-        # Histórico de mandatos: agrupa por legislatura, rastreia mudanças de partido
-        historico_raw = []
-        try:
-            hist = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/historico")
-            historico_raw = hist.get("dados", [])
-        except Exception:
-            pass
-
-        mandatos = {}
-        for h in historico_raw:
-            leg = h.get("idLegislatura")
-            if not leg:
-                continue
-            partido = h.get("siglaPartido", "")
-            if leg not in mandatos:
-                mandatos[leg] = {"idLegislatura": leg, "partidos": []}
-            if partido and partido not in ("", "S.PART.") and partido != (mandatos[leg]["partidos"] or [None])[-1]:
-                mandatos[leg]["partidos"].append(partido)
-
-        historico = []
-        for leg, m in sorted(mandatos.items()):
-            anos = LEGISLATURAS.get(leg, (None, None))
-            historico.append({
-                "idLegislatura": leg,
-                "anoInicio": anos[0],
-                "anoFim": anos[1],
-                "partidos": m["partidos"],
-            })
-
-        # Profissão
-        profissao = None
-        try:
-            prof = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/profissoes")
-            profs = prof.get("dados", [])
-            if profs:
-                profissao = profs[-1].get("titulo")
-        except Exception:
-            pass
-
-        # Órgãos (comissões atuais)
-        orgaos = []
-        try:
-            org = _fetch(f"https://dadosabertos.camara.leg.br/api/v2/deputados/{dep_id}/orgaos")
-            for o in org.get("dados", [])[:5]:
-                nome_org = o.get("nomeOrgao") or o.get("siglaOrgao", "")
-                titulo = o.get("titulo", "")
-                if nome_org:
-                    orgaos.append({"nome": nome_org, "titulo": titulo})
-        except Exception:
-            pass
-
-        return {
-            "encontrado": True,
-            "id": dep_id,
-            "nomeCivil": bio.get("nomeCivil"),
-            "nomeEleitoral": bio.get("ultimoStatus", {}).get("nomeEleitoral"),
-            "dataNascimento": bio.get("dataNascimento"),
-            "municipioNascimento": bio.get("municipioNascimento"),
-            "ufNascimento": bio.get("ufNascimento"),
-            "escolaridade": bio.get("escolaridade"),
-            "profissao": profissao,
-            "urlFoto": dep.get("urlFoto"),
-            "redeSocial": bio.get("redeSocial") or [],
-            "historico": historico,
-            "orgaos": orgaos,
-        }
-    except Exception as e:
-        return {"encontrado": False, "erro": str(e)}
 
 
 @app.get("/api/health")
@@ -1220,8 +923,7 @@ def health():
     )
     if os.path.exists(errors_file):
         try:
-            with open(errors_file, encoding="utf-8") as f:
-                linhas = f.readlines()
+            linhas = open(errors_file, encoding="utf-8").readlines()
             erros_recentes = [l.strip() for l in linhas[-5:] if l.strip()]
         except Exception:
             pass

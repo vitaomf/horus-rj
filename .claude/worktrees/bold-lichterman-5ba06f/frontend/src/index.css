@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;900&family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0a0808;
+    --bg-secondary: #0d0b00;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #050505;
+    background-image: url('/olhos_bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: rgba(5, 4, 0, 0.91);
+    pointer-events: none;
+  }
+
+  /* Textura de grain/ruído CSS puro */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.02;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-bebas {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.05em;
+  }
+
+  .font-cinzel-decorative {
+    font-family: 'Cinzel Decorative', serif;
+  }
+
+  .font-cinzel {
+    font-family: 'Cinzel', serif;
+  }
+}
+
+/* Custom leaflet popup style for the dark theme */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background-color: #FFD700 !important;
+  color: #000 !important;
+  border-radius: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+}
+
+/* --- ANIMATIONS --- */
+
+/* Stagger Fade-in for Letters */
+@keyframes letterFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-letter {
+  opacity: 0;
+  animation: letterFadeIn 0.5s forwards ease-out;
+}
+
+/* Pulsing SVG Eye */
+@keyframes pulseSvg {
+
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.5));
+  }
+
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 40px rgba(255, 215, 0, 0.8));
+  }
+}
+
+.animate-pulse-svg {
+  animation: pulseSvg 3s infinite ease-in-out;
+}
+
+/* Fill border bottom for Metric Cards */
+@keyframes fillBorder {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+.animate-fill-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background-color: #FFD700;
+  width: 0%;
+  animation: fillBorder 1s forwards ease-out;
+}
+
+/* Slide up and fade in */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-up {
+  opacity: 0;
+}
+
+.reveal-up.active {
+  animation: slideUp 0.8s forwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Delayed reveals for municipality grid */
+.reveal-grid {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.reveal-grid.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Pulse for Map municipalities with data */
+@keyframes pulseMapMuni {
+
+  0%,
+  100% {
+    fill: #1f1500;
+  }
+
+  50% {
+    fill: #332300;
+  }
+}
+
+.pulse-map-muni {
+  animation: pulseMapMuni 3s infinite ease-in-out;
+}
+
+/* Table row hover with golden tint */
+table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+table tbody tr:hover {
+  background-color: rgba(255, 215, 0, 0.05) !important;
+}
+
+/* Gradient progress bars */
+.bg-\[\#FFD700\].h-full.rounded-full {
+  background: linear-gradient(90deg, #FFD700, #FFA500) !important;
+}
+
+/* Custom Utilities */
+.bg-radial-gradient {
+  background-image: radial-gradient(var(--tw-gradient-stops));
+}
+
+@keyframes scan-fast {
+  0% { transform: translateY(-100px); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(100px); opacity: 0; }
+}
+
+.animate-scan-fast {
+  animation: scan-fast 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Section separator with gradient fade */
+.section-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #FFD700, transparent);
+  border: none;
+}
+
+/* Custom Scrollbar for Horus RJ */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #FFD700;
+  border-radius: 2px;
+}
+
+/* Override default tailwind black to warm black */
+.bg-black {
+  background-color: #0a0808 !important;
+}

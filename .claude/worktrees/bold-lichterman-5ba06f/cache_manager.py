@@ -7,20 +7,12 @@ CACHE_DIR = "cache/emendas"
 def garantir_pasta():
     os.makedirs(CACHE_DIR, exist_ok=True)
 
-def caminho_cache(ano: int, uf: str = "") -> str:
-    """Retorna caminho do arquivo de cache.
-    Com uf (ex: 'SP'): cache específico por UF — emendas_SP_2024.json
-    Sem uf: cache geral (todas as UFs) — emendas_2024.json
-    """
-    nome = f"emendas_{uf}_{ano}.json" if uf else f"emendas_{ano}.json"
-    return os.path.join(CACHE_DIR, nome)
+def caminho_cache(ano: int) -> str:
+    return os.path.join(CACHE_DIR, f"emendas_{ano}.json")
 
-def cache_existe(ano: int, force_refresh: bool = False, uf: str = "") -> bool:
-    """Retorna True se cache válido existe. `force_refresh=True` ignora cache permanente."""
-    path = caminho_cache(ano, uf)
+def cache_existe(ano: int) -> bool:
+    path = caminho_cache(ano)
     if not os.path.exists(path):
-        return False
-    if force_refresh:
         return False
     # Anos antigos (2 anos atrás ou mais): cache permanente, nunca expira
     ano_atual = datetime.now().year
@@ -31,35 +23,31 @@ def cache_existe(ano: int, force_refresh: bool = False, uf: str = "") -> bool:
     dias_passados = (datetime.now().timestamp() - modificado) / 86400
     return dias_passados < 7
 
-def salvar_cache(ano: int, dados: list, uf: str = ""):
+def salvar_cache(ano: int, dados: list):
     garantir_pasta()
-    path = caminho_cache(ano, uf)
+    path = caminho_cache(ano)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump({
             "ano": ano,
-            "uf": uf,
             "total": len(dados),
             "coletado_em": datetime.now().isoformat(),
             "dados": dados
         }, f, ensure_ascii=False, indent=2)
-    label = f"{uf} " if uf else ""
-    print(f"[CACHE] {len(dados)} emendas {label}{ano} salvas em {path}")
+    print(f"[CACHE] {len(dados)} emendas de {ano} salvas em {path}")
 
-def carregar_cache(ano: int, uf: str = "") -> list:
-    path = caminho_cache(ano, uf)
+def carregar_cache(ano: int) -> list:
+    path = caminho_cache(ano)
     with open(path, 'r', encoding='utf-8') as f:
         conteudo = json.load(f)
-    label = f"{conteudo.get('uf', '')} " if conteudo.get('uf') else ""
-    print(f"[CACHE] Carregando {conteudo['total']} emendas {label}{ano} "
-          f"(coletado em {conteudo['coletado_em'][:10]})")
+    print(f"[CACHE] Carregando {conteudo['total']} emendas de {ano} "
+          f"(coletado em {conteudo['coletado_em']})")
     return conteudo["dados"]
 
-def status_cache(uf: str = ""):
+def status_cache():
     garantir_pasta()
-    label = f" ({uf})" if uf else ""
-    print(f"\n=== STATUS DO CACHE{label} ===")
+    print("\n=== STATUS DO CACHE ===")
     for ano in range(2014, datetime.now().year + 1):
-        path = caminho_cache(ano, uf)
+        path = caminho_cache(ano)
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
                 info = json.load(f)

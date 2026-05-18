@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Horus Eye - Teste Fidelidade Wadjet</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel+Decorative:wght@700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #050505;
+      color: white;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Ambient Glow */
+    .glow {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(255,215,0,0.1) 0%, transparent 70%);
+      filter: blur(60px);
+      z-index: 1;
+    }
+
+    .eye-container {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .eye-svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.4));
+    }
+
+    /* Moving Group */
+    .sentinel-group {
+      transition: transform 0.15s ease-out;
+    }
+
+    /* UI */
+    .labels {
+      text-align: center;
+      margin-top: 20px;
+      z-index: 20;
+    }
+    .title { font-family: 'Cinzel Decorative', serif; font-size: 56px; color: #FFD700; text-shadow: 0 0 20px rgba(255,215,0,0.3); }
+    .subtitle { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 10px; opacity: 0.5; color: #FFD700; }
+
+    .hint {
+      position: fixed;
+      bottom: 40px;
+      color: rgba(255, 215, 0, 0.6);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 3px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow"></div>
+
+  <div class="eye-container" id="eyeArea">
+    <svg class="eye-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Filtro para textura de ouro levemente rugosa -->
+        <filter id="gold-texture">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
+          <feComposite operator="in" in="noise" in2="SourceGraphic" />
+        </filter>
+        <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#b8860b;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#FFD700;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+
+      <!-- ELEMENTOS FIXOS (Base, Sobrancelha, Detalhes inferiores) -->
+      <g fill="url(#gold-gradient)">
+        <!-- Sobrancelha -->
+        <path d="M60,120 Q150,55 260,55 Q350,55 380,100 Q390,110 375,105 Q350,75 260,75 Q150,75 60,135 Z" opacity="0.8"/>
+        
+        <!-- Pálpebra Inferior -->
+        <path d="M80,180 Q150,225 240,225 Q320,225 360,190 Q375,175 350,195 Q300,235 240,240 Q150,240 80,195 Z" opacity="0.9"/>
+        
+        <!-- Detalhe lágrima vertical -->
+        <path d="M190,240 Q185,280 195,350 Q200,360 205,350 Q215,280 205,240 Z" opacity="0.7"/>
+        
+        <!-- Detalhe Swirl (Espiral) -->
+        <path d="M220,330 C260,340 270,300 250,285 C230,270 215,290 225,305 C235,315 250,305 245,295" 
+              fill="none" stroke="url(#gold-gradient)" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+      </g>
+
+      <!-- GRUPO SENTINELA (Pálpebra Superior + Pupila Wadjet) -->
+      <g id="sentinelGroup" class="sentinel-group" fill="url(#gold-gradient)">
+        <!-- Pálpebra Superior com a Pupila "Hanging" (conforme imagem enviada) -->
+        <path d="M70,175 Q100,120 220,115 Q300,115 360,170 Q375,185 355,175 Q300,135 220,135 Q100,135 70,185 Z" />
+        
+        <!-- A Pupila Semicírculo (exatamente como na foto) -->
+        <path d="M175,135 Q175,185 220,185 Q265,185 265,135 Z" />
+        
+        <!-- Pequeno ponto de brilho dentro da pupila semicírculo -->
+        <circle cx="210" cy="155" r="5" fill="#050505" opacity="0.4" />
+      </g>
+    </svg>
+  </div>
+
+  <div class="labels">
+    <h1 class="title">HORUS</h1>
+    <p class="subtitle">SENTINELA DO RIO</p>
+  </div>
+
+  <div class="hint">OLHE PARA ELE E ELE OLHARÁ DE VOLTA</div>
+
+  <script>
+    const sentinelGroup = document.getElementById('sentinelGroup');
+    const eyeArea = document.getElementById('eyeArea');
+
+    document.addEventListener('mousemove', (e) => {
+      const rect = eyeArea.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+
+      // Sensibilidade do movimento do grupo superior
+      const sensitivityX = 0.04;
+      const sensitivityY = 0.02;
+
+      let moveX = dx * sensitivityX;
+      let moveY = dy * sensitivityY;
+
+      // Limitar o deslocamento para não quebrar o desenho
+      const limitX = 25;
+      const limitY = 15;
+
+      if (moveX > limitX) moveX = limitX;
+      if (moveX < -limitX) moveX = -limitX;
+      if (moveY > limitY) moveY = limitY;
+      if (moveY < -limitY) moveY = -limitY;
+
+      // Aplica o transform apenas na pálpebra superior + pupila
+      sentinelGroup.style.transform = `translate(${moveX}px, ${moveY}px)`;
+    });
+  </script>
+</body>
+</html>

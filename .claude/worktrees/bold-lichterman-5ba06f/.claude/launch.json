@@ -3,9 +3,8 @@
   "configurations": [
     {
       "name": "horus-frontend",
-      "runtimeExecutable": "C:/Users/joaov/Desktop/HORUS/frontend/node_modules/.bin/vite.cmd",
-      "runtimeArgs": ["--port", "5173", "--host", "127.0.0.1"],
-      "cwd": "C:/Users/joaov/Desktop/HORUS/frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
       "port": 5173
     },
     {

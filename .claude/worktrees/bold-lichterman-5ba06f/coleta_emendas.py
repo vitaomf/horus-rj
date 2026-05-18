@@ -32,51 +32,25 @@ def processar_valor(valor_str):
     except ValueError:
         return 0.0
 
-import re as _re
-
-def _extrair_uf(municipio: str) -> str:
-    """Extrai sigla de UF de strings como 'NITERÓI - RJ' ou 'SÃO PAULO - SP'."""
-    if not municipio:
-        return ""
-    s = municipio.upper().strip()
-    m = _re.search(r'\s-\s([A-Z]{2})$', s)
-    if m and m.group(1) not in ('UF',):
-        return m.group(1)
-    m = _re.search(r'\(([A-Z]{2})\)$', s)
-    if m and m.group(1) not in ('UF',):
-        return m.group(1)
-    if _re.match(r'^[A-Z]{2}$', s):
-        return s
-    return ""
-
-def processar_emendas_lote(dados, cursor, filtro_uf: str = ""):
-    """Processa e insere emendas no banco.
-    filtro_uf: se informado (ex: 'SP'), só processa emendas daquela UF.
-    Vazio = processa todas as UFs.
-    """
+def processar_emendas_lote(dados, cursor):
     insercoes = 0
     for emenda in dados:
         nm_municipio1 = emenda.get('nomeMunicipioConvenio') or ''
         nm_municipio2 = emenda.get('localidadeDoGasto') or ''
+        
         nm_municipio = nm_municipio1 if nm_municipio1 else nm_municipio2
-
-        # Extrai UF do município destino
-        uf_emenda = _extrair_uf(nm_municipio)
-
-        # Filtro por UF (quando passado via --uf)
-        if filtro_uf and uf_emenda != filtro_uf.upper():
-            continue
-
-        # Ignora emendas sem município identificado
-        if not nm_municipio.strip():
+        
+        # Bug 1 fix: filtro preciso por RJ (evita falsos positivos como "LARANJEIRAS")
+        nm_upper = nm_municipio.upper()
+        if not (' - RJ' in nm_upper or 'RIO DE JANEIRO' in nm_upper or nm_upper.endswith('(RJ)') or nm_upper == 'RJ'):
             continue
 
         nome_politico = emenda.get("autor", "Desconhecido")
         sigla_partido = emenda.get("siglaPartidoPolitico", None)
-
+        
         cursor.execute("SELECT id FROM politicos WHERE nome = ?", (nome_politico,))
         resultado = cursor.fetchone()
-
+        
         if resultado:
             politico_id = resultado[0]
         else:
@@ -86,15 +60,18 @@ def processar_emendas_lote(dados, cursor, filtro_uf: str = ""):
                 VALUES (?, ?, ?)
             """, (nome_politico, cargo, sigla_partido))
             politico_id = cursor.lastrowid
-
+        
         ano_emenda = emenda.get("ano")
 
+        # Valor empenhado (prometido/reservado — estágio 1)
         valor_empenhado = processar_valor(
             emenda.get("valorEmpenhado") or emenda.get("valorEmenda") or "0,00"
         )
+        # Valor pago (efetivamente transferido — estágio 3)
         valor_pago = processar_valor(
             emenda.get("valorPago") or emenda.get("valorLiquidado") or emenda.get("valorRestoPago") or "0,00"
         )
+        # Campo legado `valor` mantido para retrocompatibilidade
         valor = valor_empenhado if valor_empenhado > 0 else processar_valor(
             emenda.get("valorEmenda") or emenda.get("valorEmpenhado") or
             emenda.get("valorPago") or emenda.get("valorLiquidado") or
@@ -104,32 +81,36 @@ def processar_emendas_lote(dados, cursor, filtro_uf: str = ""):
         descricao = emenda.get("tipoEmenda", "")
         objetivo = emenda.get("funcao", "")
         municipio = nm_municipio
+        # Bug 3 fix: renomeado de 'status' para 'codigo_emenda' (semântica correta)
         codigo_emenda = emenda.get("codigoEmenda", "")
+        
         fonte_url = f"https://portaldatransparencia.gov.br/emendas/detalhe?codigoEmenda={codigo_emenda}" if codigo_emenda else None
-
-        cursor.execute("""
-            INSERT OR IGNORE INTO emendas
-            (politico_id, ano, valor, valor_empenhado, valor_pago,
-             descricao, objetivo, municipio_destino, codigo_emenda, fonte_url, uf)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        
+        query = """
+        INSERT OR IGNORE INTO emendas
+        (politico_id, ano, valor, valor_empenhado, valor_pago,
+         descricao, objetivo, municipio_destino, codigo_emenda, fonte_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        cursor.execute(query, (
             politico_id, ano_emenda,
             valor, valor_empenhado, valor_pago,
-            descricao, objetivo, municipio, codigo_emenda, fonte_url, uf_emenda
+            descricao, objetivo, municipio, codigo_emenda, fonte_url
         ))
-
+        # Atualiza valor_empenhado e valor_pago mesmo em registros já existentes
+        # (necessário quando colunas foram adicionadas depois da coleta original)
         if cursor.rowcount == 0 and (valor_empenhado > 0 or valor_pago > 0):
             cursor.execute("""
                 UPDATE emendas
-                SET valor_empenhado = ?, valor_pago = ?, uf = ?
+                SET valor_empenhado = ?, valor_pago = ?
                 WHERE codigo_emenda = ? AND municipio_destino = ?
-            """, (valor_empenhado, valor_pago, uf_emenda, codigo_emenda, municipio))
-
+            """, (valor_empenhado, valor_pago, codigo_emenda, municipio))
+        
         if cursor.rowcount > 0:
             insercoes += 1
     return insercoes
 
-def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
+def coletar_emendas():
     load_dotenv()
     
     chave_api = os.getenv("CHAVE_API_PORTAL")
@@ -138,19 +119,16 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
         sys.exit(1)
 
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/emendas"
-    # User-Agent de browser real pra contornar AWS WAF (bloqueia python-requests default)
     headers = {
         "chave-api-dados": chave_api,
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "Accept": "application/json"
     }
 
     db_path = "transparencia_rj.db"
     try:
         conn = sqlite3.connect(db_path)
-        conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
-
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS politicos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -194,15 +172,14 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
     total_processado = 0
     total_inserido = 0
     
-    label_uf = f" [{filtro_uf}]" if filtro_uf else " [NACIONAL]"
-    print(f"Iniciando coleta de emendas multiplos anos{label_uf}...")
-    status_cache(uf=filtro_uf)
+    print("Iniciando coleta de emendas multiplos anos...")
+    status_cache()
 
     # Separar anos que precisam de coleta da API vs anos com cache
     anos_com_cache = []
     anos_sem_cache = []
     for ano in ANOS:
-        if cache_existe(ano, force_refresh=force_refresh, uf=filtro_uf):
+        if cache_existe(ano):
             anos_com_cache.append(ano)
         else:
             anos_sem_cache.append(ano)
@@ -210,12 +187,12 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
     # Processar anos com cache (rápido, sequencial)
     for ano in anos_com_cache:
         print(f"[CACHE] Ano {ano} já coletado. Usando cache local.")
-        dados_ano = carregar_cache(ano, uf=filtro_uf)
-
+        dados_ano = carregar_cache(ano)
+        
         conn.execute("BEGIN TRANSACTION")
-        insercoes_ano = processar_emendas_lote(dados_ano, cursor, filtro_uf=filtro_uf)
+        insercoes_ano = processar_emendas_lote(dados_ano, cursor)
         conn.commit()
-
+        
         total_processado += len(dados_ano)
         total_inserido += insercoes_ano
         resumo_por_ano[ano] = insercoes_ano
@@ -256,7 +233,7 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
         return ano, dados_coletados
 
     if anos_sem_cache:
-        print(f"\n[>>] Coletando {len(anos_sem_cache)} ano(s) em paralelo: {anos_sem_cache}")
+        print(f"\n🚀 Coletando {len(anos_sem_cache)} ano(s) em paralelo: {anos_sem_cache}")
         # Máximo 3 threads simultâneas para não estourar rate limit da API
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {executor.submit(coletar_ano_api, ano): ano for ano in anos_sem_cache}
@@ -267,20 +244,20 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
                 if dados_coletados:
                     # Inserção no banco é sequencial (SQLite não suporta escrita paralela)
                     conn.execute("BEGIN TRANSACTION")
-                    insercoes_ano = processar_emendas_lote(dados_coletados, cursor, filtro_uf=filtro_uf)
+                    insercoes_ano = processar_emendas_lote(dados_coletados, cursor)
                     conn.commit()
-
-                    salvar_cache(ano, dados_coletados, uf=filtro_uf)
+                    
+                    salvar_cache(ano, dados_coletados)
                     
                     total_processado += len(dados_coletados)
                     total_inserido += insercoes_ano
                     resumo_por_ano[ano] = insercoes_ano
-                    print(f"  [OK] Ano {ano}: {len(dados_coletados)} total | {insercoes_ano} RJ inseridas")
+                    print(f"  ✅ Ano {ano}: {len(dados_coletados)} total | {insercoes_ano} RJ inseridas")
                 else:
                     resumo_por_ano[ano] = 0
-                    print(f"  [!!] Ano {ano}: nenhuma emenda encontrada")
+                    print(f"  ⚠️ Ano {ano}: nenhuma emenda encontrada")
     else:
-        print("\n[OK] Todos os anos ja possuem cache valido!")
+        print("\n✅ Todos os anos já possuem cache válido!")
 
     conn.close()
     
@@ -293,9 +270,4 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
     print(resumo_str)
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Coleta emendas parlamentares do Portal da Transparência")
-    parser.add_argument("--force-refresh", action="store_true", help="Ignora cache permanente e recoleta todos os anos")
-    parser.add_argument("--uf", default="", help="Filtra por UF (ex: SP, MG). Vazio = todas as UFs")
-    args = parser.parse_args()
-    coletar_emendas(force_refresh=args.force_refresh, filtro_uf=args.uf.upper())
+    coletar_emendas()

@@ -1,7 +1,7 @@
 # watchdog.ps1 - Horus RJ: watchdog definitivo.
 $ErrorActionPreference = "SilentlyContinue"
 
-$HORUS_DIR    = "C:\Users\joaov\Desktop\HORUS"
+$HORUS_DIR    = "C:\Users\joaov\OneDrive\Desktop\HORUS"
 $PYTHON       = "$HORUS_DIR\.venv\Scripts\python.exe"
 $NGROK_DOMAIN = "synergistic-hemathermal-myesha.ngrok-free.dev"
 $NGROK_CONFIG = "$HORUS_DIR\ngrok.yml"

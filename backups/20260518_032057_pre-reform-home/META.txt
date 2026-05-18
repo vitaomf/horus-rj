@@ -1,0 +1,41 @@
+﻿Horus backup snapshot
+Timestamp: 2026-05-18 03:20:59
+Tag: pre-reform-home
+
+--- git ---
+Branch: main
+Ultimo commit: 07c800e feat: esqueleto nacional — hierarquia Brasil/Região/Estado + mapa interativo
+
+Arquivos modificados:
+ M .claude/launch.json
+ M .claude/settings.local.json
+ M backend/api.py
+ M frontend/src/App.tsx
+ M frontend/src/pages/BrasilPage.tsx
+ M frontend/src/pages/EstadoPage.tsx
+ M frontend/src/pages/EstatisticasPage.tsx
+ M frontend/src/pages/MunicipioPage.tsx
+ M frontend/src/pages/PoliticoPage.tsx
+ M watchdog.ps1
+?? .claude/worktrees/
+?? PLANO_MELHORIAS.md
+?? backups/
+?? coleta_contratos_output.txt
+?? frontend/src/components/CargoCard.tsx
+?? frontend/src/components/HierarquiaCargos.tsx
+?? frontend/src/data/mockGoverno.ts
+?? ngrok.yml
+?? scripts/audit_db.py
+?? scripts/backup_horus.ps1
+?? scripts/check_schema.py
+?? scripts/check_valor.py
+?? scripts/full_update.py
+?? scripts/run_coleta.py
+?? setup_autostart.ps1
+
+--- banco ---
+emendas: 5752
+politicos: 157
+contratos: 70
+campanhas: 64
+doadores: 254

@@ -209,16 +209,64 @@ const SECRETARIAS_MUNICIPAIS = [
     funcao: 'Atende famílias em situação de vulnerabilidade — opera os CRAS (centros de referência de assistência social), distribui benefícios emergenciais e apoia idosos, crianças em risco e pessoas em situação de rua. É a rede de proteção social da cidade.' },
 ];
 
+// ── GOVERNADORES eleitos em 2022 ────────────────────────────────────────────
+// Fontes: Wikipedia / portais oficiais dos governos estaduais
+const GOVERNADORES: Record<string, { nome: string; partido: string; fotoUrl?: string }> = {
+  AC: { nome: 'Gladson Cameli',         partido: 'PP',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Gladson_Cameli_2019.jpg/400px-Gladson_Cameli_2019.jpg' },
+  AL: { nome: 'Paulo Dantas',           partido: 'MDB',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/PauloDantas.jpg/400px-PauloDantas.jpg' },
+  AP: { nome: 'Clécio Luís',            partido: 'Solidariedade' },
+  AM: { nome: 'Wilson Lima',            partido: 'União Brasil',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Wilson_Lima_-_2019_%28cropped%29.jpg/400px-Wilson_Lima_-_2019_%28cropped%29.jpg' },
+  BA: { nome: 'Jerônimo Rodrigues',     partido: 'PT',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Jer%C3%B4nimo_Rodrigues.jpg/400px-Jer%C3%B4nimo_Rodrigues.jpg' },
+  CE: { nome: 'Elmano de Freitas',      partido: 'PT' },
+  DF: { nome: 'Ibaneis Rocha',          partido: 'MDB',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Ibaneis_Rocha_foto_oficial.jpg/400px-Ibaneis_Rocha_foto_oficial.jpg' },
+  ES: { nome: 'Renato Casagrande',      partido: 'PSB',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Renato_Casagrande_2019.jpg/400px-Renato_Casagrande_2019.jpg' },
+  GO: { nome: 'Ronaldo Caiado',         partido: 'União Brasil',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Ronaldo_Caiado.jpg/400px-Ronaldo_Caiado.jpg' },
+  MA: { nome: 'Carlos Brandão',         partido: 'PSB' },
+  MT: { nome: 'Mauro Mendes',           partido: 'União Brasil' },
+  MS: { nome: 'Eduardo Riedel',         partido: 'PSDB' },
+  MG: { nome: 'Romeu Zema',            partido: 'Novo',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Romeu_Zema_Governador_de_Minas_Gerais.jpg/400px-Romeu_Zema_Governador_de_Minas_Gerais.jpg' },
+  PA: { nome: 'Helder Barbalho',        partido: 'MDB',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Helder_Barbalho_-_2019_%28cropped%29.jpg/400px-Helder_Barbalho_-_2019_%28cropped%29.jpg' },
+  PB: { nome: 'João Azevêdo',           partido: 'PSB' },
+  PR: { nome: 'Carlos Massa Ratinho Junior', partido: 'PSD',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Ratinho_Junior.jpg/400px-Ratinho_Junior.jpg' },
+  PE: { nome: 'Raquel Lyra',            partido: 'PSDB' },
+  PI: { nome: 'Rafael Fonteles',        partido: 'PT' },
+  RJ: { nome: 'Cláudio Castro',         partido: 'PL',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Cl%C3%A1udio_Castro_Governador_do_Rio_de_Janeiro.jpg/400px-Cl%C3%A1udio_Castro_Governador_do_Rio_de_Janeiro.jpg' },
+  RN: { nome: 'Fátima Bezerra',         partido: 'PT',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/F%C3%A1tima_Bezerra_governadora_RN_%28cropped%29.jpg/400px-F%C3%A1tima_Bezerra_governadora_RN_%28cropped%29.jpg' },
+  RS: { nome: 'Eduardo Leite',          partido: 'PSDB',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Eduardo_Leite_foto_oficial_2019_%28cropped%29.jpg/400px-Eduardo_Leite_foto_oficial_2019_%28cropped%29.jpg' },
+  RO: { nome: 'Marcos Rocha',           partido: 'União Brasil' },
+  RR: { nome: 'Arthur Henrique',        partido: 'MDB' },
+  SC: { nome: 'Jorginho Mello',         partido: 'PL' },
+  SP: { nome: 'Tarcísio de Freitas',    partido: 'Republicanos',
+        fotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Tarccisio_de_Freitas_%28cropped%29.jpg/400px-Tarccisio_de_Freitas_%28cropped%29.jpg' },
+  SE: { nome: 'Fábio Mitidieri',        partido: 'PSD' },
+  TO: { nome: 'Wanderlei Barbosa',      partido: 'Republicanos' },
+};
+
 export function getCargosEstaduais(uf: string): CargosEstaduais {
   const estado = getEstado(uf);
   const nomeEstado = estado?.nome ?? uf;
+  const govData = GOVERNADORES[uf.toUpperCase()];
   return {
     governador: {
       id: `gov-${uf}`,
-      nome: `Governador(a) de ${nomeEstado}`,
+      nome: govData?.nome ?? `Governador(a) de ${nomeEstado}`,
       cargo: 'Governador — Chefe do Poder Executivo Estadual',
       funcao: `É o chefe do governo de ${nomeEstado}. Comanda as polícias (Civil e Militar), as escolas estaduais e os hospitais públicos do estado. Sanciona leis estaduais (aprovadas pela Assembleia Legislativa) e nomeia secretários — cada um responsável por uma área como saúde, educação ou segurança.`,
-      partido: '—',
+      partido: govData?.partido ?? '—',
+      fotoUrl: govData?.fotoUrl,
       mandato: '2023-2026',
       ordem: 1,
     },
