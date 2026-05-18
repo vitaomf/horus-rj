@@ -25,12 +25,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
   const [result, setResult]             = useState<GlobalResult>({ municipios: [], parlamentares: [], emendas: [], leis: [] });
   const [isSearching, setIsSearching]   = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isFocused, setIsFocused]       = useState(false);
   const dropdownRef                     = useRef<HTMLDivElement>(null);
+  const inputRef                        = useRef<HTMLInputElement>(null);
   const navigate                        = useNavigate();
 
   useEffect(() => {
     const controller = new AbortController();
-
     const searchTimer = setTimeout(async () => {
       if (query.trim().length >= 3) {
         setIsSearching(true);
@@ -41,16 +42,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
             axios.get(`${API_BASE_URL}/api/politicos/busca?q=${encodeURIComponent(query)}`, { signal: controller.signal }),
             axios.get(`${API_BASE_URL}/api/emendas/busca?q=${encodeURIComponent(query)}&limite=3`, { signal: controller.signal }),
           ]);
-
           setResult({
             municipios:    (munRes.data ?? []).slice(0, 3),
             parlamentares: (polRes.data ?? []).slice(0, 3),
             emendas:       (emeRes.data?.resultados ?? []).slice(0, 3),
-            leis:          [], // placeholder até integração
+            leis:          [],
           });
         } catch (error) {
           if (!axios.isCancel(error)) {
-            console.error('Erro na busca:', error);
             setResult({ municipios: [], parlamentares: [], emendas: [], leis: [] });
           }
         } finally {
@@ -61,143 +60,214 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
         setShowDropdown(false);
       }
     }, 400);
-
-    return () => {
-      clearTimeout(searchTimer);
-      controller.abort();
-    };
+    return () => { clearTimeout(searchTimer); controller.abort(); };
   }, [query]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
+    const out = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false); setIsFocused(false);
       }
     };
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setShowDropdown(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEsc);
-    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowDropdown(false); inputRef.current?.blur(); } };
+    document.addEventListener('mousedown', out);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
   }, []);
 
-  const fechar = () => { setShowDropdown(false); setQuery(''); };
-
-  const total = result.municipios.length + result.parlamentares.length + result.emendas.length;
+  const fechar = () => { setShowDropdown(false); setQuery(''); setIsFocused(false); };
+  const total  = result.municipios.length + result.parlamentares.length + result.emendas.length;
 
   return (
-    <div className="relative w-full md:w-[320px]" ref={dropdownRef}>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FFD700] w-5 h-5 pointer-events-none" />
+    <div className="relative w-full md:w-[300px]" ref={dropdownRef}>
+
+      {/* ── INPUT ── */}
+      <div className={`relative flex items-center transition-all duration-200 ${isFocused ? 'ring-1 ring-[#FFD700]/40' : ''}`}>
+
+        {/* Ícone busca / loader */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          {isSearching
+            ? <Loader2 className="w-4 h-4 text-[#FFD700] animate-spin" />
+            : <Search className={`w-4 h-4 transition-colors ${isFocused ? 'text-[#FFD700]' : 'text-[#FFD700]/40'}`} />
+          }
+        </div>
+
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Buscar..."
+          placeholder="BUSCAR..."
           value={query}
           onChange={e => setQuery(e.target.value)}
-          onFocus={() => { if (query.length >= 3) setShowDropdown(true); }}
-          className="w-full bg-[#111] border border-[#FFD700]/50 text-white py-2 pl-10 pr-10 font-bebas text-lg tracking-wide focus:outline-none focus:border-[#FFD700] placeholder-gray-500 rounded-sm transition-colors"
+          onFocus={() => { setIsFocused(true); if (query.length >= 3) setShowDropdown(true); }}
+          className={`
+            w-full bg-black border text-white py-2 pl-9 pr-4
+            font-mono text-xs tracking-[0.2em] placeholder-gray-700
+            focus:outline-none transition-all duration-200
+            ${isFocused
+              ? 'border-[#FFD700]/40 bg-[#050505]'
+              : 'border-[#FFD700]/15 hover:border-[#FFD700]/25'
+            }
+          `}
         />
-        {isSearching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FFD700] w-5 h-5 animate-spin pointer-events-none" />
+
+        {/* Atalho ESC */}
+        {isFocused && query && (
+          <button
+            onClick={fechar}
+            className="absolute right-2 font-mono text-[8px] tracking-widest text-gray-700 hover:text-[#FFD700] transition-colors px-1 py-0.5 border border-[#333] hover:border-[#FFD700]/30"
+          >
+            ESC
+          </button>
         )}
       </div>
 
+      {/* ── DROPDOWN ── */}
       {showDropdown && query.length >= 3 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-[#FFD700] rounded-sm shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-black border border-[#FFD700]/30 shadow-[0_20px_60px_rgba(0,0,0,0.9)] z-50 overflow-hidden">
+
+          {/* Header do dropdown */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[#FFD700]/10 bg-[#050505]">
+            <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/30 uppercase">
+              {isSearching ? 'buscando...' : `${total} resultado${total !== 1 ? 's' : ''} — "${query}"`}
+            </p>
+            {!isSearching && (
+              <p className="font-mono text-[8px] tracking-widest text-gray-800">↑↓ navegar · ↵ abrir</p>
+            )}
+          </div>
+
           {isSearching ? (
-            <div className="p-4 text-center text-gray-400 font-bebas tracking-wide">BUSCANDO...</div>
+            <div className="flex items-center gap-2 px-4 py-5">
+              <div className="flex gap-1">
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-1 h-1 bg-[#FFD700]/40 rounded-full animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
+                ))}
+              </div>
+              <span className="font-mono text-[9px] tracking-widest text-gray-600">BUSCANDO</span>
+            </div>
           ) : total === 0 ? (
-            <div className="p-4 text-center text-gray-500 font-bebas tracking-wide">
-              NENHUM RESULTADO PARA "{query.toUpperCase()}"
+            <div className="px-4 py-6 text-center">
+              <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Sem resultados</p>
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto">
+            <div className="max-h-[65vh] overflow-y-auto">
 
               {/* MUNICÍPIOS */}
               {result.municipios.length > 0 && (
-                <Secao titulo="MUNICÍPIOS" icone={MapPin}>
+                <Grupo titulo="Municípios" icone={MapPin} cor="#03A9F4">
                   {result.municipios.map(m => (
-                    <Item
+                    <ResultItem
                       key={`mun-${m.id}`}
                       principal={m.nome}
+                      tag="MUN"
+                      tagCor="#03A9F4"
                       onClick={() => { fechar(); onSelectMunicipio(m.nome); }}
                     />
                   ))}
-                </Secao>
+                </Grupo>
               )}
 
               {/* PARLAMENTARES */}
               {result.parlamentares.length > 0 && (
-                <Secao titulo="PARLAMENTARES" icone={User}>
+                <Grupo titulo="Parlamentares" icone={User} cor="#FFD700">
                   {result.parlamentares.map(p => (
-                    <Item
+                    <ResultItem
                       key={`pol-${p.id}`}
                       principal={p.nome}
                       secundario={p.partido}
+                      tag="PAR"
+                      tagCor="#FFD700"
                       onClick={() => { fechar(); onSelectPolitico(p.id); }}
                     />
                   ))}
-                </Secao>
+                </Grupo>
               )}
 
               {/* EMENDAS */}
               {result.emendas.length > 0 && (
-                <Secao titulo="EMENDAS" icone={FileText}>
+                <Grupo titulo="Emendas" icone={FileText} cor="#4CAF50">
                   {result.emendas.map(e => (
-                    <Item
+                    <ResultItem
                       key={`eme-${e.id}`}
-                      principal={(e.descricao || e.objetivo || '—').slice(0, 80) + ((e.descricao || e.objetivo || '').length > 80 ? '…' : '')}
+                      principal={(e.descricao || e.objetivo || '—').slice(0, 70) + ((e.descricao || e.objetivo || '').length > 70 ? '…' : '')}
                       secundario={`${e.ano} · ${e.politico_nome ?? '—'}`}
+                      tag="EME"
+                      tagCor="#4CAF50"
                       onClick={() => { fechar(); navigate('/busca'); }}
                     />
                   ))}
-                </Secao>
+                </Grupo>
               )}
 
               {/* LEIS — placeholder */}
-              <div>
-                <div className="px-3 py-1 bg-[#111] border-y border-[#FFD700]/20 flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-[#FFD700]/40" />
-                  <span className="text-[#FFD700]/40 font-bebas tracking-widest text-sm">LEIS</span>
+              <div className="border-t border-[#1a1a1a]">
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#050505]">
+                  <Scale className="w-3 h-3 text-gray-800" />
+                  <span className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase">Leis · Em breve</span>
                 </div>
-                <div className="px-4 py-3 text-gray-600 text-xs italic">Em breve — busca em proposições do Congresso e leis municipais.</div>
               </div>
+
             </div>
           )}
+
+          {/* Footer */}
+          <div className="border-t border-[#FFD700]/10 px-3 py-2 bg-[#050505]">
+            <button
+              onClick={() => { fechar(); navigate(`/busca?q=${encodeURIComponent(query)}`); }}
+              className="font-mono text-[8px] tracking-[0.3em] text-[#FFD700]/40 hover:text-[#FFD700] transition-colors uppercase"
+            >
+              Busca completa →
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-// ── helpers ──
+// ── Componentes internos ──────────────────────────────────────────────────────
 
-function Secao({ titulo, icone: Icon, children }: { titulo: string; icone: typeof Search; children: React.ReactNode }) {
+function Grupo({ titulo, icone: Icon, cor, children }: {
+  titulo: string; icone: typeof Search; cor: string; children: React.ReactNode;
+}) {
   return (
-    <div>
-      <div className="px-3 py-1 bg-[#111] border-y border-[#FFD700]/20 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-[#FFD700]" />
-        <span className="text-[#FFD700] font-bebas tracking-widest text-sm">{titulo}</span>
+    <div className="border-b border-[#1a1a1a] last:border-b-0">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#050505]">
+        <Icon className="w-3 h-3" style={{ color: cor }} />
+        <span className="font-mono text-[8px] tracking-[0.4em] uppercase" style={{ color: `${cor}99` }}>
+          {titulo}
+        </span>
       </div>
-      {children}
+      <div>{children}</div>
     </div>
   );
 }
 
-function Item({ principal, secundario, onClick }: { principal: string; secundario?: string; onClick: () => void }) {
+function ResultItem({ principal, secundario, tag, tagCor, onClick }: {
+  principal: string; secundario?: string; tag: string; tagCor: string; onClick: () => void;
+}) {
   return (
-    <div
+    <button
       onClick={onClick}
-      className="px-4 py-3 hover:bg-[#FFD700]/10 cursor-pointer border-b border-[#333]/30 last:border-none transition-colors"
+      className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-[#0d0d0d] transition-colors group border-b border-[#111] last:border-b-0"
     >
-      <div className="text-white font-bebas text-base tracking-wide truncate">{principal}</div>
-      {secundario && (
-        <div className="text-[#FFD700]/70 text-xs uppercase font-semibold mt-0.5">{secundario}</div>
-      )}
-    </div>
+      {/* Tag lateral */}
+      <span
+        className="shrink-0 font-mono text-[7px] tracking-widest px-1 py-0.5 mt-0.5 border"
+        style={{ color: tagCor, borderColor: `${tagCor}33`, backgroundColor: `${tagCor}08` }}
+      >
+        {tag}
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-bebas text-base text-white group-hover:text-[#FFD700] transition-colors tracking-wide leading-tight truncate">
+          {principal}
+        </p>
+        {secundario && (
+          <p className="font-mono text-[9px] tracking-widest text-gray-600 mt-0.5">{secundario}</p>
+        )}
+      </div>
+
+      <span className="text-gray-800 group-hover:text-[#FFD700]/40 transition-colors text-sm shrink-0">›</span>
+    </button>
   );
 }

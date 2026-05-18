@@ -398,81 +398,110 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     }
 
     return (
-        <div className="animate-fade-in pb-12 px-4 md:px-12 pt-8 relative z-10">
+        <div className="animate-fade-in pb-12 relative z-10">
 
-            {/* ── HEADER COMPACT (sticky, só aparece ao rolar) ── */}
-            <div className={`sticky top-16 z-[40] transition-all duration-300 border-b border-[#FFD700]/40
+            {/* ── HEADER COMPACT STICKY ── */}
+            <div className={`sticky top-16 z-[40] transition-all duration-300 border-b border-[#FFD700]/20
                 ${isScrolled
-                    ? 'bg-black/95 backdrop-blur-[10px] py-3 px-4 md:px-8 -mx-4 md:-mx-12 shadow-[0_4px_20px_rgba(0,0,0,0.8)] mb-8'
+                    ? 'bg-black/95 backdrop-blur-sm py-3 px-6 md:px-12 shadow-[0_4px_30px_rgba(0,0,0,0.9)] mb-0'
                     : 'pointer-events-none opacity-0 h-0 overflow-hidden mb-0'}`}>
-                <div className="flex items-center justify-between gap-4">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <button onClick={onVoltar}
-                            className="flex items-center gap-1 text-[#FFD700] hover:text-white transition-colors group cursor-pointer shrink-0">
-                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <button onClick={onVoltar} className="text-[#FFD700]/60 hover:text-[#FFD700] transition-colors cursor-pointer">
+                            <ArrowLeft className="w-4 h-4" />
                         </button>
-                        <div className="w-9 h-9 rounded-full border border-[#FFD700] overflow-hidden shrink-0">
+                        <div className="w-8 h-8 overflow-hidden border border-[#FFD700]/40 shrink-0" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%)' }}>
                             {fotoUrl
                                 ? <img src={fotoUrl} alt={data.nome} className="w-full h-full object-cover object-top" onError={() => setFotoUrl(null)} />
-                                : <div className="w-full h-full bg-[#1a1a00] flex items-center justify-center">
-                                    <span className="font-bebas text-[#FFD700] text-lg">{getInitials(data.nome)}</span>
-                                  </div>
+                                : <div className="w-full h-full bg-[#1a1a00] flex items-center justify-center"><span className="font-bebas text-[#FFD700] text-sm">{getInitials(data.nome)}</span></div>
                             }
                         </div>
-                        <h1 className="font-bebas text-white text-2xl leading-none tracking-wide uppercase">{data.nome}</h1>
-                        <span className="text-[#FFD700] font-bold text-sm hidden sm:block">{data.partido}</span>
+                        <span className="font-bebas text-white text-xl tracking-wide uppercase">{data.nome}</span>
+                        <span className="font-mono text-[10px] text-[#FFD700]/50 tracking-widest hidden sm:block">{data.partido}</span>
                     </div>
-                    <div className="flex gap-3 shrink-0">
-                        <div className="bg-[#111] border border-[#FFD700]/30 px-3 py-1 rounded-sm text-center">
-                            <div className="font-bebas text-white text-xl leading-none">{data.total_emendas}</div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">emendas</div>
+                    <div className="flex gap-4 shrink-0">
+                        <div className="text-right">
+                            <div className="font-bebas text-white text-lg leading-none">{data.total_emendas}</div>
+                            <div className="font-mono text-[9px] text-gray-600 tracking-widest uppercase">emendas</div>
                         </div>
-                        <div className="bg-[#111] border border-[#FFD700]/30 px-3 py-1 rounded-sm text-center">
-                            <div className="font-bebas text-[#FFD700] text-xl leading-none">{formatMillions(data.valor_total)}</div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider">total</div>
+                        <div className="w-px bg-[#FFD700]/10" />
+                        <div className="text-right">
+                            <div className="font-bebas text-[#FFD700] text-lg leading-none">{formatMillions(data.valor_total)}</div>
+                            <div className="font-mono text-[9px] text-gray-600 tracking-widest uppercase">total</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* ── HERO: Foto grande + Nome + Bio ── */}
-            <div className="max-w-7xl mx-auto mb-10">
-                <button onClick={onVoltar}
-                    className="flex items-center gap-2 text-[#FFD700] hover:text-white transition-colors group w-fit cursor-pointer mb-6">
-                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                    <span className="font-bebas tracking-wider text-xl mt-1">VOLTAR</span>
-                </button>
+            {/* ── HERO full-width: foto + nome dramático ── */}
+            <div className="relative overflow-hidden border-b border-[#FFD700]/10">
+                {/* Grade de fundo */}
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+                    style={{ backgroundImage: 'linear-gradient(rgba(255,215,0,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+                {/* Vinheta */}
+                <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 50%, transparent 30%, rgba(0,0,0,0.7) 100%)' }} />
 
-                <div className="flex flex-col lg:flex-row gap-8 items-start">
-                    {/* Foto portrait grande */}
-                    <div className="shrink-0 w-52 h-[272px] lg:w-60 lg:h-[312px] rounded-xl overflow-hidden border-2 border-[#FFD700] shadow-[0_0_40px_rgba(255,215,0,0.15)] bg-[#111]">
-                        {fotoUrl ? (
-                            <img src={fotoUrl} alt={data.nome}
-                                className="w-full h-full object-cover object-top"
-                                onError={() => setFotoUrl(null)} />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <span className="font-bebas text-[#FFD700] text-7xl">{getInitials(data.nome)}</span>
+                <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
+                    {/* Breadcrumb */}
+                    <button onClick={onVoltar}
+                        className="flex items-center gap-2 text-[#FFD700]/50 hover:text-[#FFD700] transition-colors group w-fit cursor-pointer mb-10 font-mono text-[10px] tracking-[0.4em] uppercase">
+                        <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+                        VOLTAR
+                    </button>
+
+                    <div className="flex flex-col lg:flex-row gap-10 items-start">
+                        {/* Foto — estilo dossiê com clip-path */}
+                        <div className="shrink-0 relative">
+                            <div className="w-52 h-[272px] lg:w-64 lg:h-[336px] overflow-hidden bg-[#0a0a0a] border border-[#FFD700]/30"
+                                style={{ clipPath: 'polygon(0 0, 100% 0, 100% 88%, 88% 100%, 0 100%)' }}>
+                                {fotoUrl ? (
+                                    <img src={fotoUrl} alt={data.nome}
+                                        className="w-full h-full object-cover object-top grayscale-[20%]"
+                                        onError={() => setFotoUrl(null)} />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-[#0d0d0d]">
+                                        <span className="font-bebas text-[#FFD700]/40 text-8xl">{getInitials(data.nome)}</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                            {/* Tag ID */}
+                            <div className="absolute -bottom-3 left-0 bg-[#FFD700] text-black font-mono text-[9px] tracking-widest px-2 py-0.5 uppercase">
+                                ID #{String(data.id || 0).padStart(4, '0')}
+                            </div>
+                        </div>
 
-                    {/* Info + Bio */}
-                    <div className="flex-1 min-w-0 pt-1">
-                        <p className="text-[#FFD700] font-semibold tracking-[0.2em] text-xs uppercase mb-2">
-                            PARLAMENTAR FEDERAL · DOSSIÊ
-                        </p>
-                        <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-6xl md:text-7xl lg:text-8xl mb-3">
-                            {data.nome}
-                        </h1>
-                        <p className="text-gray-400 font-medium text-lg mb-5">
-                            <span className="text-[#FFD700] font-bold">{data.partido}</span>
-                            <span className="mx-3 text-zinc-700">|</span>
-                            {data.cargo}
-                        </p>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0 pt-2">
+                            <div className="flex items-center gap-3 mb-3">
+                                <span className="font-mono text-[9px] tracking-[0.5em] text-[#FFD700]/40 uppercase">Dossiê</span>
+                                <div className="h-px flex-1 bg-[#FFD700]/10" />
+                                <span className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase">{data.cargo}</span>
+                            </div>
 
-                        {/* Linha separadora */}
-                        <div className="w-16 h-0.5 bg-[#FFD700] mb-5" />
+                            <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-5xl md:text-7xl lg:text-8xl mb-4">
+                                {data.nome}
+                            </h1>
+
+                            <div className="flex items-center gap-4 mb-6">
+                                <span className="border border-[#FFD700]/40 text-[#FFD700] font-bebas tracking-widest px-3 py-1 text-sm">{data.partido}</span>
+                                <div className="h-px flex-1 max-w-[60px] bg-[#FFD700]/20" />
+                                <span className="font-mono text-[10px] text-gray-600 tracking-widest uppercase">{data.cargo}</span>
+                            </div>
+
+                            {/* Métricas inline */}
+                            <div className="grid grid-cols-2 gap-px bg-[#FFD700]/10 mb-6 max-w-xs">
+                                <div className="bg-black p-4">
+                                    <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Emendas</div>
+                                    <div className="font-bebas text-4xl text-white">{data.total_emendas}</div>
+                                </div>
+                                <div className="bg-black p-4">
+                                    <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Total</div>
+                                    <div className="font-bebas text-4xl text-[#FFD700]">{formatMillions(data.valor_total)}</div>
+                                </div>
+                            </div>
+
+                            {/* Linha separadora */}
+                            <div className="w-16 h-px bg-[#FFD700]/30 mb-5" />
 
                         {/* Bio real (Câmara API) */}
                         {getBioReal() && (
@@ -491,26 +520,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             </p>
                         </div>
 
-                        {/* Stat cards */}
-                        <div className="flex gap-4 flex-wrap">
-                            <div className="bg-[#111] border border-[#FFD700]/30 px-4 py-3 rounded-sm">
-                                <div className="flex items-center text-gray-400 mb-1 gap-1.5">
-                                    <FileText className="w-3 h-3" />
-                                    <span className="text-xs font-bold tracking-[0.15em] uppercase">Emendas Totais</span>
-                                </div>
-                                <div className="text-4xl font-bebas text-white leading-none">{data.total_emendas}</div>
-                            </div>
-                            <div className="bg-[#111] border border-[#FFD700]/30 px-4 py-3 rounded-sm">
-                                <div className="flex items-center text-[#FFD700] mb-1 gap-1.5">
-                                    <TrendingUp className="w-3 h-3" />
-                                    <span className="text-xs font-bold tracking-[0.15em] uppercase">Verba Total Enviada</span>
-                                </div>
-                                <div className="text-4xl font-bebas text-[#FFD700] leading-none">{formatMillions(data.valor_total)}</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
+            </div>
+
+            {/* ── CONTEÚDO RESTANTE ── */}
+            <div className="px-4 md:px-12">
 
             {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
             {bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length) && (
@@ -1485,6 +1501,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     );
                 })()}
             </div>
+
+            </div>{/* fim .px-4 md:px-12 */}
         </div>
     );
 };
