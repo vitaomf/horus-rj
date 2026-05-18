@@ -14,8 +14,9 @@ interface FeatureProperties {
     [key: string]: any;
 }
 
-// ── Legenda com ranges reais do quantile scale ────────────────────────────────
-const CORES_LEGENDA = ['#2a1800', '#4a2e00', '#7a4e00', '#b87800', '#cc9900', '#FFD700'];
+// ── Paleta multi-matiz: verde-tático escuro → âmbar → ouro brilhante ──────────
+// Cada passo tem hue diferente para maximizar contraste visual entre as faixas
+const CORES_LEGENDA = ['#0d1f0d', '#1e4d1e', '#5a7a00', '#b87800', '#dda000', '#FFD700'];
 
 function fmtLegenda(v: number): string {
     if (v >= 1e9) return `R$${(v / 1e9).toFixed(1)}B`;
@@ -162,11 +163,10 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
         const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
         const normalizedMunicipalities = municipalities.map(normalize);
 
-        // Escala quantile: distribui as cores igualmente entre os municípios com dados.
-        // Cada faixa de cor tem o mesmo número de municípios, tornando o mapa muito
-        // mais informativo (evita que um outlier compacte todo o resto numa cor só).
-        const COR_VAZIA = '#1a1000';
-        const CORES = ['#2a1800', '#4a2e00', '#7a4e00', '#b87800', '#cc9900', '#FFD700'];
+        // Paleta multi-matiz: verde-tático escuro → âmbar → ouro brilhante.
+        // Hues distintos em cada degrau para máximo contraste visual entre faixas.
+        const COR_VAZIA = '#0a0f0a';
+        const CORES = ['#0d1f0d', '#1e4d1e', '#5a7a00', '#b87800', '#dda000', '#FFD700'];
 
         const valoresComDados = Object.values(heatmap)
             .map(h => h.valor_total)
@@ -198,16 +198,8 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
                 const props = d.properties as FeatureProperties;
                 return getCorMunicipio(props.name);
             })
-            .attr('stroke', (d: any) => {
-                const props = d.properties as FeatureProperties;
-                const hasData = heatmap[normalize(props.name)];
-                return hasData ? '#FFD700' : '#333333';
-            })
-            .attr('stroke-width', (d: any) => {
-                const props = d.properties as FeatureProperties;
-                const hasData = heatmap[normalize(props.name)];
-                return hasData ? '0.5px' : '0.3px';
-            })
+            .attr('stroke', '#0a0a0a')
+            .attr('stroke-width', '0.8px')
             .style('opacity', 0) // Para a animação de Fade In
             .style('transition', 'fill 0.2s ease, stroke 0.2s ease') // Transições declarativas
             .style('cursor', 'pointer')
@@ -218,8 +210,9 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
                 // Efeito gráfico D3
                 d3.select(this)
                     .attr('fill', '#FFD700')
-                    .attr('stroke', '#FFF')
-                    .attr('stroke-width', '1px');
+                    .attr('stroke', '#ffffff')
+                    .attr('stroke-width', '1.5px')
+                    .raise();
 
                 // Tooltip
                 setTooltip({
@@ -251,13 +244,12 @@ const MapaRJ: React.FC<MapaRJProps> = ({ municipalities = [], onMunicipioClick, 
             })
             .on('mouseleave', function (_event, d: any) {
                 const props = d.properties as FeatureProperties;
-                const hasData = heatmap[normalize(props.name)];
 
                 // Restaura cor original D3
                 d3.select(this)
                     .attr('fill', getCorMunicipio(props.name))
-                    .attr('stroke', hasData ? '#FFD700' : '#333333')
-                    .attr('stroke-width', hasData ? '0.5px' : '0.3px');
+                    .attr('stroke', '#0a0a0a')
+                    .attr('stroke-width', '0.8px');
 
                 setTooltip(prev => ({ ...prev, show: false }));
             })
