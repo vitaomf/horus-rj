@@ -16,20 +16,30 @@ def caminho_cache(ano: int, uf: str = "") -> str:
     return os.path.join(CACHE_DIR, nome)
 
 def cache_existe(ano: int, force_refresh: bool = False, uf: str = "") -> bool:
-    """Retorna True se cache válido existe. `force_refresh=True` ignora cache permanente."""
+    """
+    Retorna True se cache válido existe. `force_refresh=True` ignora todo cache.
+
+    Política de TTL (alinhada ao quanto o Portal da Transparência ainda atualiza dados):
+      - ano atual         → 7 dias  (dados ainda chegando)
+      - ano - 1           → 30 dias (raros ajustes)
+      - ano - 2 a ano - 5 → 60 dias (estabilizado)
+      - mais antigo       → permanente
+    """
     path = caminho_cache(ano, uf)
     if not os.path.exists(path):
         return False
     if force_refresh:
         return False
-    # Anos antigos (2 anos atrás ou mais): cache permanente, nunca expira
-    ano_atual = datetime.now().year
-    if ano <= ano_atual - 2:
-        return True
-    # Anos recentes (ano atual e anterior): cache válido por 7 dias
-    modificado = os.path.getmtime(path)
+
+    ano_atual    = datetime.now().year
+    diff         = ano_atual - ano
+    modificado   = os.path.getmtime(path)
     dias_passados = (datetime.now().timestamp() - modificado) / 86400
-    return dias_passados < 7
+
+    if diff >= 6:  return True              # > 5 anos atrás: permanente
+    if diff >= 2:  return dias_passados < 60
+    if diff == 1:  return dias_passados < 30
+    return dias_passados < 7                # ano atual
 
 def salvar_cache(ano: int, dados: list, uf: str = ""):
     garantir_pasta()

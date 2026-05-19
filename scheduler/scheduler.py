@@ -50,7 +50,7 @@ def _executar(job_name: str, script_relativo: str):
             [os.sys.executable, str(script)],
             capture_output=True, text=True,
             cwd=str(PROJECT_ROOT),
-            timeout=5400,          # máximo 1.5h por coleta
+            timeout=10800,         # máximo 3h por coleta (nacional: 17 anos × 27 UFs)
         )
         if result.returncode == 0:
             saida = (result.stdout or "")[-500:]
@@ -60,7 +60,7 @@ def _executar(job_name: str, script_relativo: str):
             log.error(f"[{job_name}] Falhou (código {result.returncode}):\n{erro}")
             _registrar_erro(job_name, f"exit {result.returncode}: {erro[:200]}")
     except subprocess.TimeoutExpired:
-        msg = "timeout após 5400s (1.5h)"
+        msg = "timeout após 10800s (3h)"
         log.error(f"[{job_name}] {msg}")
         _registrar_erro(job_name, msg)
     except Exception as e:

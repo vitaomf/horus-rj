@@ -257,14 +257,20 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
         return ano, dados_coletados
 
     if anos_sem_cache:
-        print(f"\n[>>] Coletando {len(anos_sem_cache)} ano(s) em paralelo: {anos_sem_cache}")
+        tempo_inicio = time.time()
+        total_anos   = len(anos_sem_cache)
+        concluidos   = 0
+        print(f"\n[>>] Coletando {total_anos} ano(s) em paralelo: {anos_sem_cache}")
         # Máximo 3 threads simultâneas para não estourar rate limit da API
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {executor.submit(coletar_ano_api, ano): ano for ano in anos_sem_cache}
-            
+
             for future in as_completed(futures):
                 ano, dados_coletados = future.result()
-                
+                concluidos += 1
+                tempo_decorrido = time.time() - tempo_inicio
+                eta = (tempo_decorrido / concluidos) * (total_anos - concluidos) if concluidos < total_anos else 0
+
                 if dados_coletados:
                     # Inserção no banco é sequencial (SQLite não suporta escrita paralela)
                     conn.execute("BEGIN TRANSACTION")
@@ -272,14 +278,17 @@ def coletar_emendas(force_refresh: bool = False, filtro_uf: str = ""):
                     conn.commit()
 
                     salvar_cache(ano, dados_coletados, uf=filtro_uf)
-                    
+
                     total_processado += len(dados_coletados)
                     total_inserido += insercoes_ano
                     resumo_por_ano[ano] = insercoes_ano
-                    print(f"  [OK] Ano {ano}: {len(dados_coletados)} total | {insercoes_ano} RJ inseridas")
+                    print(f"  [OK {concluidos:2d}/{total_anos}] Ano {ano}: {len(dados_coletados)} total | "
+                          f"{insercoes_ano} inseridas | decorrido {tempo_decorrido/60:.1f}min | "
+                          f"ETA {eta/60:.1f}min")
                 else:
                     resumo_por_ano[ano] = 0
-                    print(f"  [!!] Ano {ano}: nenhuma emenda encontrada")
+                    print(f"  [!! {concluidos:2d}/{total_anos}] Ano {ano}: nenhuma emenda encontrada | "
+                          f"decorrido {tempo_decorrido/60:.1f}min | ETA {eta/60:.1f}min")
     else:
         print("\n[OK] Todos os anos ja possuem cache valido!")
 
