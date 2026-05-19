@@ -45,9 +45,6 @@ interface MunicipioPageProps {
     nome: string;
     onVoltar: () => void;
     onPoliticoClick: (politicoId: number) => void;
-    municipios: { id: number; nome: string }[];
-    municipioIndex: number;
-    onNavegar: (idx: number) => void;
 }
 
 // Componente para animar os números de valores financeiros
@@ -90,7 +87,7 @@ const formatCurrencyFull = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, onPoliticoClick, municipios, municipioIndex, onNavegar }) => {
+export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, onPoliticoClick }) => {
     const [data, setData] = useState<MunicipioDetalhes | null>(null);
     const [loading, setLoading] = useState(true);
     const [paginaAtual, setPaginaAtual] = useState(1);
@@ -110,8 +107,8 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                     axios.get(`${baseUrl}/contratos`).catch(() => ({ data: [] }))
                 ]);
                 setData({ ...detRes.data, contratos: contratosRes.data });
-            } catch (err) {
-                console.error("Erro ao buscar detalhes do município:", err);
+            } catch {
+                setData(null);
             } finally {
                 setLoading(false);
             }
@@ -153,31 +150,10 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                         <div>
                             <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-1">Relatório Municipal · Transparência</p>
 
-                            <div className="flex items-center flex-wrap gap-4 mt-2">
-                                <div className="flex items-center gap-2 order-2 md:order-1">
-                                    <button
-                                        onClick={() => onNavegar(municipioIndex - 1)}
-                                        disabled={municipioIndex === 0}
-                                        className="px-2 py-0.5 border border-[#FFD700] bg-black text-[#FFD700] font-bebas text-[10px] tracking-wider uppercase disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] hover:text-black transition-colors rounded-sm"
-                                    >
-                                        &larr; ANTERIOR
-                                    </button>
-
-                                    <button
-                                        onClick={() => onNavegar(municipioIndex + 1)}
-                                        disabled={municipioIndex === municipios.length - 1}
-                                        className="px-2 py-0.5 border border-[#FFD700] bg-black text-[#FFD700] font-bebas text-[10px] tracking-wider uppercase disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] hover:text-black transition-colors rounded-sm"
-                                    >
-                                        PRÓXIMO &rarr;
-                                    </button>
-                                </div>
-
-                                <h1 style={{ fontFamily: "'Cinzel Decorative', serif" }}
-                                    className="text-xl md:text-3xl text-[#FFD700] leading-none uppercase m-0 order-1 md:order-2 tracking-wide">
-                                    {data.municipio.replace(' - RJ', '').trim()}
-                                </h1>
-                            </div>
-                            <p className="text-gray-500 text-[10px] font-semibold tracking-widest mt-2 opacity-60">{municipioIndex + 1} / {municipios.length} municípios</p>
+                            <h1 style={{ fontFamily: "'Cinzel Decorative', serif" }}
+                                className="text-xl md:text-3xl text-[#FFD700] leading-none uppercase m-0 mt-2 tracking-wide">
+                                {data.municipio.replace(' - RJ', '').trim()}
+                            </h1>
                         </div>
 
                         <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">

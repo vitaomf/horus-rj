@@ -1102,9 +1102,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 }>
                     <MapaAtuacao
                         politicoId={data.id}
-                        height={320}
-                        onUfClick={(_uf) => {
-                            // futuramente: filtrar emendas pelo UF clicado
+                        height={380}
+                        onMunicipioClick={(municipio, uf) => {
+                            // Reusa o filtro existente — formato armazenado é "CIDADE - UF"
+                            setCidadeFiltro(`${municipio.toUpperCase()} - ${uf}`);
+                            setPaginaAtual(1);
                         }}
                     />
                 </Suspense>

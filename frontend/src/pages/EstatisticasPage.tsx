@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { ArrowLeft, ArrowUpRight, BarChart4, Building2, MapPin, Milestone, Receipt, Stethoscope, User, Users } from 'lucide-react';
 import { CountUp } from '../components/CountUp';
-
-interface EstatisticasPageProps {
-    onVoltar: () => void;
-    onPoliticoClick: (id: number) => void;
-    onMunicipioClick: (nome: string) => void;
-}
 
 interface Politico { id: number; nome: string; partido: string; cargo: string; total_emendas: number; valor_total: number; }
 interface Municipio { nome: string; total_emendas: number; valor_total: number; }
@@ -23,7 +18,11 @@ interface EstatisticasData {
     por_objetivo: PorObjetivo[];
 }
 
-export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, onPoliticoClick, onMunicipioClick }) => {
+export const EstatisticasPage: React.FC = () => {
+    const navigate = useNavigate();
+    const onVoltar         = () => navigate(-1);
+    const onPoliticoClick  = (id: number)    => navigate(`/politicos/${id}`);
+    const onMunicipioClick = (nome: string)  => navigate(`/municipios/${encodeURIComponent(nome)}`);
     const [data, setData] = useState<EstatisticasData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -35,8 +34,8 @@ export const EstatisticasPage: React.FC<EstatisticasPageProps> = ({ onVoltar, on
             try {
                 const res = await axios.get(`${API_BASE_URL}/api/estatisticas`);
                 setData(res.data);
-            } catch (error) {
-                console.error("Erro carregando estatísticas", error);
+            } catch {
+                setData(null);
             } finally {
                 setLoading(false);
             }

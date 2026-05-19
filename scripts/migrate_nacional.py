@@ -73,10 +73,11 @@ def main():
 
     # ── Indexes ─────────────────────────────────────────────────────────────
     indexes = [
-        ("idx_emendas_uf",     "CREATE INDEX IF NOT EXISTS idx_emendas_uf ON emendas(uf)"),
-        ("idx_emendas_uf_ano", "CREATE INDEX IF NOT EXISTS idx_emendas_uf_ano ON emendas(uf, ano)"),
-        ("idx_politicos_uf",   "CREATE INDEX IF NOT EXISTS idx_politicos_uf ON politicos(uf)"),
-        ("idx_politicos_casa", "CREATE INDEX IF NOT EXISTS idx_politicos_casa ON politicos(casa)"),
+        ("idx_emendas_uf",          "CREATE INDEX IF NOT EXISTS idx_emendas_uf ON emendas(uf)"),
+        ("idx_emendas_uf_ano",      "CREATE INDEX IF NOT EXISTS idx_emendas_uf_ano ON emendas(uf, ano)"),
+        ("idx_emendas_politico_uf", "CREATE INDEX IF NOT EXISTS idx_emendas_politico_uf ON emendas(politico_id, uf)"),
+        ("idx_politicos_uf",        "CREATE INDEX IF NOT EXISTS idx_politicos_uf ON politicos(uf)"),
+        ("idx_politicos_casa",      "CREATE INDEX IF NOT EXISTS idx_politicos_casa ON politicos(casa)"),
     ]
     for nome, sql in indexes:
         cur.execute(sql)

@@ -19,6 +19,7 @@ const BrasilPage           = lazy(() => import('./pages/BrasilPage').then(m => (
 const RegiaoPage           = lazy(() => import('./pages/RegiaoPage').then(m => ({ default: m.RegiaoPage })));
 const EstadoPage           = lazy(() => import('./pages/EstadoPage').then(m => ({ default: m.EstadoPage })));
 const ParlamentaresListPage = lazy(() => import('./pages/ParlamentaresListPage').then(m => ({ default: m.ParlamentaresListPage })));
+const StatusPage            = lazy(() => import('./pages/StatusPage').then(m => ({ default: m.StatusPage })));
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Municipio { id: number; nome: string; }
@@ -35,7 +36,7 @@ const PageSpinner = () => (
 );
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-type NavKey = 'inicio' | 'brasil' | 'politicos' | 'parlamentares' | 'busca' | 'painel';
+type NavKey = 'inicio' | 'brasil' | 'politicos' | 'parlamentares' | 'busca' | 'painel' | 'status';
 
 const ABAS: { key: NavKey; label: string; path: string }[] = [
   { key: 'inicio',       label: 'INÍCIO',         path: '/' },
@@ -43,6 +44,7 @@ const ABAS: { key: NavKey; label: string; path: string }[] = [
   { key: 'parlamentares',label: 'PARLAMENTARES',  path: '/parlamentares' },
   { key: 'busca',        label: 'BUSCA',          path: '/busca' },
   { key: 'painel',       label: 'PAINEL',         path: '/painel' },
+  { key: 'status',       label: 'COLETA',         path: '/status' },
 ];
 
 function pathToKey(path: string): NavKey {
@@ -52,6 +54,7 @@ function pathToKey(path: string): NavKey {
   if (path.startsWith('/politicos')) return 'politicos';
   if (path === '/busca') return 'busca';
   if (path === '/painel') return 'painel';
+  if (path === '/status') return 'status';
   return 'inicio';
 }
 
@@ -81,12 +84,17 @@ function Navbar({
           <div className="hidden md:flex items-center gap-1">
             {ABAS.map(({ key, label, path }) => {
               const ativo = abaAtiva === key;
+              const isColeta = key === 'status';
               return (
                 <button key={key}
                   onClick={() => { navigate(path); setMenuAberto(false); window.scrollTo(0, 0); }}
-                  className={`font-bebas tracking-widest px-4 py-2 text-lg transition-all duration-200 border-b-[3px] ${ativo
-                    ? 'text-black bg-[#FFD700] border-[#FFD700]'
-                    : 'text-white border-transparent hover:text-[#FFD700] hover:border-[#FFD700]/50'}`}>
+                  className={`font-bebas tracking-widest px-4 py-2 text-lg transition-all duration-200 border-b-[3px] relative ${
+                    ativo
+                      ? isColeta ? 'text-black bg-green-400 border-green-400' : 'text-black bg-[#FFD700] border-[#FFD700]'
+                      : isColeta ? 'text-green-400/70 border-transparent hover:text-green-400 hover:border-green-400/50'
+                                 : 'text-white border-transparent hover:text-[#FFD700] hover:border-[#FFD700]/50'
+                  }`}>
+                  {isColeta && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
                   {label}
                 </button>
               );
@@ -126,22 +134,16 @@ function Navbar({
 
 // ── Wrappers para ler useParams e passar como props ───────────────────────────
 function MunicipioPageWrapper({
-  municipios, onNavegar, onVoltar, onPoliticoClick,
+  onVoltar, onPoliticoClick,
 }: {
-  municipios: Municipio[];
-  onNavegar: (idx: number) => void;
   onVoltar: () => void;
   onPoliticoClick: (id: number) => void;
 }) {
   const { nome: nomeParam } = useParams<{ nome: string }>();
   const nomeDecoded = decodeURIComponent(nomeParam ?? '');
-  const municipioIndex = municipios.findIndex(m => m.nome === nomeDecoded);
   return (
     <MunicipioPage
       nome={nomeDecoded}
-      municipios={municipios}
-      municipioIndex={municipioIndex}
-      onNavegar={onNavegar}
       onVoltar={onVoltar}
       onPoliticoClick={onPoliticoClick}
     />
@@ -242,8 +244,6 @@ function App() {
             <Route path="/municipios" element={<Navigate to="/brasil" replace />} />
             <Route path="/municipios/:nome" element={
               <MunicipioPageWrapper
-                municipios={munOrdenados}
-                onNavegar={idx => navMunicipio(munOrdenados[idx]?.nome ?? '')}
                 onVoltar={() => navigate(-1)}
                 onPoliticoClick={navPolitico}
               />
@@ -261,14 +261,9 @@ function App() {
             } />
 
             {/* ── Outros ── */}
+            <Route path="/status" element={<StatusPage />} />
             <Route path="/busca" element={<BuscaAvancadaPage />} />
-            <Route path="/painel" element={
-              <EstatisticasPage
-                onVoltar={() => navigate(-1)}
-                onPoliticoClick={navPolitico}
-                onMunicipioClick={navMunicipio}
-              />
-            } />
+            <Route path="/painel" element={<EstatisticasPage />} />
 
             {/* Redirect legado */}
             <Route path="*" element={<Navigate to="/" replace />} />

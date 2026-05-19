@@ -42,7 +42,7 @@ export function MapaBrasil({ nivel = 'regioes', regiaoFoco, heatmap, height = 50
         return r.json();
       })
       .then(data => { setGeoData(data); setLoading(false); })
-      .catch(err => { console.error(err); setGeoError('Não foi possível carregar o mapa.'); setLoading(false); });
+      .catch(() => { setGeoError('Não foi possível carregar o mapa.'); setLoading(false); });
   }, []);
 
   // ResizeObserver
@@ -178,11 +178,14 @@ export function MapaBrasil({ nivel = 'regioes', regiaoFoco, heatmap, height = 50
 
       {/* Loading */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-2 border-[#FFD700]/20 border-t-[#FFD700] rounded-full animate-spin" />
-            <p className="font-bebas text-[#FFD700]/40 tracking-widest text-lg animate-pulse">CARREGANDO MAPA</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/30 animate-bounce"
+                style={{ animationDelay: `${i * 100}ms` }} />
+            ))}
           </div>
+          <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase">Carregando mapa</p>
         </div>
       )}
 

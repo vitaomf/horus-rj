@@ -433,9 +433,8 @@ def listar_politicos_paginado(
 
         where_clause = "WHERE " + " AND ".join(where_parts)
 
-        total = conn.execute(
-            f"SELECT COUNT(DISTINCT p.id) FROM politicos p {where_clause}", params
-        ).fetchone()[0]
+        _row  = conn.execute(f"SELECT COUNT(DISTINCT p.id) FROM politicos p {where_clause}", params).fetchone()
+        total = _row[0] if _row and _row[0] is not None else 0
         total_paginas = max(1, math.ceil(total / limite))
 
         # Quando filtrando por uf/casa, ordenar por nome; caso contrário por valor de emendas
@@ -526,53 +525,65 @@ def busca_global(request: Request, q: str = Query(..., min_length=2)):
     """
     q_like = f"%{q.strip()}%"
     conn   = get_db_connection()
+    result: dict = {"municipios": [], "parlamentares": [], "emendas": [], "leis": []}
+
+    # 1. Municípios — try com tabela `municipios`, fallback em emendas
     try:
-        # Municípios (até 5)
         try:
             mun_rows = conn.execute(
-                "SELECT id, nome FROM municipios WHERE UPPER(nome) LIKE UPPER(?) ORDER BY nome LIMIT 5", (q_like,)
+                "SELECT id, nome FROM municipios WHERE UPPER(nome) LIKE UPPER(?) ORDER BY nome LIMIT 5",
+                (q_like,)
             ).fetchall()
         except Exception:
             mun_rows = conn.execute(
-                "SELECT ROW_NUMBER() OVER() as id, municipio_destino as nome FROM emendas "
+                "SELECT ROW_NUMBER() OVER() AS id, municipio_destino AS nome FROM emendas "
                 "WHERE UPPER(municipio_destino) LIKE UPPER(?) GROUP BY municipio_destino ORDER BY municipio_destino LIMIT 5",
                 (q_like,)
             ).fetchall()
-        municipios = [{"id": r["id"], "nome": r["nome"]} for r in mun_rows]
+        result["municipios"] = [{"id": r["id"], "nome": r["nome"]} for r in mun_rows]
+    except Exception as e:
+        logger.warning("busca/global municipios falhou: %s", e)
 
-        # Parlamentares (até 5)
-        NOT_COL = "NOT (nome LIKE '%BANCADA%' OR nome LIKE 'RELATOR%' OR nome = 'Sem informação' OR nome LIKE '%LÍDER%')"
+    # 2. Parlamentares
+    try:
+        NOT_COL = ("NOT (nome LIKE '%BANCADA%' OR nome LIKE 'RELATOR%' "
+                   "OR nome = 'Sem informação' OR nome LIKE '%LÍDER%')")
         pol_rows = conn.execute(
-            f"SELECT id, nome, partido, cargo FROM politicos WHERE UPPER(nome) LIKE UPPER(?) AND {NOT_COL} ORDER BY nome LIMIT 5",
+            f"SELECT id, nome, partido, cargo FROM politicos "
+            f"WHERE UPPER(nome) LIKE UPPER(?) AND {NOT_COL} ORDER BY nome LIMIT 5",
             (q_like,)
         ).fetchall()
-        parlamentares = [{"id": r["id"], "nome": r["nome"], "partido": r["partido"], "cargo": r["cargo"]} for r in pol_rows]
+        result["parlamentares"] = [
+            {"id": r["id"], "nome": r["nome"], "partido": r["partido"], "cargo": r["cargo"]}
+            for r in pol_rows
+        ]
+    except Exception as e:
+        logger.warning("busca/global parlamentares falhou: %s", e)
 
-        # Emendas — busca em descrição e objetivo (até 4)
+    # 3. Emendas — busca em descrição e objetivo
+    try:
         eme_rows = conn.execute("""
             SELECT e.id, e.ano, e.valor, e.descricao, e.objetivo, e.municipio_destino,
-                   p.nome as politico_nome
+                   p.nome AS politico_nome
             FROM emendas e
             LEFT JOIN politicos p ON p.id = e.politico_id
             WHERE UPPER(e.descricao) LIKE UPPER(?) OR UPPER(e.objetivo) LIKE UPPER(?)
             ORDER BY e.valor DESC LIMIT 4
         """, (q_like, q_like)).fetchall()
-        emendas = [{
-            "id":             r["id"],
-            "ano":            r["ano"],
-            "valor":          float(r["valor"]) if r["valor"] else 0,
-            "descricao":      r["descricao"],
-            "objetivo":       r["objetivo"],
+        result["emendas"] = [{
+            "id":                r["id"],
+            "ano":               r["ano"],
+            "valor":             float(r["valor"]) if r["valor"] else 0,
+            "descricao":         r["descricao"],
+            "objetivo":          r["objetivo"],
             "municipio_destino": r["municipio_destino"],
-            "politico_nome":  r["politico_nome"],
+            "politico_nome":     r["politico_nome"],
         } for r in eme_rows]
-
-        return {"municipios": municipios, "parlamentares": parlamentares, "emendas": emendas, "leis": []}
     except Exception as e:
-        logger.error("Erro em /busca/global: %s", e, exc_info=True)
-        return {"municipios": [], "parlamentares": [], "emendas": [], "leis": []}
-    finally:
-        conn.close()
+        logger.warning("busca/global emendas falhou: %s", e)
+
+    conn.close()
+    return result
 
 
 @app.get("/api/politicos/busca")
@@ -778,6 +789,94 @@ def distribuicao_emendas_por_uf(request: Request, politico_id: int):
         conn.close()
 
 
+_UFS_OFICIAIS = {'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+                 'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'}
+
+
+@app.get("/api/politicos/{politico_id}/distribuicao_municipios")
+@limiter.limit("60/minute")
+def distribuicao_municipios(request: Request, politico_id: int, uf: str):
+    """
+    Municípios de um estado UF onde o parlamentar enviou emendas.
+    Usado para drill-down do mapa de atuação (clique no estado → zoom em municípios).
+    """
+    uf_u = uf.upper().strip()
+    if uf_u not in _UFS_OFICIAIS:
+        return []
+    conn = get_db_connection()
+    try:
+        rows = conn.execute("""
+            SELECT
+                TRIM(REPLACE(municipio_destino, ' - ' || ?, '')) AS municipio,
+                COUNT(*)                AS total_emendas,
+                COALESCE(SUM(valor), 0) AS valor_total
+            FROM emendas
+            WHERE politico_id = ?
+              AND UPPER(uf)   = ?
+              AND municipio_destino IS NOT NULL
+              AND municipio_destino != ''
+            GROUP BY municipio_destino
+            ORDER BY valor_total DESC
+        """, (uf_u, politico_id, uf_u)).fetchall()
+        return [
+            {"municipio": r["municipio"], "total_emendas": r["total_emendas"],
+             "valor_total": float(r["valor_total"])}
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error("Erro em /distribuicao_municipios politico %s uf %s: %s", politico_id, uf_u, e)
+        return []
+    finally:
+        conn.close()
+
+
+@app.get("/api/politicos/{politico_id}/emendas")
+@limiter.limit("60/minute")
+def emendas_politico_paginadas(
+    request: Request, politico_id: int,
+    pagina: int = Query(1, ge=1),
+    limite: int = Query(20, ge=1, le=100),
+    uf: Optional[str] = Query(None),
+    municipio: Optional[str] = Query(None),
+):
+    """Emendas de um parlamentar com paginação e filtros opcionais por UF/município."""
+    where = ["politico_id = ?"]
+    params: list = [politico_id]
+    if uf and uf.strip():
+        where.append("UPPER(uf) = ?"); params.append(uf.upper().strip())
+    if municipio and municipio.strip():
+        where.append("UPPER(municipio_destino) LIKE UPPER(?)"); params.append(f"%{municipio.strip()}%")
+    where_sql = " AND ".join(where)
+
+    conn = get_db_connection()
+    try:
+        _r = conn.execute(f"SELECT COUNT(*) FROM emendas WHERE {where_sql}", params).fetchone()
+        total = _r[0] if _r and _r[0] is not None else 0
+        total_paginas = max(1, math.ceil(total / limite))
+        offset = (pagina - 1) * limite
+
+        rows = conn.execute(f"""
+            SELECT id, ano, valor, descricao, objetivo, status, codigo_emenda,
+                   municipio_destino, uf, fonte_url
+            FROM emendas
+            WHERE {where_sql}
+            ORDER BY ano DESC, valor DESC
+            LIMIT ? OFFSET ?
+        """, params + [limite, offset]).fetchall()
+
+        return {
+            "resultados": [dict(r) for r in rows],
+            "total": total,
+            "pagina": pagina,
+            "total_paginas": total_paginas,
+        }
+    except Exception as e:
+        logger.error("Erro em /politicos/%s/emendas: %s", politico_id, e)
+        return {"resultados": [], "total": 0, "pagina": 1, "total_paginas": 1}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}")
 @limiter.limit("30/minute")
 def obter_detalhes_politico(request: Request, politico_id: int):
@@ -873,7 +972,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
                 ]
             }
 
-        # 5. Todas as Emendas (LIMIT 1000 defensivo — evita payload gigante; paginação no frontend)
+        # 5. Emendas — primeiras 100 mais recentes (paginação adicional via /api/politicos/{id}/emendas)
         ultimas_emendas_rows = conn.execute("""
             SELECT ano, valor,
                    COALESCE(valor_empenhado, valor, 0) as valor_empenhado,
@@ -882,7 +981,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             FROM emendas
             WHERE politico_id = ?
             ORDER BY ano DESC, valor DESC
-            LIMIT 1000
+            LIMIT 100
         """, (politico_id,)).fetchall()
 
         ultimas_emendas = [
@@ -1459,9 +1558,11 @@ def health():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM emendas")
-        total_emendas = cur.fetchone()[0]
+        _r1 = cur.fetchone()
+        total_emendas = _r1[0] if _r1 and _r1[0] is not None else 0
         cur.execute("SELECT MAX(ano) FROM emendas")
-        ultimo_ano = cur.fetchone()[0]
+        _r2 = cur.fetchone()
+        ultimo_ano = _r2[0] if _r2 and _r2[0] is not None else None
         conn.close()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"db error: {e}")

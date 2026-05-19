@@ -310,8 +310,9 @@ function TabEmendas() {
         const dataPol = await resPol.json();
         setMunicipiosList(dataMun || []);
         setPoliticosList(dataPol.politicos || []);
-      } catch (err) {
-        console.error('Erro metadados:', err);
+      } catch {
+        setMunicipiosList([]);
+        setPoliticosList([]);
       }
     })();
   }, []);
@@ -333,8 +334,10 @@ function TabEmendas() {
       setEmendas(data.resultados || []);
       setTotalPaginas(data.paginas || 1);
       setTotalResultados(data.total || 0);
-    } catch (err) {
-      console.error('Erro emendas:', err);
+    } catch {
+      setEmendas([]);
+      setTotalPaginas(1);
+      setTotalResultados(0);
     } finally {
       setLoading(false);
     }
