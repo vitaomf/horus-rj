@@ -297,6 +297,182 @@ def stats_estado(request: Request, uf: str):
         conn.close()
 
 
+@app.get("/api/eleitos/estadual")
+@limiter.limit("60/minute")
+def eleitos_estaduais_uf(request: Request,
+                         uf: str = Query(..., min_length=2, max_length=2)):
+    """
+    Retorna governador, vice-governador, senadores (3 por UF), deputados federais
+    e deputados estaduais ELEITOS em 2022 para uma UF.
+    """
+    uf_u = uf.upper().strip()
+    conn = get_db_connection()
+    try:
+        rows = conn.execute("""
+            SELECT cargo, nome, nome_urna, partido, numero, foto_url, mandato, sigla_situacao, id
+            FROM eleitos_estaduais
+            WHERE uf = ? AND ano_eleicao = 2022
+            ORDER BY cargo, nome
+        """, (uf_u,)).fetchall()
+
+        governador = None
+        vice       = None
+        senadores: list = []
+        dep_federais: list = []
+        dep_estaduais: list = []
+
+        for r in rows:
+            d = {
+                "id":        r["id"],
+                "nome":      r["nome"],
+                "nome_urna": r["nome_urna"],
+                "partido":   r["partido"],
+                "numero":    r["numero"],
+                "foto_url":  r["foto_url"],
+                "mandato":   r["mandato"],
+                "situacao":  r["sigla_situacao"],
+            }
+            c = r["cargo"]
+            if   c == "governador":        governador = d
+            elif c == "vice_governador":   vice = d
+            elif c == "senador":           senadores.append(d)
+            elif c == "deputado_federal":  dep_federais.append(d)
+            elif c == "deputado_estadual": dep_estaduais.append(d)
+
+        return {
+            "governador":         governador,
+            "vice_governador":    vice,
+            "senadores":          senadores,
+            "deputados_federais":  dep_federais,
+            "deputados_estaduais": dep_estaduais,
+        }
+    except Exception as e:
+        logger.error("Erro em /eleitos/estadual %s: %s", uf_u, e)
+        return {"governador": None, "vice_governador": None, "senadores": [],
+                "deputados_federais": [], "deputados_estaduais": []}
+    finally:
+        conn.close()
+
+
+@app.get("/api/foto_tse/{kind}/{registro_id}")
+def proxy_foto_tse(kind: str, registro_id: int):
+    """
+    Proxy de foto TSE para eleitos (estaduais ou municipais).
+    Resolve CORS, instabilidade 502 do TSE (com retry) e adiciona cache.
+
+    kind = "estadual" ou "municipal"
+    """
+    import time, urllib.request
+
+    if kind not in ("estadual", "municipal"):
+        raise HTTPException(status_code=400, detail="kind invalido")
+
+    _cache = getattr(proxy_foto_tse, "_cache", {})
+    proxy_foto_tse._cache = _cache
+
+    key = (kind, registro_id)
+    now = time.time()
+    if key in _cache:
+        ts, ct, data = _cache[key]
+        if now - ts < 86400:  # 24h
+            return Response(content=data, media_type=ct,
+                            headers={"Cache-Control": "public, max-age=86400"})
+
+    tabela = "eleitos_estaduais" if kind == "estadual" else "eleitos_municipais"
+    conn = get_db_connection()
+    try:
+        row = conn.execute(f"SELECT foto_url FROM {tabela} WHERE id = ?", (registro_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not row or not row["foto_url"]:
+        raise HTTPException(status_code=404, detail="sem foto")
+
+    url = row["foto_url"]
+    # Retry para resolver 502 intermitentes do TSE
+    data, ct = None, "image/jpeg"
+    for tentativa in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 Horus"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                ct   = resp.headers.get("Content-Type", "image/jpeg")
+                data = resp.read()
+            break
+        except Exception:
+            if tentativa < 2:
+                time.sleep(1.5 * (tentativa + 1))
+            continue
+
+    if not data or len(data) < 500:
+        raise HTTPException(status_code=502, detail="foto indisponivel")
+
+    _cache[key] = (now, ct, data)
+    return Response(content=data, media_type=ct,
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/eleitos/municipal")
+@limiter.limit("60/minute")
+def eleitos_municipais(request: Request,
+                       uf: str = Query(..., min_length=2, max_length=2),
+                       municipio: str = Query(..., min_length=2)):
+    """
+    Retorna prefeito, vice-prefeito e vereadores eleitos em 2024 para um município.
+    Match por (uf, municipio) case-insensitive, com normalização de acentos.
+
+    Response: {
+        prefeito: {nome, partido, foto_url, ...} | null,
+        vice:     {nome, partido, foto_url, ...} | null,
+        vereadores: [{nome, partido, foto_url, numero, ...}, ...]
+    }
+    """
+    import unicodedata
+    def norm(s: str) -> str:
+        return unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode('ascii').upper().strip()
+
+    uf_u  = uf.upper().strip()
+    mun_n = norm(municipio)
+
+    conn = get_db_connection()
+    try:
+        # Match por nome normalizado (case + acentos)
+        rows = conn.execute("""
+            SELECT id, cargo, nome, nome_urna, partido, numero, foto_url, sigla_situacao
+            FROM eleitos_municipais
+            WHERE uf = ?
+              AND UPPER(municipio) = ?
+              AND ano_eleicao = 2024
+        """, (uf_u, mun_n)).fetchall()
+
+        prefeito  = None
+        vice      = None
+        vereadores: list = []
+
+        for r in rows:
+            d = {
+                "id":        r["id"],
+                "nome":      r["nome"],
+                "nome_urna": r["nome_urna"],
+                "partido":   r["partido"],
+                "numero":    r["numero"],
+                "foto_url":  r["foto_url"],
+                "situacao":  r["sigla_situacao"],
+            }
+            if   r["cargo"] == "prefeito":      prefeito = d
+            elif r["cargo"] == "vice_prefeito": vice     = d
+            elif r["cargo"] == "vereador":      vereadores.append(d)
+
+        # ordena vereadores por nome
+        vereadores.sort(key=lambda v: v["nome"] or "")
+
+        return {"prefeito": prefeito, "vice": vice, "vereadores": vereadores}
+    except Exception as e:
+        logger.error("Erro em /eleitos/municipal %s/%s: %s", uf_u, mun_n, e)
+        return {"prefeito": None, "vice": None, "vereadores": []}
+    finally:
+        conn.close()
+
+
 @app.get("/api/municipios/{municipio_id}/problemas")
 def listar_problemas(municipio_id: int, severidade_min: Optional[int] = Query(None)):
     """

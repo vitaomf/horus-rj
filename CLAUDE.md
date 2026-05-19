@@ -31,11 +31,19 @@ python scheduler/scheduler.py                    # scheduler
 Coletas manuais:
 
 ```bash
-python coleta_emendas.py                         # emendas 2014→ano atual
-python coleta_contratos.py                       # contratos federais 2024
-python backend/collectors/coleta_tse.py          # campanhas + doadores TSE 2022
-python backend/migrate_tse.py                    # cria tabelas campanhas/doadores
-python rebuild_db.py                             # reset total (faz backup automático)
+python coleta_emendas.py                          # emendas 2014→ano atual
+python coleta_contratos.py                        # contratos federais 2024
+python backend/collectors/coleta_tse.py           # campanhas + doadores TSE 2022 (RJ)
+python backend/migrate_tse.py                     # cria tabelas campanhas/doadores
+python rebuild_db.py                              # reset total (faz backup automático)
+
+# Eleitos (autoridades exibidas em HierarquiaCargos):
+python scripts/migrate_eleitos_municipais.py      # cria tabelas eleitos_municipais e eleitos_estaduais
+python scripts/coleta_tse_estadual.py             # gov, vice-gov, senadores, dep. fed/est ELEITOS 2022 (~1.7k)
+python scripts/coleta_tse_municipal.py            # prefeitos, vice, vereadores ELEITOS 2024 (~70k)
+
+# Suporte: GeoJSON municípios e fotos
+python scripts/download_geo_municipios.py         # GeoJSONs das 27 UFs para mapa interativo
 ```
 
 ## Arquitetura

@@ -1,6 +1,18 @@
 {
   "permissions": {
     "allow": [
+      "Bash(*)",
+      "PowerShell(*)",
+      "Read(**)",
+      "Edit(**)",
+      "Write(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "WebFetch",
+      "WebSearch",
+      "Skill(*)",
+      "Agent(*)",
+      "mcp__*",
       "Read(//c/Users/joaov/OneDrive/Desktop/Nerd Club 2.0/**)",
       "Read(//c/Users/joaov/OneDrive/Desktop/**)",
       "Bash(node -e ' *)",
@@ -203,7 +215,28 @@
       "Bash(powershell -Command ' *)",
       "Bash(xargs grep *)",
       "Bash(python scripts/download_geo_municipios.py)",
-      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Start-Process python -ArgumentList \"-m uvicorn backend.api:app --port 7291\" -WorkingDirectory \"c:\\\\Users\\\\joaov\\\\Desktop\\\\HORUS\" -WindowStyle Hidden; Start-Sleep -Seconds 5; $r1 = Invoke-WebRequest -Uri \"http://localhost:7291/api/politicos/1/distribuicao_municipios?uf=RJ\" -UseBasicParsing | ConvertFrom-Json; $r2 = Invoke-WebRequest -Uri \"http://localhost:7291/api/politicos/1/emendas?limite=5\" -UseBasicParsing | ConvertFrom-Json; $r3 = Invoke-WebRequest -Uri \"http://localhost:7291/api/busca/global?q=zzznotfound\" -UseBasicParsing | ConvertFrom-Json; \"distribuicao_municipios: $\\($r1.Count\\) | emendas paginado total: $\\($r2.total\\) primeira pagina: $\\($r2.resultados.Count\\) | busca vazia: mun=$\\($r3.municipios.Count\\) pol=$\\($r3.parlamentares.Count\\) eme=$\\($r3.emendas.Count\\)\")"
-    ]
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Start-Process python -ArgumentList \"-m uvicorn backend.api:app --port 7291\" -WorkingDirectory \"c:\\\\Users\\\\joaov\\\\Desktop\\\\HORUS\" -WindowStyle Hidden; Start-Sleep -Seconds 5; $r1 = Invoke-WebRequest -Uri \"http://localhost:7291/api/politicos/1/distribuicao_municipios?uf=RJ\" -UseBasicParsing | ConvertFrom-Json; $r2 = Invoke-WebRequest -Uri \"http://localhost:7291/api/politicos/1/emendas?limite=5\" -UseBasicParsing | ConvertFrom-Json; $r3 = Invoke-WebRequest -Uri \"http://localhost:7291/api/busca/global?q=zzznotfound\" -UseBasicParsing | ConvertFrom-Json; \"distribuicao_municipios: $\\($r1.Count\\) | emendas paginado total: $\\($r2.total\\) primeira pagina: $\\($r2.resultados.Count\\) | busca vazia: mun=$\\($r3.municipios.Count\\) pol=$\\($r3.parlamentares.Count\\) eme=$\\($r3.emendas.Count\\)\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\joaov\\\\Desktop\\\\HORUS\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "WebFetch(domain:pt.wikipedia.org)",
+      "Bash(awk '/AREAS_MINISTERIAIS/,/^];/' frontend/src/data/mockGoverno.ts)",
+      "Bash(awk 'BEGIN{count=0} /const m =.*fotoUrl/{count++} END{print count}' frontend/src/data/mockGoverno.ts)",
+      "Bash(where cursor *)",
+      "Bash(where code *)",
+      "Bash(code --install-extension ms-python.python --force)",
+      "Bash(code --install-extension ms-python.vscode-pylance --force)",
+      "Bash(code --install-extension charliermarsh.ruff --force)",
+      "Bash(code --install-extension ms-python.black-formatter --force)",
+      "Bash(code --install-extension dbaeumer.vscode-eslint --force)",
+      "Bash(code --install-extension esbenp.prettier-vscode --force)",
+      "Bash(code --install-extension bradlc.vscode-tailwindcss --force)",
+      "Bash(code --install-extension eamodio.gitlens --force)",
+      "Bash(code --install-extension mhutchie.git-graph --force)",
+      "Bash(code --install-extension usernamehw.errorlens --force)",
+      "Bash(code --install-extension oderwat.indent-rainbow --force)",
+      "Bash(code --install-extension pkief.material-icon-theme --force)",
+      "Bash(python scripts/download_fotos_governadores.py)"
+    ],
+    "defaultMode": "acceptEdits"
   }
 }

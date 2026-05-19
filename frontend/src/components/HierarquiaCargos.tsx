@@ -1,10 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CargoCard } from './CargoCard';
 import {
   PRESIDENTE, VICE_PRESIDENTE, AREAS_MINISTERIAIS,
   getCargosEstaduais, getCargosMunicipais,
-  type AreaMinisterial,
+  type AreaMinisterial, type CargoEletivo,
 } from '../data/mockGoverno';
+import { API_BASE_URL } from '../config';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function capitalize(nome: string): string {
+  return nome.toLowerCase().split(' ').map(w =>
+    w.length <= 2 ? w : w[0].toUpperCase() + w.slice(1)
+  ).join(' ');
+}
+
+interface EleitoEstadual {
+  id: number;
+  nome: string;
+  nome_urna: string;
+  partido: string;
+  foto_url: string;
+  mandato: string;
+}
+interface EleitoMunicipal {
+  id: number;
+  nome: string;
+  nome_urna: string;
+  partido: string;
+  numero: number | null;
+  foto_url: string;
+}
 
 interface HierarquiaCargosProps {
   nivel: 'federal' | 'estadual' | 'municipal';
@@ -120,23 +145,125 @@ function AreaAccordion({ area, corNivel }: { area: AreaMinisterial; corNivel: st
 
 // ── ESTADUAL ─────────────────────────────────────────────────────────────────
 function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
-  const { governador, vice, secretarios } = getCargosEstaduais(uf);
+  const [eleitos, setEleitos] = useState<{
+    governador: EleitoEstadual | null;
+    vice_governador: EleitoEstadual | null;
+    senadores: EleitoEstadual[];
+    deputados_federais: EleitoEstadual[];
+    deputados_estaduais: EleitoEstadual[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API_BASE_URL}/api/eleitos/estadual?uf=${uf}`)
+      .then(r => r.json())
+      .then(setEleitos)
+      .catch(() => setEleitos(null))
+      .finally(() => setLoading(false));
+  }, [uf]);
+
+  // Fallback: secretários ainda placeholder
+  const { secretarios } = getCargosEstaduais(uf);
+
+  // Converte eleito TSE para CargoEletivo do design system
+  const toCargo = (e: EleitoEstadual | null, cargoLabel: string, descricao: string, ordem: number): CargoEletivo | null => {
+    if (!e) return null;
+    return {
+      id: `tse-est-${e.id}`,
+      nome: capitalize(e.nome_urna || e.nome),
+      cargo: cargoLabel,
+      funcao: descricao,
+      partido: e.partido,
+      mandato: e.mandato || '2023-2026',
+      fotoUrl: `${API_BASE_URL}/api/foto_tse/estadual/${e.id}`,
+      ordem,
+    };
+  };
+
+  const govCargo = toCargo(
+    eleitos?.governador ?? null,
+    'Governador — Chefe do Poder Executivo Estadual',
+    'É o chefe do governo do estado. Comanda as polícias (Civil e Militar), as escolas estaduais e os hospitais públicos. Sanciona leis estaduais e nomeia secretários para cada área.',
+    1
+  );
+  const viceCargo = toCargo(
+    eleitos?.vice_governador ?? null,
+    'Vice-Governador',
+    'Assume o governo se o Governador ficar impossibilitado. Frequentemente coordena uma secretaria ou programa específico.',
+    2
+  );
+
   return (
     <div className="space-y-8">
-      <BannerEmColeta cor={cor} />
+      {loading && <BannerCarregando cor={cor} />}
 
+      {/* Governador + Vice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start border border-[#1a1a1a] bg-[#0a0a0a] rounded-sm p-6">
         <div className="lg:col-span-3">
-          <CargoCard cargo={governador} tamanho="grande" corDestaque={cor} />
+          {govCargo
+            ? <CargoCard cargo={govCargo} tamanho="grande" corDestaque={cor} />
+            : <CargoCard cargo={getCargosEstaduais(uf).governador} tamanho="grande" corDestaque={cor} />}
         </div>
         <div className="lg:col-span-2 lg:pl-6 lg:border-l border-[#1a1a1a]">
-          <CargoCard cargo={vice} tamanho="medio" corDestaque={cor} />
+          {viceCargo
+            ? <CargoCard cargo={viceCargo} tamanho="medio" corDestaque={cor} />
+            : <CargoCard cargo={getCargosEstaduais(uf).vice} tamanho="medio" corDestaque={cor} />}
         </div>
       </div>
 
+      {/* Bancada federal eleita em 2022 */}
+      {eleitos && (eleitos.senadores.length + eleitos.deputados_federais.length > 0) && (
+        <div>
+          <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">
+            BANCADA FEDERAL DE {uf} · ELEIÇÃO 2022
+          </p>
+          <div className="border border-[#1a1a1a] rounded-sm bg-[#0a0a0a] p-4 space-y-4">
+            {eleitos.senadores.length > 0 && (
+              <div>
+                <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-2">
+                  Senador eleito ({eleitos.senadores.length})
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {eleitos.senadores.map(s => (
+                    <CargoCard
+                      key={`sen-${s.id}`}
+                      cargo={toCargo(s, 'Senador', 'Representa o estado no Senado Federal. Mandato de 8 anos.', 100) as CargoEletivo}
+                      tamanho="pequeno"
+                      corDestaque={cor}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {eleitos.deputados_federais.length > 0 && (
+              <div>
+                <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-2">
+                  Deputados federais ({eleitos.deputados_federais.length})
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                  {eleitos.deputados_federais.map(d => (
+                    <CargoCard
+                      key={`df-${d.id}`}
+                      cargo={toCargo(d, 'Deputado Federal', 'Representa o estado na Câmara dos Deputados.', 101) as CargoEletivo}
+                      tamanho="pequeno"
+                      corDestaque={cor}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Secretarias — ainda placeholder pois TSE não cobre cargos não-eletivos */}
       <div>
         <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">
           SECRETARIAS DE ESTADO
+          <span className="ml-2 font-mono text-[8px] tracking-widest text-gray-700 normal-case">
+            · dados em coleta (cargos nomeados, fora do TSE)
+          </span>
         </p>
         <div className="border border-[#1a1a1a] rounded-sm bg-[#0a0a0a] p-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -153,23 +280,96 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
 // ── MUNICIPAL ────────────────────────────────────────────────────────────────
 function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string; cor: string }) {
   const slug = municipio.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '-');
-  const { prefeito, vice, secretarios } = getCargosMunicipais(uf, slug);
+  const [eleitos, setEleitos] = useState<{
+    prefeito: EleitoMunicipal | null;
+    vice: EleitoMunicipal | null;
+    vereadores: EleitoMunicipal[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API_BASE_URL}/api/eleitos/municipal?uf=${uf}&municipio=${encodeURIComponent(municipio)}`)
+      .then(r => r.json())
+      .then(setEleitos)
+      .catch(() => setEleitos(null))
+      .finally(() => setLoading(false));
+  }, [uf, municipio]);
+
+  const { secretarios, prefeito: prefMock, vice: viceMock } = getCargosMunicipais(uf, slug);
+
+  const toCargo = (e: EleitoMunicipal | null, cargoLabel: string, descricao: string, ordem: number): CargoEletivo | null => {
+    if (!e) return null;
+    return {
+      id: `tse-mun-${e.id}`,
+      nome: capitalize(e.nome_urna || e.nome),
+      cargo: cargoLabel,
+      funcao: descricao,
+      partido: e.partido,
+      mandato: '2025-2028',
+      fotoUrl: `${API_BASE_URL}/api/foto_tse/municipal/${e.id}`,
+      ordem,
+    };
+  };
+
+  const prefCargo = toCargo(
+    eleitos?.prefeito ?? null,
+    'Prefeito — Chefe do Poder Executivo Municipal',
+    `É quem manda na administração de ${capitalize(municipio)}. Sanciona leis municipais, nomeia secretários, define investimentos da cidade.`,
+    1
+  );
+  const viceCargo = toCargo(
+    eleitos?.vice ?? null,
+    'Vice-Prefeito',
+    'Assume o comando da prefeitura se o prefeito ficar afastado. Frequentemente acumula uma secretaria.',
+    2
+  );
+
   return (
     <div className="space-y-8">
-      <BannerEmColeta cor={cor} />
+      {loading && <BannerCarregando cor={cor} />}
 
+      {/* Prefeito + Vice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start border border-[#1a1a1a] bg-[#0a0a0a] rounded-sm p-6">
         <div className="lg:col-span-3">
-          <CargoCard cargo={prefeito} tamanho="grande" corDestaque={cor} />
+          <CargoCard cargo={prefCargo ?? prefMock} tamanho="grande" corDestaque={cor} />
         </div>
         <div className="lg:col-span-2 lg:pl-6 lg:border-l border-[#1a1a1a]">
-          <CargoCard cargo={vice} tamanho="medio" corDestaque={cor} />
+          <CargoCard cargo={viceCargo ?? viceMock} tamanho="medio" corDestaque={cor} />
         </div>
       </div>
 
+      {/* Vereadores */}
+      {eleitos && eleitos.vereadores.length > 0 && (
+        <div>
+          <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">
+            CÂMARA DE VEREADORES
+            <span className="ml-2 font-mono text-[8px] tracking-widest text-gray-700 normal-case">
+              · {eleitos.vereadores.length} eleitos em 2024
+            </span>
+          </p>
+          <div className="border border-[#1a1a1a] rounded-sm bg-[#0a0a0a] p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+              {eleitos.vereadores.map(v => (
+                <CargoCard
+                  key={`ver-${v.id}`}
+                  cargo={toCargo(v, 'Vereador', `Vota leis e fiscaliza o prefeito de ${capitalize(municipio)}.`, 100) as CargoEletivo}
+                  tamanho="pequeno"
+                  corDestaque={cor}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Secretarias municipais — ainda placeholder */}
       <div>
         <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">
           SECRETARIAS MUNICIPAIS
+          <span className="ml-2 font-mono text-[8px] tracking-widest text-gray-700 normal-case">
+            · dados em coleta (cargos nomeados, fora do TSE)
+          </span>
         </p>
         <div className="border border-[#1a1a1a] rounded-sm bg-[#0a0a0a] p-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -183,21 +383,18 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
   );
 }
 
-function BannerEmColeta({ cor }: { cor: string }) {
+function BannerCarregando({ cor }: { cor: string }) {
   return (
-    <div
-      className="border rounded-sm px-4 py-3 flex items-center gap-3"
-      style={{ borderColor: `${cor}33`, backgroundColor: `${cor}08` }}
-    >
-      <span className="text-lg" style={{ color: cor }}>⏳</span>
-      <div>
-        <p className="font-bebas tracking-widest text-sm" style={{ color: cor }}>
-          DADOS EM COLETA
-        </p>
-        <p className="text-gray-500 text-xs">
-          Os nomes e fotos das autoridades atuais serão preenchidos em breve.
-        </p>
+    <div className="border border-[#1a1a1a] px-4 py-3 flex items-center gap-3 bg-[#050505]">
+      <div className="flex gap-1">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="w-1.5 h-1.5 animate-bounce"
+            style={{ backgroundColor: `${cor}99`, animationDelay: `${i * 100}ms` }} />
+        ))}
       </div>
+      <p className="font-mono text-[9px] tracking-[0.4em] text-gray-600 uppercase">
+        Carregando dados do TSE
+      </p>
     </div>
   );
 }
