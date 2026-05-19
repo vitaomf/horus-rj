@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CargoCard } from './CargoCard';
 import {
   PRESIDENTE, VICE_PRESIDENTE, AREAS_MINISTERIAIS,
@@ -21,6 +22,7 @@ interface EleitoEstadual {
   partido: string;
   foto_url: string;
   mandato: string;
+  politico_id?: number | null;
 }
 interface EleitoMunicipal {
   id: number;
@@ -145,6 +147,7 @@ function AreaAccordion({ area, corNivel }: { area: AreaMinisterial; corNivel: st
 
 // ── ESTADUAL ─────────────────────────────────────────────────────────────────
 function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
+  const navigate = useNavigate();
   const [eleitos, setEleitos] = useState<{
     governador: EleitoEstadual | null;
     vice_governador: EleitoEstadual | null;
@@ -231,6 +234,7 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
                       cargo={toCargo(s, 'Senador', 'Representa o estado no Senado Federal. Mandato de 8 anos.', 100) as CargoEletivo}
                       tamanho="pequeno"
                       corDestaque={cor}
+                      onClick={s.politico_id ? () => navigate(`/politicos/${s.politico_id}`) : undefined}
                     />
                   ))}
                 </div>
@@ -248,6 +252,7 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
                       cargo={toCargo(d, 'Deputado Federal', 'Representa o estado na Câmara dos Deputados.', 101) as CargoEletivo}
                       tamanho="pequeno"
                       corDestaque={cor}
+                      onClick={d.politico_id ? () => navigate(`/politicos/${d.politico_id}`) : undefined}
                     />
                   ))}
                 </div>

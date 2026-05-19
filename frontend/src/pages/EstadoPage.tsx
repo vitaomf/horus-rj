@@ -125,40 +125,30 @@ export function EstadoPage() {
         </div>
       </div>
 
-      {/* ── BANNER STATUS ── */}
-      {ufUpper === 'RJ' ? (
-        <div className="border-b border-[#FFD700]/20 bg-[#FFD700]/[0.03] px-6 py-4 md:px-12">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="w-2 h-2 bg-[#4CAF50] animate-pulse" />
-              <div>
-                <p className="font-bebas tracking-widest text-[#FFD700]">DADOS DISPONÍVEIS</p>
-                <p className="font-mono text-[9px] tracking-wide text-gray-600">
-                  Emendas, contratos, municípios e parlamentares do Rio de Janeiro mapeados.
-                </p>
-              </div>
+      {/* ── BANNER STATUS ── sempre mostra o que está disponível */}
+      <div className={`border-b px-6 py-4 md:px-12 ${ufUpper === 'RJ' ? 'border-[#FFD700]/20 bg-[#FFD700]/[0.03]' : 'border-[#1a1a1a] bg-[#050505]'}`}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="w-2 h-2 bg-[#4CAF50] animate-pulse" />
+            <div>
+              <p className="font-bebas tracking-widest text-[#FFD700]">DADOS DISPONÍVEIS</p>
+              <p className="font-mono text-[9px] tracking-wide text-gray-600">
+                {ufUpper === 'RJ'
+                  ? 'Emendas, contratos, municípios e parlamentares do Rio de Janeiro mapeados.'
+                  : `Governador, deputados federais (TSE 2022) e eleitos municipais (TSE 2024) de ${estado.nome} disponíveis. Emendas em coleta progressiva.`}
+              </p>
             </div>
+          </div>
+          {ufUpper === 'RJ' && (
             <Link
               to="/"
               className="font-mono text-[9px] tracking-widest border border-[#FFD700]/30 text-[#FFD700] px-4 py-2 hover:bg-[#FFD700]/10 transition-colors whitespace-nowrap"
             >
               VER DADOS COMPLETOS DO RJ →
             </Link>
-          </div>
+          )}
         </div>
-      ) : (
-        <div className="border-b border-[#1a1a1a] bg-[#050505] px-6 py-4 md:px-12">
-          <div className="flex items-center gap-4">
-            <div className="w-2 h-2 bg-[#FFD700]/40 animate-pulse" />
-            <div>
-              <p className="font-bebas tracking-widest text-[#FFD700]/60">EM COLETA</p>
-              <p className="font-mono text-[9px] tracking-wide text-gray-700">
-                Dados de {estado.nome} serão disponibilizados em breve.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ── HIERARQUIA DE CARGOS ── */}
       <HierarquiaCargos nivel="estadual" uf={ufUpper} />

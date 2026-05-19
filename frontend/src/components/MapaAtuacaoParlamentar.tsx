@@ -409,14 +409,57 @@ export function MapaAtuacaoParlamentar({ politicoId, height = 400, onUfClick, on
         )}
 
         {erroZoom && view.kind === 'estado' && !loadingZoom && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black z-30">
-            <p className="font-mono text-[9px] tracking-[0.4em] text-red-400/60 uppercase">{erroZoom}</p>
-            <button
-              onClick={() => setView({ kind: 'nacional' })}
-              className="font-mono text-[9px] tracking-widest border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#FFD700]/40 px-4 py-2 transition-colors"
-            >
-              ← VOLTAR AO BRASIL
-            </button>
+          <div className="absolute inset-0 flex flex-col bg-black z-30 overflow-auto">
+            {/* Header de erro */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#1a1a1a] shrink-0">
+              <p className="font-mono text-[8px] tracking-[0.4em] text-red-400/50 uppercase">
+                GeoJSON indisponível · mostrando dados tabulares
+              </p>
+              <button
+                onClick={() => setView({ kind: 'nacional' })}
+                className="font-mono text-[8px] tracking-widest text-gray-600 hover:text-[#FFD700] transition-colors"
+              >
+                ← BRASIL
+              </button>
+            </div>
+            {/* Fallback: top municípios em lista */}
+            <div className="flex-1 p-4 overflow-auto">
+              <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/40 uppercase mb-3">
+                TOP MUNICÍPIOS DE {view.uf} — VOLUME DE EMENDAS
+              </p>
+              {distMuns.length === 0 ? (
+                <p className="font-mono text-[9px] text-gray-700 text-center mt-8">Sem dados de municípios para este estado.</p>
+              ) : (
+                <div className="space-y-1">
+                  {distMuns.slice(0, 15).map((m, i) => {
+                    const maxVal = distMuns[0].valor_total;
+                    const pct    = maxVal > 0 ? (m.valor_total / maxVal) * 100 : 0;
+                    return (
+                      <div key={m.municipio} className="group">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[8px] text-gray-700 w-5 text-right">{i + 1}.</span>
+                            <span className="font-bebas text-sm text-white tracking-wide">{m.municipio}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bebas text-[#FFD700] text-sm">{fmtVal(m.valor_total)}</span>
+                            <span className="font-mono text-[7px] text-gray-700 ml-2">{m.total_emendas} em.</span>
+                          </div>
+                        </div>
+                        <div className="h-0.5 bg-[#1a1a1a] ml-7">
+                          <div className="h-full bg-[#FFD700]/40 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {distMuns.length > 15 && (
+                    <p className="font-mono text-[8px] text-gray-700 text-center pt-2">
+                      + {distMuns.length - 15} municípios
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

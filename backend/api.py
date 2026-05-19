@@ -308,11 +308,17 @@ def eleitos_estaduais_uf(request: Request,
     uf_u = uf.upper().strip()
     conn = get_db_connection()
     try:
+        # JOIN com politicos para obter politico_id quando houver correspondência por nome
         rows = conn.execute("""
-            SELECT cargo, nome, nome_urna, partido, numero, foto_url, mandato, sigla_situacao, id
-            FROM eleitos_estaduais
-            WHERE uf = ? AND ano_eleicao = 2022
-            ORDER BY cargo, nome
+            SELECT e.cargo, e.nome, e.nome_urna, e.partido, e.numero,
+                   e.foto_url, e.mandato, e.sigla_situacao, e.id,
+                   p.id AS politico_id
+            FROM eleitos_estaduais e
+            LEFT JOIN politicos p
+                   ON UPPER(p.nome) = UPPER(e.nome)
+                   OR UPPER(p.nome) = UPPER(e.nome_urna)
+            WHERE e.uf = ? AND e.ano_eleicao = 2022
+            ORDER BY e.cargo, e.nome
         """, (uf_u,)).fetchall()
 
         governador = None
@@ -323,14 +329,15 @@ def eleitos_estaduais_uf(request: Request,
 
         for r in rows:
             d = {
-                "id":        r["id"],
-                "nome":      r["nome"],
-                "nome_urna": r["nome_urna"],
-                "partido":   r["partido"],
-                "numero":    r["numero"],
-                "foto_url":  r["foto_url"],
-                "mandato":   r["mandato"],
-                "situacao":  r["sigla_situacao"],
+                "id":          r["id"],
+                "nome":        r["nome"],
+                "nome_urna":   r["nome_urna"],
+                "partido":     r["partido"],
+                "numero":      r["numero"],
+                "foto_url":    r["foto_url"],
+                "mandato":     r["mandato"],
+                "situacao":    r["sigla_situacao"],
+                "politico_id": r["politico_id"],  # None se não houver emendas
             }
             c = r["cargo"]
             if   c == "governador":        governador = d
@@ -426,12 +433,14 @@ def eleitos_municipais(request: Request,
         vereadores: [{nome, partido, foto_url, numero, ...}, ...]
     }
     """
-    import unicodedata
+    import unicodedata, re as _re
     def norm(s: str) -> str:
         return unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode('ascii').upper().strip()
 
     uf_u  = uf.upper().strip()
-    mun_n = norm(municipio)
+    # Remove sufixo " - UF" que vem do frontend (ex: "NITERÓI - RJ" → "NITERÓI")
+    mun_clean = _re.sub(r'\s*-\s*[A-Z]{2}$', '', municipio.strip().upper()).strip()
+    mun_n = norm(mun_clean)
 
     conn = get_db_connection()
     try:
