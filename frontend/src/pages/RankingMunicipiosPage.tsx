@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TrendingUp, MapPin } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -28,9 +28,10 @@ const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
 
 export function RankingMunicipiosPage() {
   const navigate  = useNavigate();
+  const [searchParams] = useSearchParams();
   const [dados, setDados]     = useState<Municipio[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtroUF, setFiltroUF] = useState('');
+  const [filtroUF, setFiltroUF] = useState(() => searchParams.get('uf') || '');
   const [ordenar, setOrdenar]   = useState<'valor' | 'emendas'>('valor');
 
   useEffect(() => {

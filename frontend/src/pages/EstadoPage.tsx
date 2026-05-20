@@ -187,11 +187,19 @@ export function EstadoPage() {
               MUNICÍPIOS
             </h2>
           </div>
-          {municipios.length > 0 && (
-            <p className="font-mono text-[8px] tracking-widest text-gray-700">
-              {municipios.length} CADASTRADOS
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {municipios.length > 0 && (
+              <p className="font-mono text-[8px] tracking-widest text-gray-700">
+                {municipios.length} CADASTRADOS
+              </p>
+            )}
+            <button
+              onClick={() => navigate(`/ranking/municipios?uf=${ufUpper}`)}
+              className="font-mono text-[8px] tracking-widest border border-[#FFD700]/20 text-[#FFD700]/50 hover:border-[#FFD700]/50 hover:text-[#FFD700] transition-colors px-2 py-1"
+            >
+              RANKING →
+            </button>
+          </div>
         </div>
 
         {loadingMun ? (
