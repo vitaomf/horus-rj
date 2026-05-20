@@ -1635,7 +1635,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             {emendasFiltradas.length} emendas · pág. {paginaAtual}/{totalPaginas}
                                         </span>
                                         {data.total_emendas > 100 && (
-                                            <button onClick={() => navigate('/busca')}
+                                            <button onClick={() => navigate(`/busca?tab=parlamentares&q=${encodeURIComponent(data.nome)}`)}
                                                 className="font-mono text-[8px] tracking-widest text-[#FFD700]/40 hover:text-[#FFD700] transition-colors mt-0.5">
                                                 {data.total_emendas} total · busca completa →
                                             </button>

@@ -8,6 +8,7 @@ import { SearchBar } from './components/SearchBar';
 import { NavProvider } from './contexts/NavContext';
 import { BackToTop } from './components/BackToTop';
 import { ToastProvider } from './components/Toast';
+import { FavoritosPanel } from './components/FavoritosPanel';
 
 // ── Lazy loading ──────────────────────────────────────────────────────────────
 const HomePage          = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
@@ -222,6 +223,7 @@ function App() {
         <Navbar onSelectMunicipio={navMunicipio} onSelectPolitico={navPolitico} apiError={apiError} />
         <div className="h-16" />
         <BackToTop />
+        <FavoritosPanel />
 
         <Suspense fallback={<PageSpinner />}>
           <Routes>

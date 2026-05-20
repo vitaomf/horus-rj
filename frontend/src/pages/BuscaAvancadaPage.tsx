@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Calendar, MapPin, User, ArrowRight, LayoutGrid, List as ListIcon, Scale } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -17,7 +17,9 @@ const TABS: { key: TabBusca; label: string }[] = [
 ];
 
 export const BuscaAvancadaPage: React.FC = () => {
-  const [tab, setTab] = useState<TabBusca>('emendas');
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabBusca) || 'emendas';
+  const [tab, setTab] = useState<TabBusca>(initialTab);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -161,7 +163,8 @@ function TabMunicipios() {
 
 function TabParlamentares() {
   const navigate = useNavigate();
-  const [q, setQ] = useState('');
+  const [searchParams] = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get('q') || '');
   const [resultados, setResultados] = useState<Array<{ id: number; nome: string; partido?: string; cargo?: string }>>([]);
   const [loading, setLoading] = useState(false);
 
