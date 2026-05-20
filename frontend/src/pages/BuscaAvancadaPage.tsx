@@ -193,11 +193,10 @@ function TabParlamentares() {
     <div className="space-y-5">
       <SearchInput value={q} setValue={setQ} placeholder="Buscar parlamentar pelo nome..." />
 
-      <div className="border border-[#FFD700]/15 bg-[#FFD700]/[0.02] px-4 py-3 flex items-center gap-3">
-        <div className="w-1.5 h-1.5 bg-[#FFD700]/40 shrink-0" />
+      <div className="border border-[#FFD700]/10 bg-[#FFD700]/[0.02] px-4 py-3 flex items-center gap-3">
+        <div className="w-1.5 h-1.5 bg-green-400/60 shrink-0" />
         <p className="font-mono text-[9px] tracking-widest text-gray-600">
-          <span className="text-[#FFD700]/60 mr-2">EM CONSTRUÇÃO</span>
-          Busca cobre parlamentares com emendas no RJ. Em breve: 594 federais completos.
+          Busca ativa · parlamentares federais com emendas registradas no banco Horus
         </p>
       </div>
 

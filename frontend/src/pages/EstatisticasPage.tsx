@@ -50,9 +50,11 @@ export const EstatisticasPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center pt-20">
-                <div className="w-16 h-16 border-4 border-[#FFD700]/20 border-t-[#FFD700] rounded-full animate-spin"></div>
-                <p className="mt-4 text-[#FFD700] font-bebas tracking-widest text-xl animate-pulse">PROCESSANDO INTELIGÊNCIA DE DADOS...</p>
+            <div className="min-h-screen bg-black flex flex-col items-center justify-center pt-20 gap-4">
+                <div className="flex gap-1.5">
+                    {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: `${i*100}ms` }} />)}
+                </div>
+                <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Processando dados</p>
             </div>
         );
     }

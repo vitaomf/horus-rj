@@ -387,8 +387,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
     if (loading) {
         return (
-            <div className="w-full flex justify-center items-center py-24">
-                <div className="animate-spin h-16 w-16 border-t-4 border-b-4 border-[#FFD700]"></div>
+            <div className="w-full flex flex-col items-center justify-center py-32 gap-4">
+                <div className="flex gap-1.5">
+                    {[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: `${i*100}ms` }} />)}
+                </div>
+                <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Carregando dossiê</p>
             </div>
         );
     }
@@ -836,9 +839,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     <div className="p-6">
                         {loadingAtividade && !atividade && (
                             <div className="flex flex-col items-center gap-3 text-gray-500 py-10 justify-center">
-                                <div className="animate-spin w-6 h-6 border-2 border-[#2a2a2a] border-t-[#FFD700]" />
-                                <span className="font-bebas tracking-widest text-sm">BUSCANDO NA CÂMARA DOS DEPUTADOS...</span>
-                                <span className="text-gray-700 text-xs">pode levar até 30 segundos · dados em tempo real</span>
+                                <div className="flex gap-1.5">
+                                    {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay:`${i*100}ms` }} />)}
+                                </div>
+                                <span className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Buscando na Câmara dos Deputados</span>
+                                <span className="text-gray-700 text-xs font-mono">pode levar até 30 segundos · dados em tempo real</span>
                             </div>
                         )}
 

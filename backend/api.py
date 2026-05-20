@@ -1874,6 +1874,81 @@ def health():
     }
 
 
+@app.get("/api/inconsistencias")
+@limiter.limit("10/minute")
+def relatorio_inconsistencias(request: Request):
+    """
+    Relatório de inconsistências nos dados:
+    - Emendas sem município destino
+    - Emendas com valor zero
+    - Emendas sem político vinculado
+    - Políticos sem emendas
+    - Emendas com valor_pago > valor_empenhado (anomalia)
+    """
+    conn = get_db_connection()
+    try:
+        r: dict = {}
+
+        # 1. Emendas sem município
+        row = conn.execute("SELECT COUNT(*) FROM emendas WHERE municipio_destino IS NULL OR TRIM(municipio_destino) = ''").fetchone()
+        r["emendas_sem_municipio"] = row[0] if row else 0
+
+        # 2. Emendas com valor zero
+        row = conn.execute("SELECT COUNT(*) FROM emendas WHERE COALESCE(valor, 0) = 0").fetchone()
+        r["emendas_valor_zero"] = row[0] if row else 0
+
+        # 3. Emendas sem político (politico_id nulo ou sem match)
+        row = conn.execute("""
+            SELECT COUNT(*) FROM emendas e
+            WHERE e.politico_id IS NULL
+               OR NOT EXISTS (SELECT 1 FROM politicos p WHERE p.id = e.politico_id)
+        """).fetchone()
+        r["emendas_sem_politico"] = row[0] if row else 0
+
+        # 4. Políticos sem nenhuma emenda
+        row = conn.execute(f"""
+            SELECT COUNT(*) FROM politicos p
+            WHERE {NOT_AUTOR_COLETIVO_SQL}
+              AND NOT EXISTS (SELECT 1 FROM emendas e WHERE e.politico_id = p.id)
+        """).fetchone()
+        r["politicos_sem_emendas"] = row[0] if row else 0
+
+        # 5. Anomalia: valor_pago > valor_empenhado (diferença > 5%)
+        row = conn.execute("""
+            SELECT COUNT(*) FROM emendas
+            WHERE valor_pago IS NOT NULL AND valor_empenhado IS NOT NULL
+              AND valor_empenhado > 0
+              AND valor_pago > valor_empenhado * 1.05
+        """).fetchone()
+        r["anomalia_pago_maior_empenhado"] = row[0] if row else 0
+
+        # 6. Emendas sem UF
+        row = conn.execute("SELECT COUNT(*) FROM emendas WHERE uf IS NULL OR TRIM(uf) = ''").fetchone()
+        r["emendas_sem_uf"] = row[0] if row else 0
+
+        # 7. Anos com cobertura parcial (menos de 100 emendas no ano)
+        anos_rows = conn.execute("""
+            SELECT ano, COUNT(*) as total FROM emendas
+            WHERE ano IS NOT NULL GROUP BY ano HAVING total < 100 ORDER BY ano
+        """).fetchall()
+        r["anos_cobertura_parcial"] = [{"ano": a["ano"], "total": a["total"]} for a in anos_rows]
+
+        # 8. Total geral para contexto
+        row = conn.execute("SELECT COUNT(*) FROM emendas").fetchone()
+        r["total_emendas"] = row[0] if row else 0
+
+        # Score de qualidade: % de emendas sem problemas
+        problemas = r["emendas_sem_municipio"] + r["emendas_valor_zero"] + r["emendas_sem_politico"] + r["emendas_sem_uf"]
+        r["score_qualidade"] = round((1 - problemas / max(r["total_emendas"], 1)) * 100, 1)
+
+        return r
+    except Exception as e:
+        logger.error("Erro em /inconsistencias: %s", e, exc_info=True)
+        return {"erro": "Erro interno"}
+    finally:
+        conn.close()
+
+
 # Configuração para servir o Frontend (React/Vite)
 FRONTEND_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
 

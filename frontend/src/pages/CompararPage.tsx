@@ -96,6 +96,12 @@ function BuscaPolitico({ label, selecionado, onSelecionar }: {
   );
 }
 
+function fmtMetrica(v: number, unidade: string): string {
+  if (unidade === '%') return `${v.toLocaleString('pt-BR')}%`;
+  if (unidade) return `${unidade}${v > 1000 ? fmtVal(v) : v.toLocaleString('pt-BR')}`;
+  return v > 1000 ? fmtVal(v) : v.toLocaleString('pt-BR');
+}
+
 function Metrica({ label, a, b, unidade = '' }: { label: string; a: number; b: number; unidade?: string }) {
   const max  = Math.max(a, b, 1);
   const pctA = (a / max) * 100;
@@ -109,7 +115,7 @@ function Metrica({ label, a, b, unidade = '' }: { label: string; a: number; b: n
         {/* A */}
         <div>
           <p className={`font-bebas text-2xl leading-none mb-1 ${vencedorA ? 'text-[#FFD700]' : 'text-gray-400'}`}>
-            {unidade}{typeof a === 'number' && a > 1000 ? fmtVal(a) : a.toLocaleString('pt-BR')}
+            {fmtMetrica(a, unidade)}
           </p>
           <div className="h-1 bg-[#1a1a1a]">
             <div className="h-full bg-[#FFD700]/60 transition-all" style={{ width: `${pctA}%` }} />
@@ -120,7 +126,7 @@ function Metrica({ label, a, b, unidade = '' }: { label: string; a: number; b: n
         {/* B */}
         <div className="text-right">
           <p className={`font-bebas text-2xl leading-none mb-1 ${vencedorB ? 'text-[#FFD700]' : 'text-gray-400'}`}>
-            {unidade}{typeof b === 'number' && b > 1000 ? fmtVal(b) : b.toLocaleString('pt-BR')}
+            {fmtMetrica(b, unidade)}
           </p>
           <div className="h-1 bg-[#1a1a1a]">
             <div className="h-full bg-[#FFD700]/60 transition-all ml-auto" style={{ width: `${pctB}%` }} />
@@ -259,11 +265,38 @@ export function CompararPage() {
               )}
             </div>
 
-            {/* Disclaimer */}
-            <div className="border-t border-[#1a1a1a] px-6 py-3">
+            {/* Disclaimer + CSV */}
+            <div className="border-t border-[#1a1a1a] px-6 py-3 flex items-center justify-between">
               <p className="font-mono text-[7px] tracking-widest text-gray-800">
                 Dados: Portal da Transparência · Emendas parlamentares 2010–2026 · Valor empenhado
               </p>
+              <button
+                onClick={() => {
+                  const rows = [
+                    ['metrica', polA.nome, polB.nome],
+                    ['Total empenhado', polA.valor_total, polB.valor_total],
+                    ['Total emendas', polA.total_emendas, polB.total_emendas],
+                    ['Media por emenda',
+                      polA.total_emendas > 0 ? (polA.valor_total / polA.total_emendas).toFixed(2) : 0,
+                      polB.total_emendas > 0 ? (polB.valor_total / polB.total_emendas).toFixed(2) : 0],
+                    ...(detA && detB ? [
+                      ['Anos de atividade', detA.anos_ativos.length, detB.anos_ativos.length],
+                      ['Municipios beneficiados', detA.municipios, detB.municipios],
+                      ['% pago (amostra)',
+                        detA.valor_empenhado > 0 ? Math.round((detA.valor_pago / detA.valor_empenhado) * 100) : 0,
+                        detB.valor_empenhado > 0 ? Math.round((detB.valor_pago / detB.valor_empenhado) * 100) : 0],
+                    ] : []),
+                  ];
+                  const csv = rows.map(r => r.join(',')).join('\n');
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                  a.download = `horus_comparacao_${polA.id}_vs_${polB.id}.csv`;
+                  a.click();
+                }}
+                className="font-mono text-[7px] tracking-widest border border-[#1a1a1a] text-gray-700 hover:border-[#FFD700]/30 hover:text-[#FFD700] transition-colors px-2 py-1"
+              >
+                ↓ CSV
+              </button>
             </div>
           </div>
         )}

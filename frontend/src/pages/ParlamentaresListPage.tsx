@@ -109,8 +109,8 @@ export function ParlamentaresListPage() {
         <div className="flex items-center gap-3 max-w-5xl mx-auto">
           <div className="w-1.5 h-1.5 bg-[#FFD700]/40 animate-pulse shrink-0" />
           <p className="font-mono text-[9px] tracking-widest text-gray-600">
-            <span className="text-[#FFD700]/60 mr-2">EM CONSTRUÇÃO</span>
-            Federal disponível com dados parciais (RJ). Demais níveis em coleta progressiva.
+            <span className="text-green-400/60 mr-2">ATIVO</span>
+            Federais com emendas disponíveis · Clique num estado para expandir parlamentares
           </p>
         </div>
       </div>

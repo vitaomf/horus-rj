@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { RefreshCw, Bell } from 'lucide-react';
+import { RefreshCw, Bell, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface StatusData {
   banco: { total_emendas: number; ufs_com_dados: number; tamanho_kb: number };
@@ -9,6 +9,18 @@ interface StatusData {
   parlamentares: Record<string, number>;
   log_coleta_nacional: string[];
   erros_recentes: string[];
+}
+
+interface Inconsistencias {
+  emendas_sem_municipio: number;
+  emendas_valor_zero: number;
+  emendas_sem_politico: number;
+  politicos_sem_emendas: number;
+  anomalia_pago_maior_empenhado: number;
+  emendas_sem_uf: number;
+  anos_cobertura_parcial: Array<{ ano: number; total: number }>;
+  total_emendas: number;
+  score_qualidade: number;
 }
 
 const FONT_DECO   = "'Cinzel Decorative', serif";
@@ -34,11 +46,12 @@ function corLinha(linha: string) {
 }
 
 export function StatusPage() {
-  const [data, setData]       = useState<StatusData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [agora, setAgora]     = useState(new Date());
-  const [delta, setDelta]     = useState<number | null>(null);
-  const prevTotal             = useRef<number | null>(null);
+  const [data, setData]                       = useState<StatusData | null>(null);
+  const [loading, setLoading]                 = useState(true);
+  const [agora, setAgora]                     = useState(new Date());
+  const [delta, setDelta]                     = useState<number | null>(null);
+  const [inconsistencias, setInconsistencias] = useState<Inconsistencias | null>(null);
+  const prevTotal                             = useRef<number | null>(null);
 
   const carregar = async () => {
     try {
@@ -58,6 +71,11 @@ export function StatusPage() {
   useEffect(() => {
     carregar();
     const id = setInterval(carregar, 15000);
+    // Inconsistências: carrega uma vez (dado estável)
+    fetch(`${API_BASE_URL}/api/inconsistencias`)
+      .then(r => r.json())
+      .then(d => setInconsistencias(d))
+      .catch(() => {});
     return () => clearInterval(id);
   }, []);
 
@@ -237,6 +255,55 @@ export function StatusPage() {
                     <p key={i} className="text-red-400/80 text-[10px] font-mono">{linha}</p>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── RELATÓRIO DE INCONSISTÊNCIAS ── */}
+            {inconsistencias && (
+              <div className="border border-[#1a1a1a]">
+                <div className="px-5 py-3 border-b border-[#1a1a1a] bg-[#050505] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {inconsistencias.score_qualidade >= 99
+                      ? <ShieldCheck className="w-4 h-4 text-green-400" />
+                      : <AlertTriangle className="w-4 h-4 text-yellow-500" />}
+                    <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/40 uppercase">
+                      Qualidade dos Dados
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-24 bg-[#111]">
+                      <div className="h-full bg-green-500/70 transition-all" style={{ width: `${inconsistencias.score_qualidade}%` }} />
+                    </div>
+                    <span className="font-bebas text-lg text-green-400">{inconsistencias.score_qualidade}%</span>
+                  </div>
+                </div>
+                <div className="p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-[#111]">
+                  {[
+                    { label: 'Sem município',       val: inconsistencias.emendas_sem_municipio,       alerta: inconsistencias.emendas_sem_municipio > 100 },
+                    { label: 'Valor zero',           val: inconsistencias.emendas_valor_zero,           alerta: inconsistencias.emendas_valor_zero > 500 },
+                    { label: 'Sem político',         val: inconsistencias.emendas_sem_politico,         alerta: inconsistencias.emendas_sem_politico > 0 },
+                    { label: 'Sem UF',               val: inconsistencias.emendas_sem_uf,               alerta: inconsistencias.emendas_sem_uf > 100 },
+                    { label: 'Pago > Empenhado',     val: inconsistencias.anomalia_pago_maior_empenhado, alerta: inconsistencias.anomalia_pago_maior_empenhado > 50 },
+                    { label: 'Pol. sem emendas',     val: inconsistencias.politicos_sem_emendas,        alerta: false },
+                  ].map(item => (
+                    <div key={item.label} className="bg-black p-3 text-center">
+                      <p className="font-mono text-[7px] tracking-widest text-gray-700 uppercase mb-1">{item.label}</p>
+                      <p className={`font-bebas text-xl leading-none ${item.alerta ? 'text-yellow-500' : item.val === 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                        {item.val.toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {inconsistencias.anos_cobertura_parcial.length > 0 && (
+                  <div className="border-t border-[#1a1a1a] px-5 py-3">
+                    <p className="font-mono text-[7px] tracking-widest text-yellow-600/60 uppercase mb-1">
+                      Anos com cobertura parcial (&lt;100 emendas)
+                    </p>
+                    <p className="font-mono text-[8px] text-gray-600">
+                      {inconsistencias.anos_cobertura_parcial.map(a => `${a.ano} (${a.total})`).join(' · ')}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
