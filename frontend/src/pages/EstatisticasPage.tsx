@@ -130,6 +130,22 @@ export const EstatisticasPage: React.FC = () => {
                     <p className="text-gray-400 text-sm md:text-base mt-5 max-w-2xl mx-auto leading-relaxed">
                         Análise da distribuição orçamentária — emendas parlamentares, repasses por município e concentração por objetivo.
                     </p>
+                    {/* Atalhos */}
+                    <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
+                        {por_ano.length > 0 && (
+                            <span className="font-mono text-[8px] tracking-[0.4em] text-gray-700 border border-[#1a1a1a] px-3 py-1.5">
+                                DADOS: {Math.min(...por_ano.map(a => a.ano))}–{Math.max(...por_ano.map(a => a.ano))}
+                            </span>
+                        )}
+                        <button onClick={() => navigate('/ranking/municipios')}
+                            className="font-mono text-[8px] tracking-[0.3em] text-[#FFD700]/60 border border-[#FFD700]/20 px-3 py-1.5 hover:border-[#FFD700]/50 hover:text-[#FFD700] transition-colors">
+                            RANKING MUNICÍPIOS →
+                        </button>
+                        <button onClick={() => navigate('/comparar')}
+                            className="font-mono text-[8px] tracking-[0.3em] text-[#03A9F4]/60 border border-[#03A9F4]/20 px-3 py-1.5 hover:border-[#03A9F4]/50 hover:text-[#03A9F4] transition-colors">
+                            COMPARAR POLÍTICOS →
+                        </button>
+                    </div>
                 </div>
             </div>
 
