@@ -45,8 +45,13 @@ export function HeatmapCard({
         </div>
       ) : (
         <div className="space-y-1">
-          <p className="font-bebas text-3xl text-white tracking-wide leading-none">{fmt(valorTotal)}</p>
-          <p className="text-gray-500 text-[11px] tracking-widest">{totalEmendas.toLocaleString('pt-BR')} emendas</p>
+          {valorTotal > 0
+            ? <p className="font-bebas text-3xl text-white tracking-wide leading-none">{fmt(valorTotal)}</p>
+            : <p className="font-bebas text-2xl text-[#FFD700] tracking-wide leading-none">{totalEmendas.toLocaleString('pt-BR')}</p>
+          }
+          <p className="text-gray-500 text-[11px] tracking-widest">
+            {valorTotal > 0 ? `${totalEmendas.toLocaleString('pt-BR')} emendas` : 'emendas indexadas'}
+          </p>
           {totalPoliticos !== undefined && (
             <p className="text-gray-600 text-[10px] tracking-widest">{totalPoliticos} parlamentares</p>
           )}
