@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { ArrowLeft, Database, Banknote, UserRound, FileText, ExternalLink, Building2 } from 'lucide-react';
+import { ArrowLeft, Database, Banknote, UserRound, FileText, ExternalLink, Building2, GitCompare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
+import { badgeStyle } from '../utils/partidoCores';
 
 interface Politico {
     id: number;
@@ -88,6 +90,7 @@ const formatCurrencyFull = (value: number) => {
 };
 
 export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, onPoliticoClick }) => {
+    const navigate = useNavigate();
     const [data, setData] = useState<MunicipioDetalhes | null>(null);
     const [loading, setLoading] = useState(true);
     const [paginaAtual, setPaginaAtual] = useState(1);
@@ -211,21 +214,29 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                 const prop = maxValorPolitico > 0 ? (politico.valor_total / maxValorPolitico) * 100 : 0;
                                 return (
                                     <div key={index}
-                                        onClick={() => onPoliticoClick(politico.id)}
-                                        className="flex flex-col md:flex-row items-center gap-4 bg-black p-4 border-l-4 border-black hover:border-[#FFD700] transition-colors rounded-r-sm group cursor-pointer">
-                                        <div className="text-5xl font-bebas text-[#333] group-hover:text-[#FFD700]/50 min-w-[60px] text-center">
+                                        className="flex flex-col md:flex-row items-center gap-4 bg-black p-4 border-l-4 border-black hover:border-[#FFD700] transition-colors rounded-r-sm group relative">
+                                        <div className="text-5xl font-bebas text-[#333] group-hover:text-[#FFD700]/50 min-w-[60px] text-center cursor-pointer"
+                                            onClick={() => onPoliticoClick(politico.id)}>
                                             {(index + 1).toString().padStart(2, '0')}
                                         </div>
-                                        <div className="flex-1 w-full relative">
+                                        <div className="flex-1 w-full relative cursor-pointer"
+                                            onClick={() => onPoliticoClick(politico.id)}>
                                             <div className="flex justify-between items-baseline mb-2">
-                                                <h3 className="text-2xl font-bebas tracking-wide group-hover:text-[#FFD700] transition-colors">
-                                                    {politico.nome} <span className="text-sm text-gray-500 ml-2 font-sans tracking-normal">{politico.partido}</span>
-                                                </h3>
-                                                <p className="text-xl font-bold text-white tracking-widest">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="text-2xl font-bebas tracking-wide group-hover:text-[#FFD700] transition-colors">
+                                                        {politico.nome}
+                                                    </h3>
+                                                    {politico.partido && (
+                                                        <span className="font-mono text-[7px] tracking-widest px-1.5 py-0.5 border"
+                                                            style={badgeStyle(politico.partido)}>
+                                                            {politico.partido}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xl font-bold text-white tracking-widest shrink-0">
                                                     {formatCurrencyFull(politico.valor_total)}
                                                 </p>
                                             </div>
-                                            {/* Progress Bar */}
                                             <div className="w-full h-2 bg-[#222] rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full bg-[#FFD700] rounded-full transition-all duration-1000 ease-out"
@@ -236,6 +247,15 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                                 {politico.total_emendas} {politico.total_emendas === 1 ? 'Emenda associada' : 'Emendas associadas'}
                                             </p>
                                         </div>
+                                        {/* Comparar rápido */}
+                                        <button
+                                            onClick={ev => { ev.stopPropagation(); navigate(`/comparar?a=${politico.id}`); }}
+                                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 font-mono text-[7px] tracking-widest border border-[#03A9F4]/30 text-[#03A9F4]/60 hover:text-[#03A9F4] hover:border-[#03A9F4]/60 px-2 py-1"
+                                            title="Comparar com outro parlamentar"
+                                        >
+                                            <GitCompare className="w-3 h-3" />
+                                            COMPARAR
+                                        </button>
                                     </div>
                                 )
                             })

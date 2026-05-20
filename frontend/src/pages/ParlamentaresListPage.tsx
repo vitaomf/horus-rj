@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, GitCompare } from 'lucide-react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { ESTADOS, REGIOES, type SlugRegiao } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
+import { badgeStyle } from '../utils/partidoCores';
 
 interface ParlFederal { id: number; nome: string; partido: string | null; cargo: string | null; foto_url: string | null; }
 
@@ -227,10 +228,23 @@ export function ParlamentaresListPage() {
                                 <p className="font-bebas text-[11px] tracking-wide text-white group-hover:text-[#FFD700] transition-colors leading-tight line-clamp-2">
                                   {p.nome}
                                 </p>
-                                <p className="font-mono text-[7px] tracking-widest text-gray-700 mt-0.5">
-                                  {p.partido ?? '—'}
-                                </p>
+                                {p.partido ? (
+                                  <span className="font-mono text-[6px] tracking-widest px-1 py-0.5 border mt-0.5 inline-block"
+                                    style={badgeStyle(p.partido)}>
+                                    {p.partido}
+                                  </span>
+                                ) : (
+                                  <p className="font-mono text-[7px] tracking-widest text-gray-700 mt-0.5">—</p>
+                                )}
                               </div>
+                              {/* Ação rápida Comparar no hover */}
+                              <button
+                                onClick={ev => { ev.stopPropagation(); navigate(`/comparar?a=${p.id}`); }}
+                                className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 border border-[#03A9F4]/30 p-1"
+                                title="Comparar"
+                              >
+                                <GitCompare className="w-2.5 h-2.5 text-[#03A9F4]/70" />
+                              </button>
                             </button>
                           ))}
                         </div>
