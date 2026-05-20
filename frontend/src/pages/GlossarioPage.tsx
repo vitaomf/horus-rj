@@ -1,3 +1,7 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
+
 const FONT_DECO   = "'Cinzel Decorative', serif";
 const FONT_CINZEL = "'Cinzel', serif";
 
@@ -116,6 +120,16 @@ const TERMOS: Termo[] = [
 ];
 
 export function GlossarioPage() {
+  const [filtro, setFiltro] = React.useState('');
+  const navigate = useNavigate();
+
+  const termosFiltrados = filtro.trim()
+    ? TERMOS.filter(t =>
+        t.termo.toLowerCase().includes(filtro.toLowerCase()) ||
+        t.simples.toLowerCase().includes(filtro.toLowerCase())
+      )
+    : TERMOS;
+
   return (
     <div className="min-h-screen bg-black text-white">
 
@@ -146,9 +160,33 @@ export function GlossarioPage() {
         </div>
       </div>
 
+      {/* Busca */}
+      <div className="border-b border-[#1a1a1a] bg-[#050505] px-6 md:px-12 py-4 sticky top-16 z-40">
+        <div className="max-w-4xl mx-auto relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#FFD700]/30 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="FILTRAR TERMOS..."
+            value={filtro}
+            onChange={e => setFiltro(e.target.value)}
+            className="w-full bg-black border border-[#1a1a1a] text-white py-2 pl-9 pr-3 font-mono text-xs tracking-[0.2em] placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/30 transition-colors"
+          />
+          {filtro && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[8px] tracking-widest text-gray-700">
+              {termosFiltrados.length} TERMO{termosFiltrados.length !== 1 ? 'S' : ''}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Lista de termos */}
       <div className="max-w-4xl mx-auto px-6 md:px-12 py-10 space-y-1">
-        {TERMOS.map((t, i) => (
+        {termosFiltrados.length === 0 && (
+          <div className="border border-[#1a1a1a] py-16 text-center">
+            <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Nenhum termo encontrado para "{filtro}"</p>
+          </div>
+        )}
+        {termosFiltrados.map((t, i) => (
           <div key={i} className="border border-[#1a1a1a] hover:border-[#FFD700]/20 transition-colors group">
             <div className="flex items-start gap-4 p-5">
               {/* Inicial decorativa */}
@@ -190,9 +228,21 @@ export function GlossarioPage() {
 
       {/* Footer */}
       <div className="border-t border-[#1a1a1a] px-6 md:px-12 py-6">
-        <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase text-center">
-          Horus · Transparência Pública · Fontes: Portal da Transparência, TSE, Câmara dos Deputados, Senado Federal
-        </p>
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <p className="font-mono text-[8px] tracking-[0.4em] text-gray-800 uppercase">
+            {TERMOS.length} termos · Portal da Transparência · TSE · Câmara · Senado
+          </p>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/painel')}
+              className="font-mono text-[8px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
+              Ver Painel →
+            </button>
+            <button onClick={() => navigate('/busca')}
+              className="font-mono text-[8px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
+              Busca →
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
