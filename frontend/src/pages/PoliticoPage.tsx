@@ -1,5 +1,6 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2 } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2, GitCompare, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
@@ -190,6 +191,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [bioData, setBioData] = useState<BioCamara | null>(null);
     const { toggle, isFavorito } = useFavoritos();
     const { toast } = useToast();
+    const navigate = useNavigate();
     const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
     const [loadingAtividade, setLoadingAtividade] = useState(false);
     const [cruzamento, setCruzamento] = useState<{
@@ -483,6 +485,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             >
                                 <Share2 className="w-3 h-3" />
                                 COMPARTILHAR
+                            </button>
+                            {/* Comparar */}
+                            <button
+                                onClick={() => navigate(`/comparar?a=${data.id}`)}
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#03A9F4]/50 hover:text-[#03A9F4] transition-all px-3 py-1.5"
+                            >
+                                <GitCompare className="w-3 h-3" />
+                                COMPARAR
                             </button>
                         </div>
                     </div>
@@ -1224,23 +1234,33 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             )}
 
             {/* ── CRUZAMENTO EMENDAS × CONTRATOS ──────────────────────────── */}
-            {cruzamento && cruzamento.tem_cruzamento && (
+            {cruzamento !== null && (
                 <div className="max-w-7xl mx-auto mt-8 mb-8">
-                    <div className="bg-[#0a0a0a] border border-red-900/40 overflow-hidden">
-                        <div className="bg-red-950/30 border-b border-red-900/40 px-5 py-3 flex items-center gap-3">
-                            <span className="text-red-400 text-xl">🔍</span>
+                    <div className={`bg-[#0a0a0a] border overflow-hidden ${cruzamento.tem_cruzamento ? 'border-red-900/40' : 'border-[#1a1a1a]'}`}>
+                        <div className={`border-b px-5 py-3 flex items-center gap-3 ${cruzamento.tem_cruzamento ? 'bg-red-950/30 border-red-900/40' : 'border-[#1a1a1a]'}`}>
+                            {cruzamento.tem_cruzamento
+                                ? <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                                : <ShieldCheck className="w-5 h-5 text-green-500/60 shrink-0" />
+                            }
                             <div>
-                                <p className="font-bebas text-red-400 text-lg tracking-widest">CRUZAMENTO INVESTIGATIVO</p>
-                                <p className="text-gray-500 text-[11px] font-sans">Emendas parlamentares × contratos federais nos mesmos municípios</p>
+                                <p className={`font-bebas text-lg tracking-widest ${cruzamento.tem_cruzamento ? 'text-red-400' : 'text-gray-600'}`}>
+                                    {cruzamento.tem_cruzamento ? 'CRUZAMENTO INVESTIGATIVO' : 'SEM CRUZAMENTOS DETECTADOS'}
+                                </p>
+                                <p className="text-gray-600 text-[10px] font-mono tracking-widest">
+                                    {cruzamento.tem_cruzamento
+                                        ? 'Emendas parlamentares × contratos federais nos mesmos municípios'
+                                        : 'Nenhuma sobreposição emenda→contrato encontrada nos dados disponíveis'}
+                                </p>
                             </div>
                         </div>
 
+                        {cruzamento.tem_cruzamento && (
                         <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Camada 1: Geográfica */}
                             {cruzamento.camada_geografica.length > 0 && (
                                 <div>
                                     <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
-                                        <span className="text-base">📍</span> MUNICÍPIOS COM EMENDAS E CONTRATOS
+                                        📍 MUNICÍPIOS COM EMENDAS E CONTRATOS
                                     </p>
                                     <div className="space-y-2">
                                         {cruzamento.camada_geografica.map((row, i) => (
@@ -1270,7 +1290,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {cruzamento.camada_financeira.length > 0 && (
                                 <div>
                                     <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
-                                        <span className="text-base">💰</span> DOADORES QUE TAMBÉM SÃO CONTRATADOS
+                                        💰 DOADORES QUE TAMBÉM SÃO CONTRATADOS
                                     </p>
                                     <div className="space-y-2">
                                         {cruzamento.camada_financeira.map((row, i) => (
@@ -1296,12 +1316,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-gray-700 text-[10px] mt-3 font-sans italic">
+                                    <p className="text-gray-700 text-[10px] mt-3 font-mono italic">
                                         * Cruzamento por CNPJ e nome. Verificar antes de publicar.
                                     </p>
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
             )}

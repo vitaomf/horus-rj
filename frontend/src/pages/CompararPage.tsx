@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { badgeStyle } from '../utils/partidoCores';
@@ -133,8 +133,24 @@ function Metrica({ label, a, b, unidade = '' }: { label: string; a: number; b: n
 
 export function CompararPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [polA, setPolA] = useState<PoliticoResumido | null>(null);
   const [polB, setPolB] = useState<PoliticoResumido | null>(null);
+
+  // Pre-load ?a=ID from PoliticoPage "Comparar" button
+  useEffect(() => {
+    const idA = searchParams.get('a');
+    if (!idA) return;
+    fetch(`${API_BASE_URL}/api/politicos/${idA}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d?.id) setPolA({
+          id: d.id, nome: d.nome, partido: d.partido, cargo: d.cargo,
+          total_emendas: d.total_emendas, valor_total: d.valor_total, foto_url: d.foto_url,
+        });
+      })
+      .catch(() => {});
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-black text-white">
