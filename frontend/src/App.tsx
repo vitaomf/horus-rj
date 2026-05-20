@@ -41,13 +41,14 @@ const PageSpinner = () => (
 );
 
 // ── Navbar ────────────────────────────────────────────────────────────────────
-type NavKey = 'inicio' | 'brasil' | 'politicos' | 'parlamentares' | 'busca' | 'painel' | 'status';
+type NavKey = 'inicio' | 'brasil' | 'politicos' | 'parlamentares' | 'busca' | 'comparar' | 'painel' | 'status';
 
 const ABAS: { key: NavKey; label: string; path: string }[] = [
   { key: 'inicio',       label: 'INÍCIO',         path: '/' },
   { key: 'brasil',       label: 'BRASIL',         path: '/brasil' },
   { key: 'parlamentares',label: 'PARLAMENTARES',  path: '/parlamentares' },
   { key: 'busca',        label: 'BUSCA',          path: '/busca' },
+  { key: 'comparar',     label: 'COMPARAR',       path: '/comparar' },
   { key: 'painel',       label: 'PAINEL',         path: '/painel' },
   { key: 'status',       label: 'COLETA',         path: '/status' },
 ];
@@ -58,6 +59,7 @@ function pathToKey(path: string): NavKey {
   if (path.startsWith('/parlamentares')) return 'parlamentares';
   if (path.startsWith('/politicos')) return 'politicos';
   if (path === '/busca') return 'busca';
+  if (path === '/comparar') return 'comparar';
   if (path === '/painel') return 'painel';
   if (path === '/status') return 'status';
   return 'inicio';
