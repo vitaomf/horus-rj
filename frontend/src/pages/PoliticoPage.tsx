@@ -477,8 +477,12 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             </button>
                             {/* Compartilhar */}
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     const url = `${window.location.origin}/politicos/${data.id}`;
+                                    const txt = `${data.nome} (${data.partido}) — Dossiê Horus: ${url}`;
+                                    if (navigator.share) {
+                                        try { await navigator.share({ title: data.nome, text: txt, url }); return; } catch {}
+                                    }
                                     navigator.clipboard?.writeText(url).then(() => toast('Link copiado!', 'success'));
                                 }}
                                 className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#FFD700]/40 hover:text-white transition-all px-3 py-1.5"

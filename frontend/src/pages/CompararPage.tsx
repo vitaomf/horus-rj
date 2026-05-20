@@ -221,6 +221,23 @@ export function CompararPage() {
           </div>
         )}
 
+        {/* Um selecionado: aguardando o segundo */}
+        {(polA || polB) && !(polA && polB) && (
+          <div className="border border-[#FFD700]/10 py-12 text-center space-y-3">
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: '100ms' }} />
+              <div className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: '200ms' }} />
+            </div>
+            <p className="font-mono text-[9px] tracking-[0.4em] text-gray-600 uppercase">
+              Selecione o {polA ? 'Político B' : 'Político A'} para comparar
+            </p>
+            <p className="font-bebas text-lg tracking-widest text-[#FFD700]/30">
+              {polA ? polA.nome : polB?.nome}
+            </p>
+          </div>
+        )}
+
         {!polA && !polB && (
           <div className="border border-[#1a1a1a] py-20 text-center">
             <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">
