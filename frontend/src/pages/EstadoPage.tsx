@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { badgeStyle } from '../utils/partidoCores';
 import { useEffect, useState } from 'react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
@@ -302,9 +303,15 @@ export function EstadoPage() {
                   <p className="font-bebas text-sm tracking-wide text-white group-hover:text-[#FFD700] transition-colors truncate leading-tight">
                     {p.nome}
                   </p>
-                  <p className="font-mono text-[8px] tracking-widest text-gray-700">
-                    {p.partido ?? '—'} · {p.cargo ?? 'Federal'}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    {p.partido ? (
+                      <span className="font-mono text-[6px] tracking-widest px-1 py-0.5 border"
+                        style={badgeStyle(p.partido)}>
+                        {p.partido}
+                      </span>
+                    ) : null}
+                    <span className="font-mono text-[7px] tracking-widest text-gray-700">{p.cargo ?? 'Federal'}</span>
+                  </div>
                 </div>
                 <span className="text-[#333] group-hover:text-[#FFD700]/40 transition-colors shrink-0">›</span>
               </button>
