@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, TrendingUp, ChevronRight, Filter } from 'lucide-react';
+import { Search, TrendingUp, ChevronRight, Filter, ArrowUpDown, LayoutList, LayoutGrid } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { badgeStyle } from '../utils/partidoCores';
 import { SkeletonPoliticoItem } from '../components/SkeletonCard';
@@ -30,15 +30,17 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
     const [politicos, setPoliticos]       = useState<PoliticoResumo[]>([]);
     const [busca, setBusca]               = useState('');
     const [filtroPartido, setFiltroPartido] = useState('');
+    const [ordenar, setOrdenar]           = useState<'valor' | 'emendas' | 'nome'>('valor');
+    const [compacto, setCompacto]         = useState(false);
     const [loading, setLoading]           = useState(true);
     const [paginaAtual, setPaginaAtual]   = useState(1);
     const [totalPaginas, setTotalPaginas] = useState(1);
     const [totalPoliticos, setTotalPoliticos] = useState(0);
 
-    const fetchPoliticos = useCallback(async (pagina: number, termo: string, partido: string) => {
+    const fetchPoliticos = useCallback(async (pagina: number, termo: string, partido: string, ord: string) => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({ pagina: String(pagina), limite: String(LIMITE) });
+            const params = new URLSearchParams({ pagina: String(pagina), limite: String(LIMITE), ordenar: ord });
             if (termo.trim())   params.set('busca', termo.trim());
             if (partido.trim()) params.set('partido', partido.trim());
             const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
@@ -56,12 +58,13 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
     }, []);
 
     useEffect(() => {
-        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca, filtroPartido), busca || filtroPartido ? 400 : 0);
+        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca, filtroPartido, ordenar), busca || filtroPartido ? 400 : 0);
         return () => clearTimeout(t);
-    }, [paginaAtual, busca, filtroPartido, fetchPoliticos]);
+    }, [paginaAtual, busca, filtroPartido, ordenar, fetchPoliticos]);
 
     const handleBusca = (v: string) => { setBusca(v); setPaginaAtual(1); };
     const handlePartido = (v: string) => { setFiltroPartido(v); setPaginaAtual(1); };
+    const handleOrdenar = (v: 'valor' | 'emendas' | 'nome') => { setOrdenar(v); setPaginaAtual(1); };
 
     const getInitials = (name: string) => {
         const p = name.trim().split(' ');
@@ -136,6 +139,24 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                             className="w-28 bg-black border border-[#1a1a1a] text-white py-2 pl-8 pr-2 font-mono text-xs tracking-widest placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/30 hover:border-[#FFD700]/20 transition-colors uppercase"
                         />
                     </div>
+                    {/* Ordenar */}
+                    <div className="flex items-center gap-1">
+                        <ArrowUpDown className="w-3 h-3 text-gray-700 shrink-0" />
+                        {(['valor', 'emendas', 'nome'] as const).map(o => (
+                            <button key={o} onClick={() => handleOrdenar(o)}
+                                className={`font-mono text-[8px] tracking-widest px-2 py-1 border transition-colors ${ordenar === o ? 'border-[#FFD700]/40 text-[#FFD700]' : 'border-[#1a1a1a] text-gray-600 hover:border-[#333] hover:text-gray-400'}`}>
+                                {o === 'valor' ? 'VALOR' : o === 'emendas' ? 'EMENDAS' : 'A-Z'}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Modo compacto */}
+                    <button onClick={() => setCompacto(c => !c)}
+                        className={`flex items-center gap-1.5 font-mono text-[8px] tracking-widest border px-2 py-1 transition-colors ${compacto ? 'border-[#FFD700]/40 text-[#FFD700]' : 'border-[#1a1a1a] text-gray-600 hover:border-[#333]'}`}>
+                        {compacto ? <LayoutList className="w-3 h-3" /> : <LayoutGrid className="w-3 h-3" />}
+                        {compacto ? 'NORMAL' : 'COMPACTO'}
+                    </button>
+
                     <div className="flex items-center gap-2 shrink-0 ml-auto">
                         <TrendingUp className="w-3.5 h-3.5 text-[#FFD700]/40" />
                         <p className="font-mono text-[9px] tracking-widest text-gray-600 hidden sm:block">
@@ -167,9 +188,8 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                     <button
                                         key={pol.id}
                                         onClick={() => onPoliticoClick(pol.id)}
-                                        className="w-full flex items-center gap-4 px-0 py-4 text-left hover:bg-[#080808] transition-colors group relative border-0"
+                                        className={`w-full flex items-center gap-4 px-0 text-left hover:bg-[#080808] transition-colors group relative border-0 ${compacto ? 'py-2' : 'py-4'}`}
                                         onMouseEnter={() => {
-                                            // #49 Prefetch: pré-carrega os dados do político no cache do browser
                                             const link = document.createElement('link');
                                             link.rel  = 'prefetch';
                                             link.href = `${API_BASE_URL}/api/politicos/${pol.id}`;
@@ -182,24 +202,25 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                         <div className="absolute left-0 top-0 bottom-0 w-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/40 transition-colors" />
 
                                         {/* posição */}
-                                        <span className="font-bebas text-3xl text-[#222] group-hover:text-[#FFD700]/30 transition-colors w-12 text-center shrink-0 tabular-nums leading-none">
+                                        <span className={`font-bebas text-[#222] group-hover:text-[#FFD700]/30 transition-colors w-12 text-center shrink-0 tabular-nums leading-none ${compacto ? 'text-xl' : 'text-3xl'}`}>
                                             {String(pos).padStart(2, '0')}
                                         </span>
 
-                                        {/* badge de iniciais */}
+                                        {/* badge de iniciais — oculto em modo compacto */}
+                                        {!compacto && (
                                         <div className="w-10 h-10 bg-[#0a0a0a] border border-[#2a2a2a] group-hover:border-[#FFD700]/30 transition-colors flex items-center justify-center shrink-0">
                                             <span className="font-bebas text-sm text-[#FFD700]/60 group-hover:text-[#FFD700] transition-colors">
                                                 {getInitials(pol.nome)}
                                             </span>
                                         </div>
+                                        )}
 
                                         {/* info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bebas text-xl tracking-wider text-white group-hover:text-[#FFD700] transition-colors truncate">
+                                                <span className={`font-bebas tracking-wider text-white group-hover:text-[#FFD700] transition-colors truncate ${compacto ? 'text-base' : 'text-xl'}`}>
                                                     {pol.nome}
                                                 </span>
-                                                {/* Badge colorido por partido (#3) */}
                                                 {pol.partido && (
                                                     <span
                                                         className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border shrink-0"
@@ -209,18 +230,20 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                                     </span>
                                                 )}
                                             </div>
+                                            {!compacto && (
                                             <p className="font-mono text-[9px] tracking-widest text-gray-700 mt-0.5">
                                                 {pol.total_emendas} emendas
                                                 {pol.cargo && ` · ${pol.cargo}`}
                                             </p>
+                                            )}
                                         </div>
 
                                         {/* valor */}
                                         <div className="text-right shrink-0">
-                                            <span className="font-bebas text-2xl text-[#FFD700] leading-none block">
+                                            <span className={`font-bebas text-[#FFD700] leading-none block ${compacto ? 'text-lg' : 'text-2xl'}`}>
                                                 {formatVal(pol.valor_total)}
                                             </span>
-                                            <span className="font-mono text-[8px] tracking-widest text-gray-700">total repassado</span>
+                                            {!compacto && <span className="font-mono text-[8px] tracking-widest text-gray-700">total repassado</span>}
                                         </div>
 
                                         <ChevronRight className="w-4 h-4 text-[#333] group-hover:text-[#FFD700]/40 transition-colors shrink-0" />

@@ -655,6 +655,7 @@ def listar_politicos_paginado(
     uf:      Optional[str] = Query(None),
     casa:    Optional[str] = Query(None),
     partido: Optional[str] = Query(None),
+    ordenar: Optional[str] = Query(None),  # valor|emendas|nome
 ):
     """
     Lista políticos paginados. Filtros: busca, uf, casa (camara|senado).
@@ -687,8 +688,11 @@ def listar_politicos_paginado(
         total = _row[0] if _row and _row[0] is not None else 0
         total_paginas = max(1, math.ceil(total / limite))
 
-        # Quando filtrando por uf/casa, ordenar por nome; caso contrário por valor de emendas
-        order = "p.nome ASC" if (uf or casa) else "valor_total DESC"
+        # Ordenação explícita via param ou heurística por filtro
+        if ordenar == 'nome':    order = "p.nome ASC"
+        elif ordenar == 'emendas': order = "total_emendas DESC"
+        elif ordenar == 'valor': order = "valor_total DESC"
+        else: order = "p.nome ASC" if (uf or casa) else "valor_total DESC"
 
         offset = (pagina - 1) * limite
         rows = conn.execute(f"""
