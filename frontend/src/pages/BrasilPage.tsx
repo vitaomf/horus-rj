@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapaBrasil } from '../components/MapaBrasil';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
 import { REGIOES, ESTADOS } from '../data/mockBrasil';
+import { API_BASE_URL } from '../config';
 
 const FONT_DECO = "'Cinzel Decorative', serif";
 const FONT_CINZEL = "'Cinzel', serif";
@@ -17,6 +19,17 @@ const COR_REGIAO: Record<string, string> = {
 
 export function BrasilPage() {
   const navigate = useNavigate();
+  const [totalEmendas, setTotalEmendas] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/emendas/total`)
+      .then(r => r.json())
+      .then(d => setTotalEmendas(d.total ?? null))
+      .catch(() => {});
+  }, []);
+
+  const fmtEmendas = (n: number) =>
+    n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n.toLocaleString('pt-BR');
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -112,11 +125,10 @@ export function BrasilPage() {
 
             {/* Footer do painel */}
             <div className="px-5 py-4 border-t border-[#FFD700]/10 mt-auto">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 {[
                   { v: '27', l: 'estados' },
                   { v: '5.570', l: 'municípios' },
-                  { v: '594', l: 'parlamentares' },
                 ].map(({ v, l }) => (
                   <div key={l} className="text-center">
                     <p className="font-bebas text-xl text-[#FFD700] leading-none">{v}</p>
@@ -124,6 +136,12 @@ export function BrasilPage() {
                   </div>
                 ))}
               </div>
+              {totalEmendas !== null && (
+                <div className="border-t border-[#FFD700]/10 pt-2 text-center">
+                  <p className="font-bebas text-2xl text-[#FFD700] leading-none">{fmtEmendas(totalEmendas)}</p>
+                  <p className="font-mono text-[7px] tracking-widest text-gray-700 uppercase mt-0.5">emendas indexadas</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -212,7 +230,15 @@ export function BrasilPage() {
           <p className="font-mono text-[9px] tracking-[0.4em] text-gray-800 uppercase">
             Horus Brasil · {new Date().getFullYear()}
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <button onClick={() => navigate('/ranking/municipios')}
+              className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
+              Ranking Municípios
+            </button>
+            <button onClick={() => navigate('/comparar')}
+              className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#03A9F4]/60 uppercase transition-colors">
+              Comparar
+            </button>
             <a href="/glossario"
               className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
               Glossário
