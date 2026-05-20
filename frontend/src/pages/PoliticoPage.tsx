@@ -1630,9 +1630,17 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                         className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all">
                                         ← ANTERIOR
                                     </button>
-                                    <span className="text-gray-500 font-sans text-sm">
-                                        {emendasFiltradas.length} emendas · pág. {paginaAtual}/{totalPaginas}
-                                    </span>
+                                    <div className="text-center">
+                                        <span className="text-gray-500 font-mono text-[9px] tracking-widest block">
+                                            {emendasFiltradas.length} emendas · pág. {paginaAtual}/{totalPaginas}
+                                        </span>
+                                        {data.total_emendas > 100 && (
+                                            <button onClick={() => navigate('/busca')}
+                                                className="font-mono text-[8px] tracking-widest text-[#FFD700]/40 hover:text-[#FFD700] transition-colors mt-0.5">
+                                                {data.total_emendas} total · busca completa →
+                                            </button>
+                                        )}
+                                    </div>
                                     <button onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
                                         disabled={paginaAtual >= totalPaginas}
                                         className="px-4 py-2 font-bebas tracking-widest text-sm border border-[#FFD700] text-[#FFD700] disabled:opacity-30 hover:bg-[#FFD700] hover:text-black transition-all">
