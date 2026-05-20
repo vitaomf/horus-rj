@@ -759,6 +759,35 @@ def proxy_foto_politico(politico_id: int):
         conn.close()
 
     if not row or not row["foto_url"]:
+        # Tenta buscar via API da Câmara pelo nome do parlamentar
+        try:
+            conn2 = get_db_connection()
+            nome_row = conn2.execute("SELECT nome FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+            conn2.close()
+            if nome_row and nome_row["nome"]:
+                import urllib.request as _ur
+                import urllib.parse
+                import json as _json
+                nome_enc = urllib.parse.quote(nome_row["nome"])
+                api_url = f"https://dadosabertos.camara.leg.br/api/v2/deputados?nome={nome_enc}&itens=1&ordenarPor=nome"
+                req2 = _ur.Request(api_url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+                with _ur.urlopen(req2, timeout=6) as resp2:
+                    dados = _json.loads(resp2.read()).get("dados", [])
+                    if dados:
+                        dep = dados[0]
+                        dep_uri = dep.get("uri", "")
+                        dep_id = dep_uri.rstrip("/").split("/")[-1] if dep_uri else str(dep.get("id", ""))
+                        if dep_id:
+                            foto_nova = f"https://www.camara.leg.br/internet/deputado/bandep/{dep_id}.jpg"
+                            # Salva no banco para próximas chamadas
+                            conn3 = get_db_connection()
+                            conn3.execute("UPDATE politicos SET foto_url = ? WHERE id = ?", (foto_nova, politico_id))
+                            conn3.commit()
+                            conn3.close()
+                            row = {"foto_url": foto_nova}
+        except Exception:
+            pass
+    if not row or not row["foto_url"]:
         raise HTTPException(status_code=404, detail="Sem foto")
 
     url = row["foto_url"]

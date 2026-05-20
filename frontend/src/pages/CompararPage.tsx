@@ -24,6 +24,7 @@ function BuscaPolitico({ label, selecionado, onSelecionar }: {
   selecionado: PoliticoResumido | null;
   onSelecionar: (p: PoliticoResumido | null) => void;
 }) {
+  const navigate = useNavigate();
   const [busca, setBusca]   = useState('');
   const [lista, setLista]   = useState<PoliticoResumido[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -48,15 +49,26 @@ function BuscaPolitico({ label, selecionado, onSelecionar }: {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="w-16 h-16 bg-[#111] mx-auto mb-3 overflow-hidden">
-          {selecionado.foto_url && (
+        {/* Foto clicável → perfil */}
+        <button onClick={() => navigate(`/politicos/${selecionado.id}`)}
+          className="block w-16 h-16 bg-[#111] mx-auto mb-3 overflow-hidden hover:ring-2 hover:ring-[#FFD700]/40 transition-all"
+          title={`Ver perfil de ${selecionado.nome}`}
+        >
+          {selecionado.foto_url ? (
             <img src={`${API_BASE_URL}/api/foto/${selecionado.id}`} alt={selecionado.nome}
               className="w-full h-full object-cover object-top"
               onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+          ) : (
+            <span className="w-full h-full flex items-center justify-center font-bebas text-xl text-[#FFD700]/40">
+              {selecionado.nome.split(' ').map((n: string) => n[0]).slice(0,2).join('')}
+            </span>
           )}
-        </div>
-        <p className="font-bebas text-lg tracking-wider text-[#FFD700] text-center leading-tight">{selecionado.nome}</p>
-        <p className="font-mono text-[8px] tracking-widest text-gray-600 text-center mt-1">{selecionado.partido} · {selecionado.cargo}</p>
+        </button>
+        <button onClick={() => navigate(`/politicos/${selecionado.id}`)}
+          className="block w-full text-center hover:opacity-80 transition-opacity">
+          <p className="font-bebas text-lg tracking-wider text-[#FFD700] leading-tight">{selecionado.nome}</p>
+          <p className="font-mono text-[8px] tracking-widest text-gray-600 mt-1">{selecionado.partido} · {selecionado.cargo}</p>
+        </button>
       </div>
     );
   }
