@@ -298,9 +298,25 @@ export const EstatisticasPage: React.FC = () => {
 
                     {/* TOP 10 Politicos */}
                     <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
-                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#1a1a1a] pb-4 flex items-center gap-3">
-                            <User className="text-[#FFD700]" /> TOP 10 POLÍTICOS MAIS ATIVOS
-                        </h2>
+                        <div className="flex items-center justify-between mb-6 border-b border-[#1a1a1a] pb-4">
+                            <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest flex items-center gap-3">
+                                <User className="text-[#FFD700]" /> TOP 10 POLÍTICOS MAIS ATIVOS
+                            </h2>
+                            <button
+                                onClick={() => {
+                                    const csv = ['pos,nome,partido,cargo,total_emendas,valor_total',
+                                        ...top_politicos.map((p: any, i: number) =>
+                                            [i+1, `"${p.nome}"`, p.partido??'', p.cargo??'', p.total_emendas, p.valor_total.toFixed(2)].join(',')
+                                        )].join('\n');
+                                    const a = document.createElement('a');
+                                    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                                    a.download = 'horus_top_politicos.csv'; a.click();
+                                }}
+                                className="flex items-center gap-1 font-mono text-[8px] tracking-widest border border-[#1a1a1a] text-gray-600 hover:border-[#FFD700]/30 hover:text-[#FFD700] transition-colors px-2 py-1 shrink-0"
+                            >
+                                <ArrowUpRight className="w-3 h-3" />CSV
+                            </button>
+                        </div>
                         <div className="space-y-4">
                             {top_politicos.map((p: any, idx: number) => {
                                 const maxVal = top_politicos[0].valor_total;
@@ -330,9 +346,25 @@ export const EstatisticasPage: React.FC = () => {
 
                     {/* TOP 10 Municipios */}
                     <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
-                        <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest mb-6 border-b border-[#1a1a1a] pb-4 flex items-center gap-3">
-                            <MapPin className="text-[#FFD700]" /> TOP 10 CIDADES DESTINATÁRIAS
-                        </h2>
+                        <div className="flex items-center justify-between mb-6 border-b border-[#1a1a1a] pb-4">
+                            <h2 className="text-2xl md:text-3xl font-bebas text-white tracking-widest flex items-center gap-3">
+                                <MapPin className="text-[#FFD700]" /> TOP 10 CIDADES DESTINATÁRIAS
+                            </h2>
+                            <button
+                                onClick={() => {
+                                    const csv = ['pos,municipio,total_emendas,valor_total',
+                                        ...top_municipios.map((m: any, i: number) =>
+                                            [i+1, `"${m.nome}"`, m.total_emendas, m.valor_total.toFixed(2)].join(',')
+                                        )].join('\n');
+                                    const a = document.createElement('a');
+                                    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                                    a.download = 'horus_top_municipios.csv'; a.click();
+                                }}
+                                className="flex items-center gap-1 font-mono text-[8px] tracking-widest border border-[#1a1a1a] text-gray-600 hover:border-[#FFD700]/30 hover:text-[#FFD700] transition-colors px-2 py-1 shrink-0"
+                            >
+                                <ArrowUpRight className="w-3 h-3" />CSV
+                            </button>
+                        </div>
                         <div className="space-y-4">
                             {top_municipios.map((m: any, idx: number) => {
                                 const maxVal = top_municipios[0].valor_total;
