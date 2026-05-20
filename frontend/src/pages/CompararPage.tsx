@@ -131,11 +131,45 @@ function Metrica({ label, a, b, unidade = '' }: { label: string; a: number; b: n
   );
 }
 
+interface DetalheCompar {
+  anos_ativos: number[];
+  estados: number;
+  municipios: number;
+  valor_pago: number;
+  valor_empenhado: number;
+}
+
+async function fetchDetalhe(id: number): Promise<DetalheCompar | null> {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/politicos/${id}`);
+    const d = await r.json();
+    const anos = (d.emendas_por_ano ?? []).map((a: { ano: number }) => a.ano);
+    const estados = new Set((d.ultimas_emendas ?? []).map((e: { municipio_destino: string }) => {
+      const m = e.municipio_destino ?? '';
+      const uf = m.match(/- ([A-Z]{2})$/)?.[1];
+      return uf ?? m;
+    })).size;
+    const muns = (d.municipios_beneficiados ?? []).length;
+    const empenhado = (d.ultimas_emendas ?? []).reduce((s: number, e: { valor_empenhado?: number; valor?: number }) => s + (e.valor_empenhado || e.valor || 0), 0);
+    const pago = (d.ultimas_emendas ?? []).reduce((s: number, e: { valor_pago?: number }) => s + (e.valor_pago || 0), 0);
+    return { anos_ativos: anos, estados, municipios: muns, valor_pago: pago, valor_empenhado: empenhado };
+  } catch { return null; }
+}
+
 export function CompararPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [polA, setPolA] = useState<PoliticoResumido | null>(null);
   const [polB, setPolB] = useState<PoliticoResumido | null>(null);
+  const [detA, setDetA] = useState<DetalheCompar | null>(null);
+  const [detB, setDetB] = useState<DetalheCompar | null>(null);
+
+  // Carrega detalhes quando ambos estão selecionados
+  useEffect(() => {
+    if (!polA || !polB) { setDetA(null); setDetB(null); return; }
+    fetchDetalhe(polA.id).then(setDetA);
+    fetchDetalhe(polB.id).then(setDetB);
+  }, [polA?.id, polB?.id]);
 
   // Pre-load ?a=ID from PoliticoPage "Comparar" button
   useEffect(() => {
@@ -210,6 +244,19 @@ export function CompararPage() {
               <Metrica label="Média por emenda"
                 a={polA.total_emendas > 0 ? polA.valor_total / polA.total_emendas : 0}
                 b={polB.total_emendas > 0 ? polB.valor_total / polB.total_emendas : 0} />
+              {detA && detB && (
+                <>
+                  <Metrica label="Anos de atividade registrada" a={detA.anos_ativos.length} b={detB.anos_ativos.length} />
+                  <Metrica label="Municípios beneficiados" a={detA.municipios} b={detB.municipios} />
+                  {(detA.valor_empenhado > 0 || detB.valor_empenhado > 0) && (
+                    <Metrica label="Valor efetivamente pago (amostra)"
+                      a={detA.valor_empenhado > 0 ? Math.round((detA.valor_pago / detA.valor_empenhado) * 100) : 0}
+                      b={detB.valor_empenhado > 0 ? Math.round((detB.valor_pago / detB.valor_empenhado) * 100) : 0}
+                      unidade="%"
+                    />
+                  )}
+                </>
+              )}
             </div>
 
             {/* Disclaimer */}
