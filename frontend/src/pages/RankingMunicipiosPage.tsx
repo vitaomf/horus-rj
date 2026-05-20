@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { TrendingUp, MapPin } from 'lucide-react';
+import { TrendingUp, MapPin, Download } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 const FONT_DECO   = "'Cinzel Decorative', serif";
@@ -108,9 +108,30 @@ export function RankingMunicipiosPage() {
           </div>
 
           {!loading && (
-            <p className="font-mono text-[8px] tracking-widest text-gray-700 ml-auto">
-              {dados.length} MUNICÍPIOS
-            </p>
+            <div className="flex items-center gap-3 ml-auto">
+              <p className="font-mono text-[8px] tracking-widest text-gray-700">
+                {dados.length} MUNICÍPIOS
+              </p>
+              <button
+                onClick={() => {
+                  const header = 'pos,municipio,uf,total_emendas,valor_total,total_politicos,ano_min,ano_max';
+                  const rows = dados.map((m, i) =>
+                    [i+1, `"${m.municipio}"`, m.uf, m.total_emendas, m.valor_total.toFixed(2), m.total_politicos, m.ano_min, m.ano_max].join(',')
+                  );
+                  const csv = [header, ...rows].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = `horus_ranking_municipios${filtroUF ? '_' + filtroUF : ''}.csv`;
+                  a.click(); URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-1 font-mono text-[8px] tracking-widest border border-[#1a1a1a] text-gray-600 hover:border-[#FFD700]/30 hover:text-[#FFD700] transition-colors px-2 py-1"
+                title="Exportar CSV"
+              >
+                <Download className="w-3 h-3" />
+                CSV
+              </button>
+            </div>
           )}
         </div>
       </div>

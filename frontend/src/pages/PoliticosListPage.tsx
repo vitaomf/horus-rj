@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, TrendingUp, ChevronRight, Filter, ArrowUpDown, LayoutList, LayoutGrid } from 'lucide-react';
+import { Search, TrendingUp, ChevronRight, Filter, ArrowUpDown, LayoutList, LayoutGrid, Download } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { badgeStyle } from '../utils/partidoCores';
 import { SkeletonPoliticoItem } from '../components/SkeletonCard';
@@ -162,6 +162,27 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                         <p className="font-mono text-[9px] tracking-widest text-gray-600 hidden sm:block">
                             {(busca || filtroPartido) ? `FILTRO ATIVO` : 'RANKING · VOLUME DE REPASSES'}
                         </p>
+                        {!loading && politicos.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    const header = 'pos,nome,partido,cargo,total_emendas,valor_total';
+                                    const rows = politicos.map((p, i) =>
+                                        [(paginaAtual-1)*LIMITE+i+1, `"${p.nome}"`, p.partido??'', p.cargo??'', p.total_emendas, p.valor_total.toFixed(2)].join(',')
+                                    );
+                                    const csv = [header, ...rows].join('\n');
+                                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url; a.download = `horus_politicos_pag${paginaAtual}.csv`;
+                                    a.click(); URL.revokeObjectURL(url);
+                                }}
+                                className="flex items-center gap-1 font-mono text-[8px] tracking-widest border border-[#1a1a1a] text-gray-600 hover:border-[#FFD700]/30 hover:text-[#FFD700] transition-colors px-2 py-1"
+                                title="Exportar CSV"
+                            >
+                                <Download className="w-3 h-3" />
+                                CSV
+                            </button>
+                        )}
                         {loading && <div className="w-3 h-3 border border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />}
                     </div>
                 </div>
