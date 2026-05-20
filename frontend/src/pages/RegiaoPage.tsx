@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapaBrasil } from '../components/MapaBrasil';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { HeatmapCard } from '../components/HeatmapCard';
 import { getRegiao, getEstadosByRegiao, type SlugRegiao } from '../data/mockBrasil';
+import { API_BASE_URL } from '../config';
 
 const FONT_DECO   = "'Cinzel Decorative', serif";
 const FONT_CINZEL = "'Cinzel', serif";
@@ -15,10 +17,24 @@ const COR_REGIAO: Record<string, string> = {
   sul:            '#4a1a7a',
 };
 
+interface UfStat { uf: string; total: number; ano_min: number; ano_max: number; }
+
 export function RegiaoPage() {
   const { slugRegiao } = useParams<{ slugRegiao: string }>();
   const navigate = useNavigate();
   const regiao   = slugRegiao ? getRegiao(slugRegiao as SlugRegiao) : null;
+  const [ufStats, setUfStats] = useState<Map<string, UfStat>>(new Map());
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/status/coleta`)
+      .then(r => r.json())
+      .then(d => {
+        const m = new Map<string, UfStat>();
+        (d.emendas_por_uf ?? []).forEach((s: UfStat) => m.set(s.uf, s));
+        setUfStats(m);
+      })
+      .catch(() => {});
+  }, []);
 
   if (!regiao) {
     return (
@@ -137,22 +153,27 @@ export function RegiaoPage() {
             </h2>
           </div>
           <span className="font-mono text-[8px] tracking-widest text-gray-700 uppercase hidden md:block">
-            EM BREVE
+            {ufStats.size > 0 ? `${ufStats.size} ESTADOS COM DADOS` : 'EM BREVE'}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-px bg-[#1a1a1a]">
-          {estados.map(estado => (
-            <HeatmapCard
-              key={estado.uf}
-              titulo={`${estado.uf} — ${estado.nome}`}
-              subtitulo={`${estado.totalMunicipios} municípios · Cap: ${estado.capital}`}
-              valorTotal={0}
-              totalEmendas={0}
-              placeholder
-              to={`/estado/${estado.uf.toLowerCase()}`}
-            />
-          ))}
+          {estados.map(estado => {
+            const stat = ufStats.get(estado.uf);
+            return (
+              <HeatmapCard
+                key={estado.uf}
+                titulo={`${estado.uf} — ${estado.nome}`}
+                subtitulo={stat
+                  ? `${stat.total.toLocaleString('pt-BR')} emendas · ${stat.ano_min}–${stat.ano_max}`
+                  : `${estado.totalMunicipios} municípios · Cap: ${estado.capital}`}
+                valorTotal={0}
+                totalEmendas={stat?.total ?? 0}
+                placeholder={!stat}
+                to={`/estado/${estado.uf.toLowerCase()}`}
+              />
+            );
+          })}
         </div>
       </section>
 
