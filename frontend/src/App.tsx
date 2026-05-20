@@ -16,7 +16,9 @@ const PoliticoPage      = lazy(() => import('./pages/PoliticoPage').then(m => ({
 const EstatisticasPage  = lazy(() => import('./pages/EstatisticasPage').then(m => ({ default: m.EstatisticasPage })));
 const PoliticosListPage  = lazy(() => import('./pages/PoliticosListPage').then(m => ({ default: m.PoliticosListPage })));
 const BuscaAvancadaPage  = lazy(() => import('./pages/BuscaAvancadaPage').then(m => ({ default: m.BuscaAvancadaPage })));
-const GlossarioPage      = lazy(() => import('./pages/GlossarioPage').then(m => ({ default: m.GlossarioPage })));
+const GlossarioPage        = lazy(() => import('./pages/GlossarioPage').then(m => ({ default: m.GlossarioPage })));
+const RankingMunicipiosPage = lazy(() => import('./pages/RankingMunicipiosPage').then(m => ({ default: m.RankingMunicipiosPage })));
+const CompararPage          = lazy(() => import('./pages/CompararPage').then(m => ({ default: m.CompararPage })));
 // Novas páginas nacionais
 const BrasilPage           = lazy(() => import('./pages/BrasilPage').then(m => ({ default: m.BrasilPage })));
 const RegiaoPage           = lazy(() => import('./pages/RegiaoPage').then(m => ({ default: m.RegiaoPage })));
@@ -270,8 +272,10 @@ function App() {
             <Route path="/busca" element={<BuscaAvancadaPage />} />
             <Route path="/painel" element={<EstatisticasPage />} />
 
-            {/* Glossário */}
+            {/* Glossário, ranking e comparação */}
             <Route path="/glossario" element={<GlossarioPage />} />
+            <Route path="/ranking/municipios" element={<RankingMunicipiosPage />} />
+            <Route path="/comparar" element={<CompararPage />} />
 
             {/* Redirect legado */}
             <Route path="*" element={<Navigate to="/" replace />} />

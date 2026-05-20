@@ -168,6 +168,15 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                         key={pol.id}
                                         onClick={() => onPoliticoClick(pol.id)}
                                         className="w-full flex items-center gap-4 px-0 py-4 text-left hover:bg-[#080808] transition-colors group relative border-0"
+                                        onMouseEnter={() => {
+                                            // #49 Prefetch: pré-carrega os dados do político no cache do browser
+                                            const link = document.createElement('link');
+                                            link.rel  = 'prefetch';
+                                            link.href = `${API_BASE_URL}/api/politicos/${pol.id}`;
+                                            link.as   = 'fetch';
+                                            link.crossOrigin = 'anonymous';
+                                            document.head.appendChild(link);
+                                        }}
                                     >
                                         {/* linha de acento no hover */}
                                         <div className="absolute left-0 top-0 bottom-0 w-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/40 transition-colors" />

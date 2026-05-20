@@ -268,6 +268,66 @@ def listar_municipios(
         conn.close()
 
 
+@app.get("/api/municipios/ranking")
+@limiter.limit("30/minute")
+def ranking_municipios(
+    request: Request,
+    limite: int = Query(50, ge=5, le=200),
+    uf: Optional[str] = Query(None),
+    ordenar: str = Query("valor", pattern="^(valor|emendas)$"),
+):
+    """
+    Ranking dos municípios que mais receberam emendas no Brasil.
+    Filtros: ?uf=SP para filtrar por estado. Ordenação: ?ordenar=valor (padrão) ou ?ordenar=emendas.
+    """
+    conn = get_db_connection()
+    try:
+        where = []
+        params: list = []
+        if uf:
+            where.append("UPPER(uf) = ?"); params.append(uf.upper().strip())
+        # Exclui pseudo-municípios (nacionais, múltiplos, etc)
+        where.append("municipio_destino IS NOT NULL")
+        where.append("municipio_destino != ''")
+        where.append("LENGTH(municipio_destino) > 3")
+
+        order = "valor_total DESC" if ordenar == "valor" else "total_emendas DESC"
+        where_sql = (" AND ".join(where)) if where else "1=1"
+
+        rows = conn.execute(f"""
+            SELECT
+                municipio_destino                    AS municipio,
+                uf,
+                COUNT(*)                             AS total_emendas,
+                COALESCE(SUM(valor), 0)              AS valor_total,
+                COUNT(DISTINCT politico_id)          AS total_politicos,
+                MIN(ano) AS ano_min, MAX(ano) AS ano_max
+            FROM emendas
+            WHERE {where_sql}
+            GROUP BY municipio_destino, uf
+            ORDER BY {order}
+            LIMIT ?
+        """, params + [limite]).fetchall()
+
+        return [
+            {
+                "municipio":      r["municipio"],
+                "uf":             r["uf"],
+                "total_emendas":  r["total_emendas"],
+                "valor_total":    float(r["valor_total"]),
+                "total_politicos":r["total_politicos"],
+                "ano_min":        r["ano_min"],
+                "ano_max":        r["ano_max"],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error("Erro em /municipios/ranking: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
 @app.get("/api/estados/{uf}/stats")
 @limiter.limit("60/minute")
 def stats_estado(request: Request, uf: str):

@@ -6,6 +6,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { SentinelEye, ScrollReveal, TypeWriter } from '../components/Animations';
 import { CountUp } from '../components/CountUp';
 import logoHorus from '../assets/logo_amarelo.png';
+import { API_BASE_URL } from '../config';
 
 const MapaBrasil = React.lazy(() =>
   import('../components/MapaBrasil').then(m => ({ default: m.MapaBrasil }))
@@ -27,6 +28,65 @@ interface HomePageProps {
 
 const TOTAL_MUNICIPIOS_BR = 5570;
 const TOTAL_PARLAMENTARES_FEDERAIS = 594;
+
+const UFS_BRASIL = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+];
+
+interface UfStat { uf: string; total: number; }
+
+function HeatmapEstados() {
+  const [stats, setStats] = useState<UfStat[]>([]);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/status/coleta`)
+      .then(r => r.json())
+      .then(d => setStats(d.emendas_por_uf ?? []))
+      .catch(() => {});
+  }, []);
+
+  const map = new Map(stats.map(s => [s.uf, s.total]));
+  const max = Math.max(...stats.map(s => s.total), 1);
+
+  function cor(uf: string) {
+    const v = map.get(uf) ?? 0;
+    if (!v) return { bg: '#0a0a0a', border: '#1a1a1a', text: '#333' };
+    const t = v / max;
+    const alpha = Math.round(10 + t * 80);
+    return {
+      bg: `rgba(255,215,0,${alpha / 100})`,
+      border: `rgba(255,215,0,${(alpha + 20) / 100})`,
+      text: t > 0.4 ? '#FFD700' : '#FFD70099',
+    };
+  }
+
+  const fmt = (v: number) =>
+    v >= 1e6 ? `${(v / 1e6).toFixed(0)}k` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}k` : String(v);
+
+  return (
+    <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-1">
+      {UFS_BRASIL.map(uf => {
+        const c = cor(uf);
+        const total = map.get(uf) ?? 0;
+        return (
+          <div
+            key={uf}
+            title={total ? `${uf}: ${total.toLocaleString('pt-BR')} emendas` : `${uf}: sem dados`}
+            className="aspect-square flex flex-col items-center justify-center border text-center transition-all duration-300 hover:scale-105 cursor-default"
+            style={{ backgroundColor: c.bg, borderColor: c.border }}
+          >
+            <span className="font-bebas text-xs leading-none" style={{ color: c.text }}>{uf}</span>
+            {total > 0 && (
+              <span className="font-mono text-[7px] leading-none mt-0.5" style={{ color: c.text + '99' }}>
+                {fmt(total)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /* Linha de código piscante — efeito terminal */
 function TerminalLine({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -331,6 +391,23 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
           ))}
         </div>
       </section>
+
+      {/* ══ HEATMAP POR ESTADO ════════════════════════════════════════════ */}
+      <ScrollReveal delay={0}>
+        <section className="space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-1 bg-[#FFD700]/10" />
+            <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Cobertura por Estado</h2>
+            <div className="h-px flex-1 bg-[#FFD700]/10" />
+          </div>
+          <div className="border border-[#FFD700]/10 bg-black/40 p-6">
+            <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-4">
+              Intensidade = volume de emendas coletadas · mais dourado = mais emendas
+            </p>
+            <HeatmapEstados />
+          </div>
+        </section>
+      </ScrollReveal>
 
     </main>
 

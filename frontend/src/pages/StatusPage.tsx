@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Bell } from 'lucide-react';
 
 interface StatusData {
   banco: { total_emendas: number; ufs_com_dados: number; tamanho_kb: number };
@@ -37,11 +37,20 @@ export function StatusPage() {
   const [data, setData]       = useState<StatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [agora, setAgora]     = useState(new Date());
+  const [delta, setDelta]     = useState<number | null>(null);
+  const prevTotal             = useRef<number | null>(null);
 
   const carregar = async () => {
     try {
       const r = await fetch(`${API_BASE_URL}/api/status/coleta`);
-      if (r.ok) setData(await r.json());
+      if (r.ok) {
+        const d: StatusData = await r.json();
+        setData(d);
+        if (prevTotal.current !== null && d.banco.total_emendas !== prevTotal.current) {
+          setDelta(d.banco.total_emendas - prevTotal.current);
+        }
+        prevTotal.current = d.banco.total_emendas;
+      }
     } catch { /* silencioso */ }
     finally { setLoading(false); setAgora(new Date()); }
   };
@@ -133,6 +142,20 @@ export function StatusPage() {
                 </div>
               ))}
             </div>
+
+            {/* ── MONITOR NOVAS EMENDAS ── */}
+            {delta !== null && delta !== 0 && (
+              <div className={`border flex items-center gap-3 px-5 py-3 ${delta > 0 ? 'border-green-500/30 bg-green-900/10' : 'border-red-500/30 bg-red-900/10'}`}>
+                <Bell className={`w-4 h-4 shrink-0 ${delta > 0 ? 'text-green-400' : 'text-red-400'}`} />
+                <p className={`font-mono text-[9px] tracking-widest ${delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {delta > 0 ? `+${delta.toLocaleString('pt-BR')} EMENDAS NOVAS` : `${delta.toLocaleString('pt-BR')} EMENDAS REMOVIDAS`}
+                  {' '}&mdash; detectado na última atualização
+                </p>
+                <button onClick={() => setDelta(null)} className="ml-auto font-mono text-[8px] tracking-widest text-gray-700 hover:text-white transition-colors">
+                  DISPENSAR
+                </button>
+              </div>
+            )}
 
             {/* ── PARLAMENTARES POR CASA ── */}
             <div className="border border-[#1a1a1a] bg-[#050505]">

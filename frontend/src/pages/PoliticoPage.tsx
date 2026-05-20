@@ -520,10 +520,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 {data.nome}
                             </h1>
 
-                            <div className="flex items-center gap-4 mb-6">
+                            <div className="flex items-center gap-3 mb-3 flex-wrap">
                                 <span className="border border-[#FFD700]/40 text-[#FFD700] font-bebas tracking-widest px-3 py-1 text-sm">{data.partido}</span>
-                                <div className="h-px flex-1 max-w-[60px] bg-[#FFD700]/20" />
                                 <span className="font-mono text-[10px] text-gray-600 tracking-widest uppercase">{data.cargo}</span>
+                                {/* #42 mandatos */}
+                                {bioData?.historico && bioData.historico.length > 0 && (
+                                    <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
+                                        {bioData.historico.length} {bioData.historico.length === 1 ? 'mandato' : 'mandatos'}
+                                    </span>
+                                )}
                             </div>
 
                             {/* Métricas inline */}
@@ -562,6 +567,35 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             </div>
                                         )}
                                     </>
+                                );
+                            })()}
+
+                            {/* #38 Empenho vs Pago */}
+                            {(() => {
+                                const empenhado = data.ultimas_emendas.reduce((s, e) => s + (e.valor_empenhado || e.valor || 0), 0);
+                                const pago      = data.ultimas_emendas.reduce((s, e) => s + (e.valor_pago || 0), 0);
+                                if (empenhado === 0) return null;
+                                const execPct = Math.min(100, Math.round((pago / empenhado) * 100));
+                                const fmtM = (v: number) => `R$ ${(v / 1e6).toFixed(1)}M`;
+                                return (
+                                    <div className="mb-4 max-w-xs">
+                                        <div className="flex justify-between font-mono text-[8px] tracking-widest mb-1">
+                                            <span className="text-[#FFD700]/50">Empenhado</span>
+                                            <span className="text-[#4CAF50]/70">Pago {execPct}%</span>
+                                        </div>
+                                        <div className="h-1.5 bg-[#1a1a1a] mb-1">
+                                            <div className="h-full bg-[#FFD700]/50 relative" style={{ width: '100%' }}>
+                                                <div className="absolute top-0 left-0 h-full bg-[#4CAF50]/70" style={{ width: `${execPct}%` }} />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between font-mono text-[7px] tracking-widest text-gray-700">
+                                            <span>{fmtM(empenhado)}</span>
+                                            <span className="text-green-700">{fmtM(pago)} pagos</span>
+                                        </div>
+                                        <p className="font-mono text-[7px] tracking-widest text-gray-800 mt-0.5">
+                                            {empenhado - pago > 0 ? `${fmtM(empenhado - pago)} ainda pendente de execução` : 'execução completa'}
+                                        </p>
+                                    </div>
                                 );
                             })()}
 
