@@ -9,6 +9,7 @@ interface Politico { id: number; nome: string; partido: string; cargo: string; t
 interface Municipio { nome: string; total_emendas: number; valor_total: number; }
 interface PorAno { ano: number; total_emendas: number; valor_total: number; }
 interface PorObjetivo { objetivo: string; total: number; valor_total: number; }
+interface PorPartido { partido: string; total_emendas: number; valor_total: number; total_politicos: number; }
 interface EstatisticasData {
     valor_total_geral: number;
     media_por_emenda: number;
@@ -16,6 +17,7 @@ interface EstatisticasData {
     top_municipios: Municipio[];
     por_ano: PorAno[];
     por_objetivo: PorObjetivo[];
+    por_partido?: PorPartido[];
 }
 
 export const EstatisticasPage: React.FC = () => {
@@ -65,6 +67,7 @@ export const EstatisticasPage: React.FC = () => {
     }
 
     const { valor_total_geral, media_por_emenda, top_politicos, top_municipios, por_ano, por_objetivo } = data;
+    void media_por_emenda; // usada indiretamente via data
 
     const formatCurrency = (val: number) => {
         if (val >= 1e9) return `R$ ${(val / 1e9).toFixed(2)}B`;
@@ -388,6 +391,42 @@ export const EstatisticasPage: React.FC = () => {
                         })}
                     </div>
                 </div>
+
+            {/* Por Partido */}
+            {data.por_partido && data.por_partido.length > 0 && (
+                <div className="border-t border-[#FFD700]/10 px-4 md:px-8 py-12">
+                <div className="max-w-7xl mx-auto">
+                    <h2 className="text-3xl md:text-4xl font-bebas text-white tracking-widest mb-2 text-center">
+                        DISTRIBUIÇÃO POR PARTIDO
+                    </h2>
+                    <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 text-center mb-10 uppercase">
+                        Volume total de emendas por legenda partidária
+                    </p>
+                    <div className="space-y-2">
+                        {(() => {
+                            const max = data.por_partido![0].valor_total;
+                            const fmtM = (v: number) => v >= 1e9 ? `R$ ${(v/1e9).toFixed(1)}B` : `R$ ${(v/1e6).toFixed(0)}M`;
+                            return data.por_partido!.map((p, i) => {
+                                const pct = max > 0 ? (p.valor_total / max) * 100 : 0;
+                                return (
+                                    <div key={p.partido} className="flex items-center gap-3 group hover:bg-[#080808] px-3 py-2 transition-colors">
+                                        <span className="font-mono text-[8px] tracking-widest text-gray-700 w-5 shrink-0 tabular-nums">{String(i+1).padStart(2,'0')}</span>
+                                        <span className="font-bebas text-sm tracking-widest text-[#FFD700] w-16 shrink-0">{p.partido}</span>
+                                        <div className="flex-1 h-1.5 bg-[#111]">
+                                            <div className="h-full bg-[#FFD700]/60 transition-all duration-700" style={{ width: `${pct}%` }} />
+                                        </div>
+                                        <span className="font-bebas text-sm text-white w-20 text-right shrink-0">{fmtM(p.valor_total)}</span>
+                                        <span className="font-mono text-[7px] tracking-widest text-gray-700 w-16 text-right shrink-0 hidden md:block">
+                                            {p.total_politicos} parl.
+                                        </span>
+                                    </div>
+                                );
+                            });
+                        })()}
+                    </div>
+                </div>
+                </div>
+            )}
 
             </div>
             </div>

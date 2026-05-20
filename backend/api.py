@@ -1377,13 +1377,38 @@ def obter_estatisticas(request: Request):
             for r in por_objetivo_rows
         ]
 
+        # 6. Por Partido (Top 12)
+        por_partido_rows = conn.execute(f"""
+            SELECT p.partido,
+                   COUNT(e.id) as total_emendas,
+                   SUM(e.valor) as valor_total,
+                   COUNT(DISTINCT p.id) as total_politicos
+            FROM politicos p
+            JOIN emendas e ON p.id = e.politico_id
+            WHERE {NOT_AUTOR_COLETIVO_SQL} AND p.partido IS NOT NULL AND p.partido != ''
+            GROUP BY p.partido
+            ORDER BY valor_total DESC
+            LIMIT 12
+        """).fetchall()
+
+        por_partido = [
+            {
+                "partido": r["partido"],
+                "total_emendas": r["total_emendas"],
+                "valor_total": float(r["valor_total"]) if r["valor_total"] else 0,
+                "total_politicos": r["total_politicos"],
+            }
+            for r in por_partido_rows
+        ]
+
         return {
             "valor_total_geral": valor_total_geral,
             "media_por_emenda": media_por_emenda,
             "top_politicos": top_politicos,
             "top_municipios": top_municipios,
             "por_ano": por_ano,
-            "por_objetivo": por_objetivo
+            "por_objetivo": por_objetivo,
+            "por_partido": por_partido,
         }
 
     except Exception as e:
