@@ -27,9 +27,13 @@ const formatVal      = (v: number) => v >= 1_000_000 ? formatMillions(v) : v >= 
 const LIMITE = 20;
 
 export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPoliticoClick }) => {
+    const anoAtual = new Date().getFullYear();
+    const anosDisponiveis = Array.from({ length: anoAtual - 2009 }, (_, i) => anoAtual - i);
+
     const [politicos, setPoliticos]       = useState<PoliticoResumo[]>([]);
     const [busca, setBusca]               = useState('');
     const [filtroPartido, setFiltroPartido] = useState('');
+    const [filtroAno, setFiltroAno]       = useState('');
     const [ordenar, setOrdenar]           = useState<'valor' | 'emendas' | 'nome'>('valor');
     const [compacto, setCompacto]         = useState(false);
     const [loading, setLoading]           = useState(true);
@@ -37,12 +41,13 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
     const [totalPaginas, setTotalPaginas] = useState(1);
     const [totalPoliticos, setTotalPoliticos] = useState(0);
 
-    const fetchPoliticos = useCallback(async (pagina: number, termo: string, partido: string, ord: string) => {
+    const fetchPoliticos = useCallback(async (pagina: number, termo: string, partido: string, ord: string, ano: string) => {
         try {
             setLoading(true);
             const params = new URLSearchParams({ pagina: String(pagina), limite: String(LIMITE), ordenar: ord });
             if (termo.trim())   params.set('busca', termo.trim());
             if (partido.trim()) params.set('partido', partido.trim());
+            if (ano)            params.set('ano', ano);
             const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
                 headers: { 'ngrok-skip-browser-warning': '69420' }
             });
@@ -58,13 +63,15 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
     }, []);
 
     useEffect(() => {
-        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca, filtroPartido, ordenar), busca || filtroPartido ? 400 : 0);
+        const hasFilter = busca || filtroPartido || filtroAno;
+        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca, filtroPartido, ordenar, filtroAno), hasFilter ? 400 : 0);
         return () => clearTimeout(t);
-    }, [paginaAtual, busca, filtroPartido, ordenar, fetchPoliticos]);
+    }, [paginaAtual, busca, filtroPartido, filtroAno, ordenar, fetchPoliticos]);
 
     const handleBusca = (v: string) => { setBusca(v); setPaginaAtual(1); };
     const handlePartido = (v: string) => { setFiltroPartido(v); setPaginaAtual(1); };
     const handleOrdenar = (v: 'valor' | 'emendas' | 'nome') => { setOrdenar(v); setPaginaAtual(1); };
+    const handleAno = (v: string) => { setFiltroAno(v); setPaginaAtual(1); };
 
     const getInitials = (name: string) => {
         const p = name.trim().split(' ');
@@ -139,6 +146,17 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                             className="w-28 bg-black border border-[#1a1a1a] text-white py-2 pl-8 pr-2 font-mono text-xs tracking-widest placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/30 hover:border-[#FFD700]/20 transition-colors uppercase"
                         />
                     </div>
+                    {/* Filtro ano */}
+                    <select
+                        value={filtroAno}
+                        onChange={e => handleAno(e.target.value)}
+                        className="bg-black border border-[#1a1a1a] text-white font-mono text-[8px] tracking-widest py-2 px-2 focus:outline-none focus:border-[#FFD700]/30 hover:border-[#FFD700]/20 transition-colors"
+                        style={{ color: filtroAno ? '#FFD700' : undefined, borderColor: filtroAno ? 'rgba(255,215,0,0.3)' : undefined }}
+                    >
+                        <option value="">ANO...</option>
+                        {anosDisponiveis.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+
                     {/* Ordenar */}
                     <div className="flex items-center gap-1">
                         <ArrowUpDown className="w-3 h-3 text-gray-700 shrink-0" />

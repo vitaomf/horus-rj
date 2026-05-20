@@ -656,6 +656,7 @@ def listar_politicos_paginado(
     casa:    Optional[str] = Query(None),
     partido: Optional[str] = Query(None),
     ordenar: Optional[str] = Query(None),  # valor|emendas|nome
+    ano:     Optional[int] = Query(None),  # filtra parlamentares com emendas neste ano
 ):
     """
     Lista políticos paginados. Filtros: busca, uf, casa (camara|senado).
@@ -681,6 +682,10 @@ def listar_politicos_paginado(
         if partido and partido.strip():
             where_parts.append("UPPER(p.partido) LIKE UPPER(?)")
             params.append(f'%{partido.strip()}%')
+
+        if ano:
+            where_parts.append("EXISTS (SELECT 1 FROM emendas e2 WHERE e2.politico_id = p.id AND e2.ano = ?)")
+            params.append(ano)
 
         where_clause = "WHERE " + " AND ".join(where_parts)
 
