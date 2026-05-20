@@ -208,13 +208,19 @@ export function BrasilPage() {
 
       {/* ── RODAPÉ ── */}
       <footer className="border-t border-[#FFD700]/10 px-6 md:px-12 py-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <p className="font-mono text-[9px] tracking-[0.4em] text-gray-800 uppercase">
             Horus Brasil · {new Date().getFullYear()}
           </p>
-          <p className="font-mono text-[9px] tracking-[0.3em] text-gray-800 uppercase hidden md:block">
-            Portal da Transparência · TSE · Câmara · Senado
-          </p>
+          <div className="flex items-center gap-4">
+            <a href="/glossario"
+              className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
+              Glossário
+            </a>
+            <p className="font-mono text-[9px] tracking-[0.3em] text-gray-800 uppercase hidden md:block">
+              Portal da Transparência · TSE · Câmara · Senado
+            </p>
+          </div>
         </div>
       </footer>
     </div>

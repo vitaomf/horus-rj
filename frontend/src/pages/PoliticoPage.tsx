@@ -1,8 +1,12 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2 } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
+import { EmendasTooltip } from '../components/EmendasTooltip';
+import { VoceSabia } from '../components/VoceSabia';
+import { useFavoritos } from '../hooks/useFavoritos';
+import { useToast } from '../components/Toast';
 
 const MapaAtuacao = lazy(() => import('../components/MapaAtuacaoParlamentar').then(m => ({ default: m.MapaAtuacaoParlamentar })));
 
@@ -184,6 +188,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const [filtroPagamento, setFiltroPagamento] = useState<'todas' | 'pagas' | 'nao_pagas'>('todas');
     const [fotoUrl, setFotoUrl] = useState<string | null>(null);
     const [bioData, setBioData] = useState<BioCamara | null>(null);
+    const { toggle, isFavorito } = useFavoritos();
+    const { toast } = useToast();
     const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
     const [loadingAtividade, setLoadingAtividade] = useState(false);
     const [cruzamento, setCruzamento] = useState<{
@@ -443,12 +449,43 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 50%, transparent 30%, rgba(0,0,0,0.7) 100%)' }} />
 
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
-                    {/* Breadcrumb */}
-                    <button onClick={onVoltar}
-                        className="flex items-center gap-2 text-[#FFD700]/50 hover:text-[#FFD700] transition-colors group w-fit cursor-pointer mb-10 font-mono text-[10px] tracking-[0.4em] uppercase">
-                        <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
-                        VOLTAR
-                    </button>
+                    {/* Breadcrumb + ações */}
+                    <div className="flex items-center justify-between mb-10">
+                        <button onClick={onVoltar}
+                            className="flex items-center gap-2 text-[#FFD700]/50 hover:text-[#FFD700] transition-colors group w-fit cursor-pointer font-mono text-[10px] tracking-[0.4em] uppercase">
+                            <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+                            VOLTAR
+                        </button>
+                        <div className="flex items-center gap-2">
+                            {/* Favoritar */}
+                            <button
+                                onClick={() => {
+                                    toggle({ id: data.id, nome: data.nome, partido: data.partido ?? null, cargo: data.cargo ?? null });
+                                    toast(isFavorito(data.id) ? `${data.nome} removido dos favoritos` : `${data.nome} adicionado aos favoritos`, isFavorito(data.id) ? 'info' : 'success');
+                                }}
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border px-3 py-1.5 transition-all"
+                                style={{
+                                    borderColor:  isFavorito(data.id) ? '#FFD70060' : '#2a2a2a',
+                                    color:        isFavorito(data.id) ? '#FFD700'   : '#555',
+                                    background:   isFavorito(data.id) ? '#FFD70010' : 'transparent',
+                                }}
+                            >
+                                <Star className="w-3 h-3" fill={isFavorito(data.id) ? 'currentColor' : 'none'} />
+                                {isFavorito(data.id) ? 'FAVORITADO' : 'FAVORITAR'}
+                            </button>
+                            {/* Compartilhar */}
+                            <button
+                                onClick={() => {
+                                    const url = `${window.location.origin}/politicos/${data.id}`;
+                                    navigator.clipboard?.writeText(url).then(() => toast('Link copiado!', 'success'));
+                                }}
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#FFD700]/40 hover:text-white transition-all px-3 py-1.5"
+                            >
+                                <Share2 className="w-3 h-3" />
+                                COMPARTILHAR
+                            </button>
+                        </div>
+                    </div>
 
                     <div className="flex flex-col lg:flex-row gap-10 items-start">
                         {/* Foto — estilo dossiê com clip-path */}
@@ -916,9 +953,12 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         <TrendingUp className="w-4 h-4 text-[#FFD700]" />
                         <h2 className="text-2xl font-bebas text-white tracking-widest">ATIVIDADE POR ANO</h2>
                     </div>
-                    <p className="text-gray-600 text-[11px] font-sans mb-4 uppercase tracking-widest">
-                        Repasses históricos · clique para filtrar emendas
-                    </p>
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-gray-600 text-[11px] font-sans uppercase tracking-widest">
+                            Repasses históricos · clique para filtrar emendas
+                        </p>
+                        <EmendasTooltip />
+                    </div>
 
                     {data.emendas_por_ano.length === 0 ? (
                         <p className="text-gray-600 text-sm italic">Nenhum dado disponível.</p>
@@ -1111,6 +1151,16 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     />
                 </Suspense>
             </div>
+
+            {/* ── VOCÊ SABIA? ── */}
+            {data.total_emendas > 0 && (
+                <div className="max-w-7xl mx-auto mb-6 px-0">
+                    <VoceSabia
+                        fato={`${data.nome.split(' ')[0]} destinou emendas para ${data.municipios_beneficiados.length} município${data.municipios_beneficiados.length !== 1 ? 's' : ''} ao longo de sua carreira. O dinheiro empenhado não necessariamente chega todo — parte pode ser bloqueada pelo governo ou ficar pendente de execução.`}
+                        fonte="Portal da Transparência"
+                    />
+                </div>
+            )}
 
             {/* ── CRUZAMENTO EMENDAS × CONTRATOS ──────────────────────────── */}
             {cruzamento && cruzamento.tem_cruzamento && (

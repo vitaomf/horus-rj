@@ -6,6 +6,8 @@ import { API_BASE_URL } from './config';
 import logoHorus from './assets/logo_amarelo.png';
 import { SearchBar } from './components/SearchBar';
 import { NavProvider } from './contexts/NavContext';
+import { BackToTop } from './components/BackToTop';
+import { ToastProvider } from './components/Toast';
 
 // ── Lazy loading ──────────────────────────────────────────────────────────────
 const HomePage          = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
@@ -14,6 +16,7 @@ const PoliticoPage      = lazy(() => import('./pages/PoliticoPage').then(m => ({
 const EstatisticasPage  = lazy(() => import('./pages/EstatisticasPage').then(m => ({ default: m.EstatisticasPage })));
 const PoliticosListPage  = lazy(() => import('./pages/PoliticosListPage').then(m => ({ default: m.PoliticosListPage })));
 const BuscaAvancadaPage  = lazy(() => import('./pages/BuscaAvancadaPage').then(m => ({ default: m.BuscaAvancadaPage })));
+const GlossarioPage      = lazy(() => import('./pages/GlossarioPage').then(m => ({ default: m.GlossarioPage })));
 // Novas páginas nacionais
 const BrasilPage           = lazy(() => import('./pages/BrasilPage').then(m => ({ default: m.BrasilPage })));
 const RegiaoPage           = lazy(() => import('./pages/RegiaoPage').then(m => ({ default: m.RegiaoPage })));
@@ -209,10 +212,12 @@ function App() {
   };
 
   return (
+    <ToastProvider>
     <NavProvider>
       <div className="min-h-screen text-white overflow-x-hidden relative z-10">
         <Navbar onSelectMunicipio={navMunicipio} onSelectPolitico={navPolitico} apiError={apiError} />
         <div className="h-16" />
+        <BackToTop />
 
         <Suspense fallback={<PageSpinner />}>
           <Routes>
@@ -265,12 +270,16 @@ function App() {
             <Route path="/busca" element={<BuscaAvancadaPage />} />
             <Route path="/painel" element={<EstatisticasPage />} />
 
+            {/* Glossário */}
+            <Route path="/glossario" element={<GlossarioPage />} />
+
             {/* Redirect legado */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </div>
     </NavProvider>
+    </ToastProvider>
   );
 }
 
