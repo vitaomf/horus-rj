@@ -106,7 +106,8 @@ export default BuscaAvancadaPage;
 
 function TabMunicipios() {
   const navigate = useNavigate();
-  const [q, setQ] = useState('');
+  const [searchParams] = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get('q') || '');
   const [resultados, setResultados] = useState<{ id: number; nome: string }[]>([]);
   const [loading, setLoading] = useState(false);
 

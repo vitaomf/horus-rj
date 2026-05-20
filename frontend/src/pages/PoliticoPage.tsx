@@ -7,6 +7,7 @@ import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
 import { useFavoritos } from '../hooks/useFavoritos';
+import { useRecentesVistos } from '../hooks/useRecentesVistos';
 import { useToast } from '../components/Toast';
 
 const MapaAtuacao = lazy(() => import('../components/MapaAtuacaoParlamentar').then(m => ({ default: m.MapaAtuacaoParlamentar })));
@@ -192,6 +193,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const { toggle, isFavorito } = useFavoritos();
     const { toast } = useToast();
     const navigate = useNavigate();
+    const { registrar: registrarRecente } = useRecentesVistos();
     const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
     const [loadingAtividade, setLoadingAtividade] = useState(false);
     const [cruzamento, setCruzamento] = useState<{
@@ -219,6 +221,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                 });
                 setData(res.data);
+                registrarRecente({ id: res.data.id, nome: res.data.nome, partido: res.data.partido ?? null, cargo: res.data.cargo ?? null });
             } catch (err: any) {
                 setError(err.response?.data?.detail || err.message || 'Erro desconhecido');
             } finally {
