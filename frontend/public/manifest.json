@@ -1,0 +1,20 @@
+{
+  "name": "Horus — Transparência Pública",
+  "short_name": "Horus",
+  "description": "Monitore emendas parlamentares, contratos públicos e autoridades eleitas em todo o Brasil.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#FFD700",
+  "icons": [
+    {
+      "src": "/logo_amarelo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["government", "news"],
+  "lang": "pt-BR",
+  "orientation": "portrait-primary"
+}

@@ -136,8 +136,11 @@ export function StatusPage() {
 
             {/* ── PARLAMENTARES POR CASA ── */}
             <div className="border border-[#1a1a1a] bg-[#050505]">
-              <div className="px-5 py-3 border-b border-[#1a1a1a]">
-                <p className="font-mono text-[8px] tracking-[0.4em] text-[#03A9F4]/50 uppercase">Parlamentares Federais</p>
+              <div className="px-5 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                <p className="font-mono text-[8px] tracking-[0.4em] text-[#03A9F4]/50 uppercase">Parlamentares Federais · Eleição 2022</p>
+                <p className="font-mono text-[7px] tracking-widest text-gray-700">
+                  ⚠ Atualizar após eleições de outubro/2026
+                </p>
               </div>
               <div className="flex flex-wrap gap-px bg-[#1a1a1a] p-px">
                 {Object.entries(data.parlamentares).map(([casa, qtd]) => (

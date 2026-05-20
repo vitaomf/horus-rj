@@ -527,16 +527,43 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             </div>
 
                             {/* Métricas inline */}
-                            <div className="grid grid-cols-2 gap-px bg-[#FFD700]/10 mb-6 max-w-xs">
-                                <div className="bg-black p-4">
-                                    <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Emendas</div>
-                                    <div className="font-bebas text-4xl text-white">{data.total_emendas}</div>
-                                </div>
-                                <div className="bg-black p-4">
-                                    <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Total</div>
-                                    <div className="font-bebas text-4xl text-[#FFD700]">{formatMillions(data.valor_total)}</div>
-                                </div>
-                            </div>
+                            {(() => {
+                                // #35 badge concentração
+                                const topMun = data.municipios_beneficiados[0];
+                                const topPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
+                                const concentrado = topPct >= 80;
+                                // #37 por dia (mandato 4 anos = 1461 dias)
+                                const porDia = data.valor_total > 0 ? data.valor_total / (data.emendas_por_ano.length * 365 || 365) : 0;
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-px bg-[#FFD700]/10 mb-3 max-w-xs">
+                                            <div className="bg-black p-4">
+                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Emendas</div>
+                                                <div className="font-bebas text-4xl text-white">{data.total_emendas}</div>
+                                            </div>
+                                            <div className="bg-black p-4">
+                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Total</div>
+                                                <div className="font-bebas text-4xl text-[#FFD700]">{formatMillions(data.valor_total)}</div>
+                                            </div>
+                                        </div>
+                                        {/* #37 por dia */}
+                                        {porDia > 0 && (
+                                            <p className="font-mono text-[9px] tracking-widest text-gray-700 mb-3 max-w-xs">
+                                                ≈ {formatMillions(porDia * 30)}/mês empenhado em emendas
+                                            </p>
+                                        )}
+                                        {/* #35 badge concentração */}
+                                        {concentrado && (
+                                            <div className="flex items-center gap-2 border border-yellow-600/40 bg-yellow-900/10 px-3 py-2 mb-3 max-w-xs">
+                                                <span className="text-yellow-500 text-sm">⚠</span>
+                                                <p className="font-mono text-[8px] tracking-widest text-yellow-600/80">
+                                                    {topPct}% das emendas foram para {topMun.nome.replace(' - RJ','')} · concentração elevada
+                                                </p>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
 
                             {/* Linha separadora */}
                             <div className="w-16 h-px bg-[#FFD700]/30 mb-5" />
@@ -1413,9 +1440,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     const execPct   = empenhado > 0 ? Math.min(100, (pago / empenhado) * 100) : 0;
                                     const foiPago   = pago > 0;
                                     const municipio = emenda.municipio_destino?.replace(' - RJ', '') || '—';
+                                    // #45 cor por recência: emendas dos últimos 2 anos mais vivas
+                                    const anoAtual = new Date().getFullYear();
+                                    const recente  = emenda.ano >= anoAtual - 1;
 
                                     return (
-                                        <div key={idx} className="bg-[#0d0d0d] border border-[#1a1a1a] hover:border-[#333] overflow-hidden transition-all">
+                                        <div key={idx} className={`bg-[#0d0d0d] border overflow-hidden transition-all ${recente ? 'border-[#FFD700]/15 hover:border-[#FFD700]/30' : 'border-[#1a1a1a] hover:border-[#333]'}`}
+                                            style={recente ? { boxShadow: 'inset 0 0 0 1px rgba(255,215,0,0.05)' } : {}}>
 
                                             {/* ── Faixa superior: área + ano + município ── */}
                                             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, TrendingUp, ChevronRight } from 'lucide-react';
+import { Search, TrendingUp, ChevronRight, Filter } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import { badgeStyle } from '../utils/partidoCores';
+import { SkeletonPoliticoItem } from '../components/SkeletonCard';
 
 interface PoliticoResumo {
     id: number;
@@ -27,16 +29,18 @@ const LIMITE = 20;
 export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPoliticoClick }) => {
     const [politicos, setPoliticos]       = useState<PoliticoResumo[]>([]);
     const [busca, setBusca]               = useState('');
+    const [filtroPartido, setFiltroPartido] = useState('');
     const [loading, setLoading]           = useState(true);
     const [paginaAtual, setPaginaAtual]   = useState(1);
     const [totalPaginas, setTotalPaginas] = useState(1);
     const [totalPoliticos, setTotalPoliticos] = useState(0);
 
-    const fetchPoliticos = useCallback(async (pagina: number, termo: string) => {
+    const fetchPoliticos = useCallback(async (pagina: number, termo: string, partido: string) => {
         try {
             setLoading(true);
             const params = new URLSearchParams({ pagina: String(pagina), limite: String(LIMITE) });
-            if (termo.trim()) params.set('busca', termo.trim());
+            if (termo.trim())   params.set('busca', termo.trim());
+            if (partido.trim()) params.set('partido', partido.trim());
             const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
                 headers: { 'ngrok-skip-browser-warning': '69420' }
             });
@@ -52,11 +56,12 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
     }, []);
 
     useEffect(() => {
-        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca), busca ? 400 : 0);
+        const t = setTimeout(() => fetchPoliticos(paginaAtual, busca, filtroPartido), busca || filtroPartido ? 400 : 0);
         return () => clearTimeout(t);
-    }, [paginaAtual, busca, fetchPoliticos]);
+    }, [paginaAtual, busca, filtroPartido, fetchPoliticos]);
 
     const handleBusca = (v: string) => { setBusca(v); setPaginaAtual(1); };
+    const handlePartido = (v: string) => { setFiltroPartido(v); setPaginaAtual(1); };
 
     const getInitials = (name: string) => {
         const p = name.trim().split(' ');
@@ -108,39 +113,45 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
 
             {/* ── CONTROLES ── */}
             <div className="border-b border-[#1a1a1a] bg-[#050505] px-6 md:px-12 py-4 sticky top-16 z-40 backdrop-blur-sm">
-                <div className="max-w-7xl mx-auto flex items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
+                    {/* Busca */}
+                    <div className="relative flex-1 min-w-[180px] max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#FFD700]/30 pointer-events-none" />
-                        {loading && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 border border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />
-                        )}
                         <input
                             type="text"
                             placeholder="BUSCAR POLÍTICO..."
                             value={busca}
                             onChange={e => handleBusca(e.target.value)}
-                            className="w-full bg-black border border-[#FFD700]/15 text-white py-2 pl-9 pr-8 font-mono text-xs tracking-[0.2em] placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/40 hover:border-[#FFD700]/25 transition-colors"
+                            className="w-full bg-black border border-[#FFD700]/15 text-white py-2 pl-9 pr-3 font-mono text-xs tracking-[0.2em] placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/40 hover:border-[#FFD700]/25 transition-colors"
                         />
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    {/* Filtro partido (#41) */}
+                    <div className="relative">
+                        <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-700 pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="PARTIDO..."
+                            value={filtroPartido}
+                            onChange={e => handlePartido(e.target.value)}
+                            className="w-28 bg-black border border-[#1a1a1a] text-white py-2 pl-8 pr-2 font-mono text-xs tracking-widest placeholder-gray-800 focus:outline-none focus:border-[#FFD700]/30 hover:border-[#FFD700]/20 transition-colors uppercase"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
                         <TrendingUp className="w-3.5 h-3.5 text-[#FFD700]/40" />
                         <p className="font-mono text-[9px] tracking-widest text-gray-600 hidden sm:block">
-                            {busca.trim() ? `BUSCA: "${busca.toUpperCase()}"` : 'RANKING · VOLUME DE REPASSES'}
+                            {(busca || filtroPartido) ? `FILTRO ATIVO` : 'RANKING · VOLUME DE REPASSES'}
                         </p>
+                        {loading && <div className="w-3 h-3 border border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />}
                     </div>
                 </div>
             </div>
 
             <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
 
+                {/* Skeleton loading (#1) */}
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-24 gap-4">
-                        <div className="flex gap-1.5">
-                            {[0,1,2].map(i => (
-                                <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
-                            ))}
-                        </div>
-                        <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700">CARREGANDO REGISTROS</p>
+                    <div className="divide-y divide-[#111]">
+                        {Array.from({ length: 10 }).map((_, i) => <SkeletonPoliticoItem key={i} />)}
                     </div>
                 ) : politicos.length === 0 ? (
                     <div className="border border-[#1a1a1a] py-24 text-center">
@@ -179,8 +190,12 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                                 <span className="font-bebas text-xl tracking-wider text-white group-hover:text-[#FFD700] transition-colors truncate">
                                                     {pol.nome}
                                                 </span>
+                                                {/* Badge colorido por partido (#3) */}
                                                 {pol.partido && (
-                                                    <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border border-[#333] text-gray-600 shrink-0">
+                                                    <span
+                                                        className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border shrink-0"
+                                                        style={badgeStyle(pol.partido)}
+                                                    >
                                                         {pol.partido}
                                                     </span>
                                                 )}

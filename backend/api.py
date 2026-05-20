@@ -589,11 +589,12 @@ def obter_total_politicos():
 @limiter.limit("60/minute")
 def listar_politicos_paginado(
     request: Request,
-    pagina: int = Query(1, ge=1),
-    limite: int = Query(20, ge=1, le=2000),
-    busca: Optional[str] = Query(None),
-    uf:   Optional[str] = Query(None),
-    casa: Optional[str] = Query(None),
+    pagina:  int = Query(1, ge=1),
+    limite:  int = Query(20, ge=1, le=2000),
+    busca:   Optional[str] = Query(None),
+    uf:      Optional[str] = Query(None),
+    casa:    Optional[str] = Query(None),
+    partido: Optional[str] = Query(None),
 ):
     """
     Lista políticos paginados. Filtros: busca, uf, casa (camara|senado).
@@ -615,6 +616,10 @@ def listar_politicos_paginado(
         if casa and casa.strip():
             where_parts.append("p.casa = ?")
             params.append(casa.strip().lower())
+
+        if partido and partido.strip():
+            where_parts.append("UPPER(p.partido) LIKE UPPER(?)")
+            params.append(f'%{partido.strip()}%')
 
         where_clause = "WHERE " + " AND ".join(where_parts)
 
@@ -1792,8 +1797,14 @@ if os.path.exists(FRONTEND_PATH):
         # Tenta servir o arquivo solicitado na pasta dist (ex: imagens, svgs)
         file_path = os.path.join(FRONTEND_PATH, rest_of_path)
         if os.path.isfile(file_path):
+            # #48 Cache headers: GeoJSONs (7d) e imagens (24h) raramente mudam
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext == '.json' and 'geo' in rest_of_path:
+                return FileResponse(file_path, headers={"Cache-Control": "public, max-age=604800"})
+            if ext in ('.jpg', '.jpeg', '.png', '.webp', '.svg'):
+                return FileResponse(file_path, headers={"Cache-Control": "public, max-age=86400"})
             return FileResponse(file_path)
-            
+
         # Fallback para o index.html (SPA routing)
         return FileResponse(os.path.join(FRONTEND_PATH, "index.html"))
 else:
