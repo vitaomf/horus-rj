@@ -191,7 +191,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
                       secundario={`${e.ano} · ${e.politico_nome ?? '—'}`}
                       tag="EME"
                       tagCor="#4CAF50"
-                      onClick={() => { fechar(); navigate('/busca'); }}
+                      onClick={() => {
+                        fechar();
+                        // Navega para busca avançada com a query pré-preenchida na aba emendas
+                        navigate(`/busca?tab=emendas&q=${encodeURIComponent(query)}`);
+                      }}
                     />
                   ))}
                 </Grupo>
@@ -209,13 +213,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
           )}
 
           {/* Footer */}
-          <div className="border-t border-[#FFD700]/10 px-3 py-2 bg-[#050505]">
+          <div className="border-t border-[#FFD700]/10 px-3 py-2 bg-[#050505] flex items-center justify-between">
             <button
-              onClick={() => { fechar(); navigate(`/busca?q=${encodeURIComponent(query)}`); }}
+              onClick={() => {
+                fechar();
+                const tab = result.parlamentares.length > 0 ? 'parlamentares' : 'emendas';
+                navigate(`/busca?tab=${tab}&q=${encodeURIComponent(query)}`);
+              }}
               className="font-mono text-[8px] tracking-[0.3em] text-[#FFD700]/40 hover:text-[#FFD700] transition-colors uppercase"
             >
-              Busca completa →
+              Busca avançada →
             </button>
+            <span className="font-mono text-[7px] tracking-widest text-gray-800">{total} resultado{total !== 1 ? 's' : ''}</span>
           </div>
         </div>
       )}

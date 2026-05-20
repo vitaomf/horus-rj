@@ -285,13 +285,14 @@ const formatCurrency = (value: number) =>
 const LIMITE_EMENDAS = 25;
 
 function TabEmendas() {
+  const [searchParams] = useSearchParams();
   const [emendas, setEmendas] = useState<Emenda[]>([]);
   const [loading, setLoading] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [totalResultados, setTotalResultados] = useState(0);
 
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(() => searchParams.get('q') || '');
   const placeholder = usePlaceholderRotativo(q === '');
   const [ano, setAno] = useState('');
   const [municipio, setMunicipio] = useState('');
