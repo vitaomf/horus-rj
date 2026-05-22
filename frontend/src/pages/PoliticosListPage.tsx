@@ -208,6 +208,19 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
 
             <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
 
+                {/* Nota explicativa — autores coletivos excluídos */}
+                <div className="mb-6 border border-[#FFD700]/15 bg-[#0a0a0a] px-4 py-3 flex items-start gap-3">
+                    <span className="font-bebas text-[#FFD700]/60 text-xs tracking-[0.3em] shrink-0 mt-0.5">NOTA</span>
+                    <p className="font-mono text-[10px] leading-relaxed text-gray-400">
+                        Esta lista mostra apenas <span className="text-[#FFD700]">parlamentares individuais</span>. Emendas
+                        assinadas por <span className="text-[#FFD700]/80">comissões</span> (ex: "COM. DA SAÚDE"),
+                        <span className="text-[#FFD700]/80"> bancadas estaduais</span> e
+                        <span className="text-[#FFD700]/80"> relatores do orçamento</span> são excluídas porque a indicação
+                        é colegiada — não faz sentido atribuir a um político só. Saiba mais no{' '}
+                        <a href="/glossario" className="underline text-[#FFD700]/70 hover:text-[#FFD700]">glossário</a>.
+                    </p>
+                </div>
+
                 {/* Skeleton loading (#1) */}
                 {loading ? (
                     <div className="divide-y divide-[#111]">

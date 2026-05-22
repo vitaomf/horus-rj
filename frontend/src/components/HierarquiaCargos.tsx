@@ -31,6 +31,7 @@ interface EleitoMunicipal {
   partido: string;
   numero: number | null;
   foto_url: string;
+  politico_id?: number | null;
 }
 
 interface HierarquiaCargosProps {
@@ -205,12 +206,14 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start border border-[#1a1a1a] bg-[#0a0a0a] rounded-sm p-6">
         <div className="lg:col-span-3">
           {govCargo
-            ? <CargoCard cargo={govCargo} tamanho="grande" corDestaque={cor} />
+            ? <CargoCard cargo={govCargo} tamanho="grande" corDestaque={cor}
+                onClick={eleitos?.governador?.politico_id ? () => navigate(`/politicos/${eleitos.governador!.politico_id}`) : undefined} />
             : <CargoCard cargo={getCargosEstaduais(uf).governador} tamanho="grande" corDestaque={cor} />}
         </div>
         <div className="lg:col-span-2 lg:pl-6 lg:border-l border-[#1a1a1a]">
           {viceCargo
-            ? <CargoCard cargo={viceCargo} tamanho="medio" corDestaque={cor} />
+            ? <CargoCard cargo={viceCargo} tamanho="medio" corDestaque={cor}
+                onClick={eleitos?.vice_governador?.politico_id ? () => navigate(`/politicos/${eleitos.vice_governador!.politico_id}`) : undefined} />
             : <CargoCard cargo={getCargosEstaduais(uf).vice} tamanho="medio" corDestaque={cor} />}
         </div>
       </div>
@@ -291,6 +294,7 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
     vereadores: EleitoMunicipal[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -337,10 +341,12 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
       {/* Prefeito + Vice */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start border border-[#1a1a1a] bg-[#0a0a0a] rounded-sm p-6">
         <div className="lg:col-span-3">
-          <CargoCard cargo={prefCargo ?? prefMock} tamanho="grande" corDestaque={cor} />
+          <CargoCard cargo={prefCargo ?? prefMock} tamanho="grande" corDestaque={cor}
+            onClick={eleitos?.prefeito?.politico_id ? () => navigate(`/politicos/${eleitos.prefeito!.politico_id}`) : undefined} />
         </div>
         <div className="lg:col-span-2 lg:pl-6 lg:border-l border-[#1a1a1a]">
-          <CargoCard cargo={viceCargo ?? viceMock} tamanho="medio" corDestaque={cor} />
+          <CargoCard cargo={viceCargo ?? viceMock} tamanho="medio" corDestaque={cor}
+            onClick={eleitos?.vice?.politico_id ? () => navigate(`/politicos/${eleitos.vice!.politico_id}`) : undefined} />
         </div>
       </div>
 
@@ -361,6 +367,7 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
                   cargo={toCargo(v, 'Vereador', `Vota leis e fiscaliza o prefeito de ${capitalize(municipio)}.`, 100) as CargoEletivo}
                   tamanho="pequeno"
                   corDestaque={cor}
+                  onClick={v.politico_id ? () => navigate(`/politicos/${v.politico_id}`) : undefined}
                 />
               ))}
             </div>

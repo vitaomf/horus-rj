@@ -50,13 +50,13 @@ function HeatmapEstados() {
 
   function cor(uf: string) {
     const v = map.get(uf) ?? 0;
-    if (!v) return { bg: '#0a0a0a', border: '#1a1a1a', text: '#333' };
-    const t = v / max;
-    const alpha = Math.round(10 + t * 80);
+    if (!v) return { bg: '#0a0a0a', border: '#FFD70033', text: '#FFD70099' };
+    const t = Math.pow(v / max, 0.45);
+    const alpha = Math.round(45 + t * 55);
     return {
       bg: `rgba(255,215,0,${alpha / 100})`,
-      border: `rgba(255,215,0,${(alpha + 20) / 100})`,
-      text: t > 0.4 ? '#FFD700' : '#FFD70099',
+      border: `rgba(255,215,0,1)`,
+      text: '#0a0a0a',
     };
   }
 
@@ -75,9 +75,9 @@ function HeatmapEstados() {
             className="aspect-square flex flex-col items-center justify-center border text-center transition-all duration-300 hover:scale-105 cursor-default"
             style={{ backgroundColor: c.bg, borderColor: c.border }}
           >
-            <span className="font-bebas text-xs leading-none" style={{ color: c.text }}>{uf}</span>
+            <span className="font-bebas text-2xl leading-none font-bold" style={{ color: c.text }}>{uf}</span>
             {total > 0 && (
-              <span className="font-mono text-[7px] leading-none mt-0.5" style={{ color: c.text + '99' }}>
+              <span className="font-mono text-xs leading-none mt-1.5 font-bold" style={{ color: c.text }}>
                 {fmt(total)}
               </span>
             )}
@@ -339,7 +339,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
           <div className="h-px flex-1 bg-[#FFD700]/10" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#FFD700]/10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px">
           {[
             {
               num: '01',
@@ -364,7 +364,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
             },
           ].map(({ num, title, cor, desc, tag }, i) => (
             <ScrollReveal key={title} delay={i * 100}>
-              <div className="relative bg-black p-8 group overflow-hidden">
+              <div className="relative bg-black p-8 group overflow-hidden h-[318px]">
                 {/* Número gigante de fundo */}
                 <span
                   className="absolute -top-4 -right-2 font-bebas text-[160px] leading-none select-none pointer-events-none transition-all duration-700 group-hover:scale-110 group-hover:-translate-y-2"
@@ -396,12 +396,12 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
       <ScrollReveal delay={0}>
         <section className="space-y-6">
           <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-[#FFD700]/10" />
-            <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Cobertura por Estado</h2>
-            <div className="h-px flex-1 bg-[#FFD700]/10" />
+            <div className="h-px flex-1 bg-[#FFD700]/40" />
+            <h2 className="font-mono text-sm tracking-[0.6em] text-[#FFD700] uppercase font-semibold">Cobertura por Estado</h2>
+            <div className="h-px flex-1 bg-[#FFD700]/40" />
           </div>
-          <div className="border border-[#FFD700]/10 bg-black/40 p-6">
-            <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-4">
+          <div className="border border-[#FFD700]/40 bg-black/40 p-6">
+            <p className="font-mono text-xs tracking-[0.4em] text-[#FFD700]/70 uppercase mb-4">
               Intensidade = volume de emendas coletadas · mais dourado = mais emendas
             </p>
             <HeatmapEstados />

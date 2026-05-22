@@ -1,19 +1,11 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2, GitCompare, Download } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2, GitCompare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
-import { PerfilPorCargo } from '../components/PerfilPorCargo';
-import { LayoutPrefeito } from '../components/layouts/LayoutPrefeito';
-import { LayoutVereador } from '../components/layouts/LayoutVereador';
-import { LayoutGovernador } from '../components/layouts/LayoutGovernador';
-import { LayoutDeputadoEstadual } from '../components/layouts/LayoutDeputadoEstadual';
-import { LayoutSenador } from '../components/layouts/LayoutSenador';
-import { LayoutCandidato } from '../components/layouts/LayoutCandidato';
-import { useSearchParams } from 'react-router-dom';
 import { useFavoritos } from '../hooks/useFavoritos';
 import { useRecentesVistos } from '../hooks/useRecentesVistos';
 import { useToast } from '../components/Toast';
@@ -118,17 +110,9 @@ interface DadosCampanha {
 interface PoliticoData {
     id: number;
     nome: string;
-    nome_urna?: string | null;
     partido: string;
     cargo: string;
     foto_url?: string | null;
-    data_nascimento?: string | null;
-    municipio_nascimento?: string | null;
-    uf_nascimento?: string | null;
-    escolaridade?: string | null;
-    profissao?: string | null;
-    bio_texto?: string | null;
-    mandatos?: MandatoHistorico[];
     total_emendas: number;
     valor_total: number;
     dados_campanha?: DadosCampanha | null;
@@ -209,7 +193,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const { toggle, isFavorito } = useFavoritos();
     const { toast } = useToast();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const { registrar: registrarRecente } = useRecentesVistos();
     const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
     const [loadingAtividade, setLoadingAtividade] = useState(false);
@@ -223,31 +206,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         eventos?: { ano: number; trecho: string }[];
         url?: string;
     } | null>(null);
-    const [ranking, setRanking] = useState<{
-        nacional_valor?: { posicao: number | null; de: number };
-        nacional_emendas?: { posicao: number | null; de: number };
-        partido_valor?: { posicao: number | null; de: number };
-        partido_emendas?: { posicao: number | null; de: number };
-        uf_valor?: { posicao: number | null; de: number };
-        uf_emendas?: { posicao: number | null; de: number };
-        partido?: string;
-        uf?: string;
+    const [cruzamento, setCruzamento] = useState<{
+        camada_geografica: { municipio: string; valor_emendas: number; num_emendas: number; valor_contratos: number; num_contratos: number }[];
+        camada_financeira: { doador: string; documento: string; valor_doacao: number; valor_contratos: number; num_contratos: number; municipios: string }[];
+        tem_cruzamento: boolean;
     } | null>(null);
-    const [trajetoria, setTrajetoria] = useState<{
-        trajetoria: Array<{
-            tipo: string; nivel: string; uf?: string; municipio?: string | null;
-            cargo?: string; ano?: number; ano_fim?: number;
-            mandato?: string; partido?: string; partidos?: string[];
-            situacao?: string; sq_candidato?: string;
-            votos_total?: number; votos_municipios?: number;
-        }>;
-        tem_votos: boolean;
-    } | null>(null);
-    const [votos, setVotos] = useState<{
-        votos: Array<{ ano: number; uf: string; municipio: string; votos: number; cargo: string; partido: string }>;
-        total: number;
-    } | null>(null);
-    const [perfilTipo, setPerfilTipo] = useState<any>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -278,30 +241,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
         fetchData();
 
+        // Cruzamento emendas × contratos (carrega em paralelo)
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/cruzamento`)
+            .then(res => setCruzamento(res.data))
+            .catch(() => {});
+
         // Biografia complementar do Wikipedia
         axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/wikipedia`)
             .then(res => setWikiData(res.data))
             .catch(() => setWikiData({ encontrado: false }));
-
-        // Trajetória eleitoral (eleitos_* + mandatos_json + votos TSE)
-        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/trajetoria`)
-            .then(res => setTrajetoria(res.data))
-            .catch(() => setTrajetoria(null));
-
-        // Votos por município
-        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/votos`)
-            .then(res => setVotos(res.data))
-            .catch(() => setVotos(null));
-
-        // Perfil por tipo de cargo (detecta automaticamente)
-        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/perfil_tipo`)
-            .then(res => setPerfilTipo(res.data))
-            .catch(() => setPerfilTipo(null));
-
-        // Ranking nacional/partido/UF
-        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/ranking`)
-            .then(res => setRanking(res.data))
-            .catch(() => {});
     }, [politicoId]);
 
     // Foto + Bio + Atividade: ativa loading IMEDIATAMENTE para o usuário ver feedback
@@ -378,55 +326,57 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     };
 
-    // Download CSV — exporta resumo + emendas detalhadas
-    const baixarRelatorioCSV = () => {
-        if (!data) return;
-        const lines: string[] = [];
-        const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Bio irônica gerada automaticamente a partir dos padrões de gasto
+    const getBioIronica = (): string => {
+        if (!data) return '';
+        const total = data.valor_total;
+        const numMuns = data.municipios_beneficiados.length;
+        const topMun = data.municipios_beneficiados[0];
+        const topMunPct = topMun ? Math.round((topMun.valor / total) * 100) : 0;
+        const anos = data.emendas_por_ano.map(a => a.ano);
+        const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
+        const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
+        const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
+        const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s+a.valor_total,0)/medEleit.length : 0;
+        const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s+a.valor_total,0)/medNorm.length  : 0;
+        const ehEleitoreiro = avgNorm > 0 && avgEleit > avgNorm * 1.8;
 
-        lines.push('# HORUS — RELATÓRIO DO PARLAMENTAR');
-        lines.push(`# Nome,${esc(data.nome)}`);
-        lines.push(`# Partido,${esc(data.partido || '—')}`);
-        lines.push(`# Cargo,${esc(data.cargo || '—')}`);
-        lines.push(`# Total de emendas,${data.total_emendas}`);
-        lines.push(`# Valor total empenhado,${data.valor_total.toFixed(2)}`);
-        lines.push(`# Municípios beneficiados,${data.municipios_beneficiados.length}`);
-        lines.push(`# Gerado em,${new Date().toISOString()}`);
-        lines.push(`# Fonte,Portal da Transparência (gov.br) + TSE`);
-        lines.push('');
+        // Área dominante
+        const porArea = data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
+            const k = e.objetivo || 'sem área';
+            acc[k] = (acc[k]||0) + e.valor;
+            return acc;
+        }, {});
+        const topArea = Object.entries(porArea).sort(([,a],[,b]) => b-a)[0]?.[0] || 'diversas áreas';
+        const topAreaPct = Math.round((porArea[topArea]||0) / total * 100);
 
-        if (data.emendas_por_ano.length > 0) {
-            lines.push('## EMENDAS POR ANO');
-            lines.push('ano,total_emendas,valor_total');
-            data.emendas_por_ano.forEach(a =>
-                lines.push(`${a.ano},${a.total},${a.valor_total.toFixed(2)}`));
-            lines.push('');
+        const totalFmt = total >= 1e9
+            ? `R$ ${(total/1e9).toFixed(1)} bilhões`
+            : `R$ ${(total/1e6).toFixed(0)} milhões`;
+
+        let bio = `Parlamentar com ${anos.length} ano${anos.length!==1?'s':''} de atividade rastreada, `;
+        bio += `tendo destinado ${totalFmt} em emendas parlamentares ao Rio de Janeiro. `;
+
+        if (topMunPct >= 40) {
+            bio += `Fiel ao método da concentração: ${topMunPct}% dos recursos foram para ${topMun.nome.replace(' - RJ','')} — `;
+            bio += `que, por coincidência ou não, lidera sua lista de municípios favoritos. `;
+        } else {
+            bio += `Distribuiu verbas por ${numMuns} municípios diferentes — generosidade digna de nota, `;
+            bio += `ou estratégia eleitoral bem calibrada, dependendo do ângulo. `;
         }
 
-        if (data.municipios_beneficiados.length > 0) {
-            lines.push('## MUNICÍPIOS BENEFICIADOS');
-            lines.push('municipio,num_emendas,valor_total');
-            data.municipios_beneficiados.forEach(m =>
-                lines.push(`${esc(m.nome)},${m.total},${m.valor.toFixed(2)}`));
-            lines.push('');
+        if (topAreaPct >= 50) {
+            bio += `Especialista declarado em ${topArea} (${topAreaPct}% do total investido). `;
         }
 
-        if (data.ultimas_emendas.length > 0) {
-            lines.push('## EMENDAS DETALHADAS');
-            lines.push('ano,valor,valor_empenhado,valor_pago,objetivo,municipio_destino,descricao,fonte_url');
-            data.ultimas_emendas.forEach(e =>
-                lines.push([e.ano, e.valor.toFixed(2), e.valor_empenhado.toFixed(2), e.valor_pago.toFixed(2),
-                    esc(e.objetivo), esc(e.municipio_destino), esc(e.descricao), esc(e.fonte_url || '')].join(',')));
+        if (ehEleitoreiro) {
+            const mult = (avgEleit/avgNorm).toFixed(1);
+            bio += `Curiosidade: seus investimentos crescem ${mult}× em anos eleitorais. Coincidências acontecem.`;
+        } else {
+            bio += `Dados coletados do Portal da Transparência do Governo Federal.`;
         }
 
-        const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const slug = data.nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
-        a.href = url; a.download = `horus-relatorio-${slug}.csv`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast('Relatório CSV baixado', 'success');
+        return bio;
     };
 
     const getBioReal = (): string => {
@@ -477,34 +427,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         );
     }
 
-    // ── Roteamento de layout por tipo de cargo ────────────────────────────
-    // Decisão #2 (multi-cargo): cargo via query string ?cargo=X tem prioridade
-    // sobre o cargo detectado automaticamente. Permite ver Lula "como vereador"
-    // ao clicar numa foto da trajetória.
-    const cargoQuery = searchParams.get('cargo');
-    const tipo = cargoQuery || perfilTipo?.tipo_principal;
-
-    const layoutProps = { data, fotoUrl, perfilTipo, trajetoria, votos, navigate };
-
-    if (tipo === 'prefeito' || tipo === 'vice_prefeito') {
-        return <LayoutPrefeito {...layoutProps} />;
-    }
-    if (tipo === 'vereador') {
-        return <LayoutVereador {...layoutProps} />;
-    }
-    if (tipo === 'governador' || tipo === 'vice_governador') {
-        return <LayoutGovernador {...layoutProps} />;
-    }
-    if (tipo === 'deputado_estadual') {
-        return <LayoutDeputadoEstadual {...layoutProps} />;
-    }
-    if (tipo === 'senador') {
-        return <LayoutSenador {...layoutProps} />;
-    }
-    if (tipo === 'candidato') {
-        return <LayoutCandidato {...layoutProps} />;
-    }
-    // Default: layout legislativo federal (deputado federal — original com emendas etc.)
     return (
         <div className="animate-fade-in pb-12 relative z-10">
 
@@ -611,15 +533,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 <GitCompare className="w-3 h-3" />
                                 COMPARAR
                             </button>
-                            {/* Download CSV */}
-                            <button
-                                onClick={baixarRelatorioCSV}
-                                title="Baixar relatório completo em CSV"
-                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#FFD700]/40 text-[#FFD700]/80 hover:border-[#FFD700] hover:text-[#FFD700] hover:bg-[#FFD700]/10 transition-all px-3 py-1.5"
-                            >
-                                <Download className="w-3 h-3" />
-                                BAIXAR CSV
-                            </button>
                         </div>
                     </div>
 
@@ -652,77 +565,57 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 <span className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase">{data.cargo}</span>
                             </div>
 
-                            <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-5xl md:text-7xl lg:text-8xl mb-2">
-                                {data.nome_urna || data.nome}
+                            <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-5xl md:text-7xl lg:text-8xl mb-4">
+                                {data.nome}
                             </h1>
-                            {data.nome_urna && data.nome_urna.toUpperCase() !== data.nome.toUpperCase() && (
-                                <p className="font-mono text-[10px] tracking-widest text-gray-600 uppercase mb-3">
-                                    Nome civil: {data.nome}
-                                </p>
-                            )}
 
                             <div className="flex items-center gap-3 mb-3 flex-wrap">
                                 <span className="border border-[#FFD700]/40 text-[#FFD700] font-bebas tracking-widest px-3 py-1 text-sm">{data.partido}</span>
                                 <span className="font-mono text-[10px] text-gray-600 tracking-widest uppercase">{data.cargo}</span>
-                                {/* mandatos (do banco enriquecido ou da bio live) */}
-                                {(() => {
-                                    const n = (data.mandatos?.length ?? 0) || (bioData?.historico?.length ?? 0);
-                                    return n > 0 ? (
-                                        <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
-                                            {n} {n === 1 ? 'mandato' : 'mandatos'}
-                                        </span>
-                                    ) : null;
-                                })()}
-                                {/* Idade (se data_nascimento existe no banco enriquecido) */}
-                                {data.data_nascimento && (() => {
-                                    const ano = new Date(data.data_nascimento + 'T00:00:00').getFullYear();
-                                    const idade = new Date().getFullYear() - ano;
-                                    return (
-                                        <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
-                                            {idade} anos
-                                        </span>
-                                    );
-                                })()}
-                                {/* UF de nascimento */}
-                                {data.uf_nascimento && (
+                                {/* #42 mandatos */}
+                                {bioData?.historico && bioData.historico.length > 0 && (
                                     <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
-                                        nascido(a) em {data.uf_nascimento}
+                                        {bioData.historico.length} {bioData.historico.length === 1 ? 'mandato' : 'mandatos'}
                                     </span>
                                 )}
                             </div>
 
-                            {/* Dashboard KPIs — 6 cards compactos */}
+                            {/* Métricas inline */}
                             {(() => {
+                                // #35 badge concentração
                                 const topMun = data.municipios_beneficiados[0];
-                                const topMunPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
-                                const porArea = data.ultimas_emendas.reduce((acc: Record<string, number>, e) => {
-                                    const k = e.objetivo || 'Não informado';
-                                    acc[k] = (acc[k] || 0) + e.valor;
-                                    return acc;
-                                }, {});
-                                const topArea = Object.entries(porArea).sort(([, a], [, b]) => (b as number) - (a as number))[0];
-                                const anosAtivos = data.emendas_por_ano.length;
-                                const fmtCompact = (v: number) => v >= 1e9 ? `R$ ${(v/1e9).toFixed(2)}B` : v >= 1e6 ? `R$ ${(v/1e6).toFixed(1)}M` : `R$ ${(v/1e3).toFixed(0)}K`;
-
-                                const kpis = [
-                                    { label: 'Emendas', value: String(data.total_emendas), sub: 'no total', cor: '#FFD700' },
-                                    { label: 'Valor empenhado', value: fmtCompact(data.valor_total), sub: 'soma de todos os anos', cor: '#FFD700' },
-                                    { label: 'Municípios', value: String(data.municipios_beneficiados.length), sub: 'atingidos', cor: '#4ade80' },
-                                    { label: 'Anos ativos', value: String(anosAtivos), sub: 'com emendas', cor: '#60a5fa' },
-                                    { label: 'Top município', value: topMun ? topMun.nome.replace(/\s*-\s*[A-Z]{2}$/,'').slice(0, 12) : '—', sub: topMun ? `${topMunPct}% do total` : '', cor: '#f59e0b' },
-                                    { label: 'Área predileta', value: topArea ? String(topArea[0]).slice(0, 14) : '—', sub: topArea ? `${(((topArea[1] as number) / data.valor_total) * 100).toFixed(0)}% do total` : '', cor: '#c084fc' },
-                                ];
-
+                                const topPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
+                                const concentrado = topPct >= 80;
+                                // #37 por dia (mandato 4 anos = 1461 dias)
+                                const porDia = data.valor_total > 0 ? data.valor_total / (data.emendas_por_ano.length * 365 || 365) : 0;
                                 return (
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-[#FFD700]/10 mb-4">
-                                        {kpis.map((k, i) => (
-                                            <div key={i} className="bg-black p-3 min-w-0">
-                                                <div className="font-mono text-[8px] tracking-[0.25em] uppercase mb-1.5 truncate" style={{ color: `${k.cor}66` }}>{k.label}</div>
-                                                <div className="font-bebas text-2xl leading-none truncate" style={{ color: k.cor }} title={k.value}>{k.value}</div>
-                                                {k.sub && <div className="font-mono text-[8px] tracking-widest text-gray-600 mt-1 truncate">{k.sub}</div>}
+                                    <>
+                                        <div className="grid grid-cols-2 gap-px bg-[#FFD700]/10 mb-3 max-w-xs">
+                                            <div className="bg-black p-4">
+                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Emendas</div>
+                                                <div className="font-bebas text-4xl text-white">{data.total_emendas}</div>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="bg-black p-4">
+                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Total</div>
+                                                <div className="font-bebas text-4xl text-[#FFD700]">{formatMillions(data.valor_total)}</div>
+                                            </div>
+                                        </div>
+                                        {/* #37 por dia */}
+                                        {porDia > 0 && (
+                                            <p className="font-mono text-[9px] tracking-widest text-gray-700 mb-3 max-w-xs">
+                                                ≈ {formatMillions(porDia * 30)}/mês empenhado em emendas
+                                            </p>
+                                        )}
+                                        {/* #35 badge concentração */}
+                                        {concentrado && (
+                                            <div className="flex items-center gap-2 border border-yellow-600/40 bg-yellow-900/10 px-3 py-2 mb-3 max-w-xs">
+                                                <span className="text-yellow-500 text-sm">⚠</span>
+                                                <p className="font-mono text-[8px] tracking-widest text-yellow-600/80">
+                                                    {topPct}% das emendas foram para {topMun.nome.replace(' - RJ','')} · concentração elevada
+                                                </p>
+                                            </div>
+                                        )}
+                                    </>
                                 );
                             })()}
 
@@ -760,23 +653,20 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {/* Bio real (Câmara API) */}
                         {getBioReal() && (
-                            <p className="text-gray-300 text-sm font-sans leading-relaxed mb-3">
+                            <p className="text-gray-300 text-sm font-sans leading-relaxed mb-4">
                                 {getBioReal()}
                             </p>
                         )}
 
-                        {/* Bio Wikipedia (texto livre) */}
-                        {data.bio_texto && (
-                            <div className="bg-[#080808] border-l-2 border-[#FFD700]/30 px-4 py-3 mb-4">
-                                <p className="font-mono text-[8px] tracking-widest text-gray-700 mb-2">
-                                    BIOGRAFIA · WIKIPEDIA
-                                </p>
-                                <p className="text-gray-400 text-sm font-sans leading-relaxed">
-                                    {data.bio_texto}
-                                </p>
-                            </div>
-                        )}
-
+                        {/* Bio irônica (análise de gastos) */}
+                        <div className="bg-[#080808] border border-[#1a1a1a] p-4 mb-5">
+                            <p className="font-bebas text-[10px] tracking-widest text-gray-600 mb-2">
+                                ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
+                            </p>
+                            <p className="text-gray-400 text-sm font-sans leading-relaxed">
+                                {getBioIronica()}
+                            </p>
+                        </div>
 
                     </div>
                 </div>
@@ -786,140 +676,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             {/* ── CONTEÚDO RESTANTE ── */}
             <div className="px-4 md:px-12">
 
-            {/* ── PERFIL POR TIPO DE CARGO (template adaptativo) ── */}
-            <PerfilPorCargo dados={perfilTipo} />
-
-            {/* ── TRAJETÓRIA ELEITORAL (cargos + votos por município) ── */}
-            {trajetoria && trajetoria.trajetoria.length > 0 && (
-                <div className="max-w-7xl mx-auto mb-10">
-                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <p className="font-bebas text-[#FFD700] text-xl tracking-widest">TRAJETÓRIA ELEITORAL</p>
-                                <p className="text-gray-600 text-[11px] uppercase tracking-widest">
-                                    Cargos eleitos · TSE + Câmara · {trajetoria.trajetoria.length} eventos
-                                </p>
-                            </div>
-                            {trajetoria.tem_votos && (
-                                <div className="text-right">
-                                    <p className="font-bebas text-2xl text-[#FFD700]">
-                                        {(votos?.total ?? 0).toLocaleString('pt-BR')}
-                                    </p>
-                                    <p className="font-mono text-[8px] tracking-widest text-gray-700">VOTOS TOTAIS</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Linha do tempo */}
-                        <div className="relative">
-                            <div className="absolute left-2 top-1 bottom-1 w-px bg-[#1a1a1a]" />
-                            <div className="space-y-3">
-                                {trajetoria.trajetoria.map((ev, i) => {
-                                    const cargoLabel: Record<string, string> = {
-                                        deputado_federal: 'Deputado Federal',
-                                        deputado_estadual: 'Deputado Estadual',
-                                        senador: 'Senador',
-                                        governador: 'Governador',
-                                        vice_governador: 'Vice-Governador',
-                                        prefeito: 'Prefeito',
-                                        vice_prefeito: 'Vice-Prefeito',
-                                        vereador: 'Vereador',
-                                    };
-                                    const cor = ev.nivel === 'federal' ? '#FFD700'
-                                              : ev.nivel === 'estadual' ? '#03A9F4'
-                                              : '#4CAF50';
-                                    const cargo = cargoLabel[ev.cargo || ''] || ev.cargo || ev.tipo;
-                                    return (
-                                        <div key={i} className="relative flex gap-4 pl-7">
-                                            <div className="absolute left-0 top-1.5 w-[15px] h-[15px] border-2 z-10"
-                                                style={{ borderColor: cor, backgroundColor: '#0a0a0a' }} />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-baseline gap-3 flex-wrap">
-                                                    <span className="font-bebas text-2xl leading-none" style={{ color: cor }}>
-                                                        {ev.ano}
-                                                    </span>
-                                                    <span className="font-bebas text-sm text-white tracking-wide">{cargo}</span>
-                                                    {ev.uf && (
-                                                        <span className="text-[10px] font-bold tracking-widest text-gray-500 border border-[#2a2a2a] px-1.5 py-0.5">
-                                                            {ev.municipio ? `${ev.municipio}/${ev.uf}` : ev.uf}
-                                                        </span>
-                                                    )}
-                                                    {ev.partido && (
-                                                        <span className="text-[10px] font-bold tracking-widest text-gray-500 border border-[#2a2a2a] px-1.5 py-0.5">
-                                                            {ev.partido}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-3 text-[11px] mt-0.5 text-gray-500">
-                                                    {ev.mandato && <span>Mandato {ev.mandato}</span>}
-                                                    {ev.situacao && <span className="text-green-500/70">· {ev.situacao}</span>}
-                                                    {ev.votos_total !== undefined && (
-                                                        <span className="text-[#FFD700]/60">
-                                                            · {ev.votos_total.toLocaleString('pt-BR')} votos
-                                                            {ev.votos_municipios && ` em ${ev.votos_municipios} municípios`}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── VOTOS POR MUNICÍPIO (top 20) ── */}
-            {votos && votos.votos.length > 0 && (
-                <div className="max-w-7xl mx-auto mb-10">
-                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
-                        <div className="flex items-center justify-between mb-5">
-                            <div>
-                                <p className="font-bebas text-[#FFD700] text-xl tracking-widest">VOTOS POR MUNICÍPIO</p>
-                                <p className="text-gray-600 text-[11px] uppercase tracking-widest">
-                                    Top municípios onde recebeu mais votos · fonte TSE
-                                </p>
-                            </div>
-                            <p className="font-mono text-[9px] tracking-widest text-gray-700">
-                                {votos.votos.length} registros · {votos.total.toLocaleString('pt-BR')} votos
-                            </p>
-                        </div>
-
-                        <div className="space-y-1">
-                            {votos.votos.slice(0, 20).map((v, i) => {
-                                const max = votos.votos[0].votos;
-                                const pct = max > 0 ? (v.votos / max) * 100 : 0;
-                                return (
-                                    <div key={i} className="flex items-center gap-3 px-2 py-2 hover:bg-[#080808] transition-colors">
-                                        <span className="font-mono text-[8px] text-gray-700 w-6 tabular-nums">{String(i+1).padStart(2,'0')}</span>
-                                        <span className="font-bebas text-xs tracking-widest text-[#FFD700]/70 w-8">{v.uf}</span>
-                                        <span className="font-bebas text-sm text-white flex-1 truncate">{v.municipio}</span>
-                                        <div className="flex-1 h-1.5 bg-[#111]">
-                                            <div className="h-full bg-[#FFD700]/60 transition-all"
-                                                style={{ width: `${pct}%` }} />
-                                        </div>
-                                        <span className="font-bebas text-sm text-[#FFD700] w-24 text-right tabular-nums">
-                                            {v.votos.toLocaleString('pt-BR')}
-                                        </span>
-                                        <span className="font-mono text-[8px] text-gray-700 w-12">{v.ano}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {votos.votos.length > 20 && (
-                            <p className="text-center font-mono text-[8px] tracking-widest text-gray-700 mt-3">
-                                · {votos.votos.length - 20} municípios adicionais ·
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-
             {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
-            {((data.mandatos?.length ?? 0) > 0 || (bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
+            {((bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
                 <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
 
                     {/* Linha do tempo */}
@@ -965,18 +723,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     type Ev = { ano: number; tipo: string; titulo: string; desc?: string; cor: string; partido?: string };
                                     const eventos: Ev[] = [];
 
-                                    // Nascimento (prefere banco enriquecido sobre bio live)
-                                    const dataNasc = data.data_nascimento || bioData?.dataNascimento;
-                                    const munNasc = data.municipio_nascimento || bioData?.municipioNascimento;
-                                    const ufNasc = data.uf_nascimento || bioData?.ufNascimento;
-                                    if (dataNasc) {
-                                        const ano = new Date(dataNasc + 'T00:00:00').getFullYear();
-                                        eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${munNasc || ''}${ufNasc ? ' (' + ufNasc + ')' : ''}`, cor: '#94a3b8' });
+                                    // Nascimento
+                                    if (bioData?.dataNascimento) {
+                                        const ano = new Date(bioData.dataNascimento + 'T00:00:00').getFullYear();
+                                        eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${bioData.municipioNascimento || ''}${bioData.ufNascimento ? ' (' + bioData.ufNascimento + ')' : ''}`, cor: '#94a3b8' });
                                     }
 
-                                    // Mandatos legislativos (banco enriquecido tem prioridade)
-                                    const mandatos = (data.mandatos && data.mandatos.length > 0) ? data.mandatos : (bioData?.historico || []);
-                                    mandatos.forEach(m => {
+                                    // Mandatos legislativos
+                                    (bioData?.historico || []).forEach(m => {
                                         const ano = m.anoInicio || 0;
                                         const partidoInicio = m.partidos[0] || '';
                                         const partidoFim = m.partidos[m.partidos.length - 1] || partidoInicio;
@@ -1615,8 +1369,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>{/* fim flex flex-col direita */}
             </div>{/* fim grid */}
 
-            {/* ── MAPA DE ATUAÇÃO NACIONAL ── (só quando há emendas) */}
-            {data.total_emendas > 0 ? (
+            {/* ── MAPA DE ATUAÇÃO NACIONAL ── */}
             <div className="max-w-7xl mx-auto mt-5 mb-8">
                 <Suspense fallback={
                     <div className="border border-[#1a1a1a] h-[380px] flex flex-col items-center justify-center gap-3 bg-black">
@@ -1633,31 +1386,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         politicoId={data.id}
                         height={380}
                         onMunicipioClick={(municipio, uf) => {
+                            // Reusa o filtro existente — formato armazenado é "CIDADE - UF"
                             setCidadeFiltro(`${municipio.toUpperCase()} - ${uf}`);
                             setPaginaAtual(1);
                         }}
                     />
                 </Suspense>
             </div>
-            ) : (
-                /* Sem emendas — substitui o mapa por mensagem útil */
-                <div className="max-w-7xl mx-auto mt-5 mb-8 border border-[#1a1a1a] bg-[#0a0a0a] p-8 text-center">
-                    <p className="font-mono text-[9px] tracking-[0.4em] text-gray-600 uppercase mb-2">Mapa de Atuação Federal</p>
-                    <p className="font-bebas text-2xl tracking-widest text-gray-500 mb-3">SEM EMENDAS FEDERAIS</p>
-                    <p className="text-[12px] text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                        Este parlamentar não possui emendas individuais registradas no Portal da Transparência.
-                        Emendas individuais são instrumentos de deputados federais e senadores —
-                        {perfilTipo?.tipo_principal && perfilTipo.tipo_principal !== 'deputado_federal' && perfilTipo.tipo_principal !== 'senador' && (
-                            <> este perfil parece ser de outro tipo de cargo ({(perfilTipo.tipo_principal as string).replace(/_/g, ' ')}), que tem outras atribuições.</>
-                        )}
-                    </p>
-                    {votos && votos.votos.length > 0 && (
-                        <p className="font-mono text-[9px] tracking-widest text-[#FFD700]/40 mt-3">
-                            VEJA A BASE ELEITORAL ABAIXO ↓
-                        </p>
-                    )}
-                </div>
-            )}
 
             {/* ── VOCÊ SABIA? ── */}
             {data.total_emendas > 0 && (
@@ -1669,55 +1404,50 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             )}
 
-            {/* ── COMPARAÇÃO COM PARES (ranking nacional/partido/UF) ───────── */}
-            {ranking && ranking.nacional_valor && (data.total_emendas > 0) && (
+            {/* ── EMENDAS × CONTRATOS NOS MESMOS MUNICÍPIOS ───────────────── */}
+            {cruzamento !== null && cruzamento.tem_cruzamento && (
                 <div className="max-w-7xl mx-auto mt-8 mb-8">
-                    <div className="bg-[#0a0a0a] border border-[#1a1a1a]">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] overflow-hidden">
                         <div className="border-b border-[#1a1a1a] px-5 py-3 flex items-center gap-3">
-                            <TrendingUp className="w-5 h-5 text-[#FFD700]/70 shrink-0" />
+                            <GitCompare className="w-5 h-5 text-[#FFD700]/70 shrink-0" />
                             <div>
-                                <p className="font-bebas text-lg tracking-widest text-[#FFD700]">COMPARAÇÃO COM PARES</p>
+                                <p className="font-bebas text-lg tracking-widest text-[#FFD700]">
+                                    EMENDAS E CONTRATOS NOS MESMOS MUNICÍPIOS
+                                </p>
                                 <p className="text-gray-600 text-[10px] font-mono tracking-widest">
-                                    Posição deste parlamentar em rankings por valor distribuído e por número de emendas
+                                    Comparação informativa · municípios que receberam emendas deste parlamentar e também tiveram contratos federais
                                 </p>
                             </div>
                         </div>
-                        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#1a1a1a]">
-                            {([
-                                { label: 'NACIONAL', rValor: ranking.nacional_valor, rEmendas: ranking.nacional_emendas, cor: '#FFD700' },
-                                ...(ranking.partido_valor ? [{ label: `PARTIDO · ${ranking.partido}`, rValor: ranking.partido_valor, rEmendas: ranking.partido_emendas, cor: '#60a5fa' }] : []),
-                                ...(ranking.uf_valor ? [{ label: `UF · ${ranking.uf}`, rValor: ranking.uf_valor, rEmendas: ranking.uf_emendas, cor: '#4ade80' }] : []),
-                            ] as { label: string; rValor: { posicao: number | null; de: number }; rEmendas?: { posicao: number | null; de: number }; cor: string }[]).map((g, i) => {
-                                const pctValor = g.rValor.posicao && g.rValor.de ? (1 - (g.rValor.posicao - 1) / g.rValor.de) * 100 : 0;
-                                return (
-                                    <div key={i} className="bg-black p-4">
-                                        <p className="font-mono text-[9px] tracking-[0.3em] text-gray-600 uppercase mb-3 truncate" title={g.label}>{g.label}</p>
-                                        <div className="mb-3">
-                                            <div className="flex items-baseline gap-2 mb-1">
-                                                <span className="font-bebas text-3xl leading-none" style={{ color: g.cor }}>#{g.rValor.posicao ?? '—'}</span>
-                                                <span className="font-mono text-[10px] text-gray-600">de {g.rValor.de}</span>
-                                            </div>
-                                            <p className="font-mono text-[9px] tracking-widest text-gray-600 uppercase">por valor distribuído</p>
-                                            <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden mt-1">
-                                                <div className="h-full transition-all" style={{ width: `${Math.max(pctValor, 2)}%`, backgroundColor: g.cor + 'aa' }} />
-                                            </div>
-                                            <p className="font-mono text-[8px] text-gray-700 mt-1">topo {Math.max(1, 100 - pctValor).toFixed(0)}%</p>
-                                        </div>
-                                        {g.rEmendas && (
-                                            <div className="border-t border-[#1a1a1a] pt-2">
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="font-bebas text-xl leading-none text-gray-300">#{g.rEmendas.posicao ?? '—'}</span>
-                                                    <span className="font-mono text-[9px] text-gray-700">de {g.rEmendas.de} · por nº de emendas</span>
+
+                        {cruzamento.camada_geografica.length > 0 && (
+                            <div className="p-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {cruzamento.camada_geografica.map((row, i) => (
+                                        <div key={i} className="bg-[#080808] border border-[#1a1a1a] p-3">
+                                            <p className="font-bebas text-white text-base tracking-wide mb-2">{row.municipio}</p>
+                                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                <div>
+                                                    <span className="text-gray-600 text-[9px] font-mono tracking-widest">EMENDAS</span>
+                                                    <p className="text-[#FFD700] font-bebas text-sm">
+                                                        R$ {(row.valor_emendas/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_emendas}x)</span>
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-600 text-[9px] font-mono tracking-widest">CONTRATOS</span>
+                                                    <p className="text-gray-300 font-bebas text-sm">
+                                                        R$ {(row.valor_contratos/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_contratos}x)</span>
+                                                    </p>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <p className="px-5 pb-3 text-gray-600 text-[10px] font-mono">
-                            Posição calculada sobre todos os parlamentares com pelo menos 1 emenda registrada no Portal da Transparência.
-                        </p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-gray-600 text-[10px] mt-4 font-mono">
+                                    Fontes: Portal da Transparência (emendas e contratos federais). Apenas dados públicos — não implica relação causal.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

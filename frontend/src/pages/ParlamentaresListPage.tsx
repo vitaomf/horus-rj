@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, GitCompare } from 'lucide-react';
+import { ChevronRight, GitCompare, Search, TrendingUp, Award, Wallet } from 'lucide-react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { ESTADOS, REGIOES, type SlugRegiao } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 import { badgeStyle } from '../utils/partidoCores';
 
 interface ParlFederal { id: number; nome: string; partido: string | null; cargo: string | null; foto_url: string | null; }
+interface PoliticoRank { id: number; nome: string; partido: string | null; cargo: string | null; total_emendas: number; valor_total: number; }
+interface PartidoRank { partido: string; total_emendas: number; valor_total: number; total_politicos: number; }
 
 // ── Tipografia padrão do Horus ──
 const FONT_DECORATIVE = "'Cinzel Decorative', serif";
@@ -44,6 +46,45 @@ export function ParlamentaresListPage() {
   const [ufExpandida, setUfExpandida]   = useState<string | null>(null);
   const [parlCache, setParlCache]        = useState<Record<string, ParlFederal[]>>({});
   const [loadingUf, setLoadingUf]        = useState<string | null>(null);
+
+  // Busca rápida
+  const [busca, setBusca] = useState('');
+  const [resultados, setResultados] = useState<ParlFederal[]>([]);
+  const [buscando, setBuscando] = useState(false);
+
+  useEffect(() => {
+    if (busca.trim().length < 2) { setResultados([]); return; }
+    setBuscando(true);
+    const t = setTimeout(() => {
+      fetch(`${API_BASE_URL}/api/politicos?busca=${encodeURIComponent(busca)}&limite=8`)
+        .then(r => r.json())
+        .then(d => setResultados(d.politicos ?? []))
+        .catch(() => setResultados([]))
+        .finally(() => setBuscando(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  // Rankings (top políticos por valor e por número de emendas, top partidos)
+  const [rankValor, setRankValor]       = useState<PoliticoRank[]>([]);
+  const [rankEmendas, setRankEmendas]   = useState<PoliticoRank[]>([]);
+  const [rankPartidos, setRankPartidos] = useState<PartidoRank[]>([]);
+  const [loadingRank, setLoadingRank]   = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/estatisticas`)
+      .then(r => r.json())
+      .then(d => {
+        setRankValor((d.top_politicos ?? []).slice(0, 5));
+        setRankPartidos((d.por_partido ?? []).slice(0, 5));
+      })
+      .catch(() => {});
+    fetch(`${API_BASE_URL}/api/politicos?ordenar=emendas&limite=5`)
+      .then(r => r.json())
+      .then(d => setRankEmendas(d.politicos ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingRank(false));
+  }, []);
 
   useEffect(() => {
     if (!ufExpandida || parlCache[ufExpandida]) return;
@@ -116,6 +157,171 @@ export function ParlamentaresListPage() {
       </div>
 
       <main className="max-w-6xl mx-auto px-6 md:px-12 py-12 space-y-10">
+
+        {/* ── BUSCA RÁPIDA ── */}
+        <div className="relative">
+          <div className="flex items-center gap-3 border border-[#FFD700]/20 bg-[#0a0a0a] px-4 py-3 focus-within:border-[#FFD700]/60 transition-colors">
+            <Search className="w-4 h-4 text-[#FFD700]/60 shrink-0" />
+            <input
+              type="text"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar parlamentar pelo nome (ex: Lula, Tebet, Crivella...)"
+              className="flex-1 bg-transparent text-white placeholder:text-gray-600 outline-none font-mono text-sm"
+            />
+            {buscando && <div className="w-3 h-3 border border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin" />}
+            {busca && (
+              <button onClick={() => { setBusca(''); setResultados([]); }} className="text-gray-600 hover:text-white text-xs font-mono">✕</button>
+            )}
+          </div>
+
+          {/* Dropdown de resultados */}
+          {resultados.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 border border-[#FFD700]/30 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.9)] divide-y divide-[#1a1a1a] max-h-96 overflow-y-auto">
+              {resultados.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => { navigate(`/politicos/${p.id}`); setBusca(''); setResultados([]); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#0a0a0a] transition-colors text-left group"
+                >
+                  <div className="w-8 h-8 border border-[#2a2a2a] group-hover:border-[#FFD700]/30 overflow-hidden bg-[#0a0a0a] shrink-0 flex items-center justify-center">
+                    {p.foto_url ? (
+                      <img src={`${API_BASE_URL}/api/foto/${p.id}`} alt={p.nome} className="w-full h-full object-cover object-top" loading="lazy"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <span className="font-bebas text-[#FFD700]/40 text-xs">{p.nome.split(' ').map(n => n[0]).slice(0,2).join('')}</span>
+                    )}
+                  </div>
+                  <span className="font-bebas text-sm text-white group-hover:text-[#FFD700] tracking-wide flex-1 truncate">{p.nome}</span>
+                  {p.partido && (
+                    <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border shrink-0" style={badgeStyle(p.partido)}>{p.partido}</span>
+                  )}
+                  <ChevronRight className="w-3 h-3 text-gray-700 group-hover:text-[#FFD700]/60" />
+                </button>
+              ))}
+              <button
+                onClick={() => navigate(`/politicos?busca=${encodeURIComponent(busca)}`)}
+                className="w-full px-4 py-2 text-left font-mono text-[10px] tracking-widest text-[#FFD700]/60 hover:text-[#FFD700] hover:bg-[#0a0a0a] transition-colors uppercase"
+              >
+                Ver todos os resultados →
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── RANKINGS ── */}
+        {!loadingRank && (rankValor.length > 0 || rankEmendas.length > 0 || rankPartidos.length > 0) && (
+          <div className="border border-[#FFD700]/15 bg-[#0a0a0a] p-5">
+            <div className="flex items-center gap-3 mb-5">
+              <TrendingUp className="w-4 h-4 text-[#FFD700]/70" />
+              <p className="font-bebas text-[#FFD700] text-lg tracking-widest">RANKINGS NACIONAIS</p>
+              <span className="font-mono text-[9px] tracking-widest text-gray-600 uppercase">Top 5 · todos os anos</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Quem mais distribuiu */}
+              <div className="bg-black border border-[#1a1a1a] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wallet className="w-3.5 h-3.5 text-[#FFD700]/70" />
+                  <p className="font-bebas text-xs tracking-widest text-[#FFD700]">QUEM MAIS DISTRIBUIU</p>
+                </div>
+                <p className="font-mono text-[9px] text-gray-600 uppercase tracking-widest mb-3">Valor total em emendas</p>
+                <div className="space-y-2">
+                  {rankValor.map((p, i) => {
+                    const max = rankValor[0]?.valor_total || 1;
+                    const pct = p.valor_total / max * 100;
+                    const fmt = p.valor_total >= 1e9 ? `R$ ${(p.valor_total/1e9).toFixed(2)}B` : `R$ ${(p.valor_total/1e6).toFixed(0)}M`;
+                    return (
+                      <button key={p.id} onClick={() => navigate(`/politicos/${p.id}`)} className="w-full text-left group">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bebas text-gray-700 text-xs w-4 shrink-0">{i+1}</span>
+                            <span className="text-gray-300 text-xs truncate group-hover:text-[#FFD700]">{p.nome}</span>
+                            {p.partido && <span className="font-mono text-[7px] tracking-widest px-1 py-0.5 border shrink-0" style={badgeStyle(p.partido)}>{p.partido}</span>}
+                          </div>
+                          <span className="font-bebas text-[#FFD700] text-xs shrink-0">{fmt}</span>
+                        </div>
+                        <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden ml-6">
+                          <div className="h-full bg-[#FFD700]/70 group-hover:bg-[#FFD700] transition-colors" style={{ width: `${Math.max(pct, 2)}%` }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Quem é mais produtivo */}
+              <div className="bg-black border border-[#1a1a1a] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Award className="w-3.5 h-3.5 text-green-400/70" />
+                  <p className="font-bebas text-xs tracking-widest text-green-400">MAIS PRODUTIVOS</p>
+                </div>
+                <p className="font-mono text-[9px] text-gray-600 uppercase tracking-widest mb-3">Número de emendas registradas</p>
+                <div className="space-y-2">
+                  {rankEmendas.map((p, i) => {
+                    const max = rankEmendas[0]?.total_emendas || 1;
+                    const pct = p.total_emendas / max * 100;
+                    return (
+                      <button key={p.id} onClick={() => navigate(`/politicos/${p.id}`)} className="w-full text-left group">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bebas text-gray-700 text-xs w-4 shrink-0">{i+1}</span>
+                            <span className="text-gray-300 text-xs truncate group-hover:text-green-400">{p.nome}</span>
+                            {p.partido && <span className="font-mono text-[7px] tracking-widest px-1 py-0.5 border shrink-0" style={badgeStyle(p.partido)}>{p.partido}</span>}
+                          </div>
+                          <span className="font-bebas text-green-400 text-xs shrink-0">{p.total_emendas}</span>
+                        </div>
+                        <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden ml-6">
+                          <div className="h-full bg-green-500/70 group-hover:bg-green-400 transition-colors" style={{ width: `${Math.max(pct, 2)}%` }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Top partidos */}
+              <div className="bg-black border border-[#1a1a1a] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-3.5 h-3.5 text-[#03A9F4]/70" />
+                  <p className="font-bebas text-xs tracking-widest text-[#03A9F4]">PARTIDOS QUE MAIS RECEBERAM</p>
+                </div>
+                <p className="font-mono text-[9px] text-gray-600 uppercase tracking-widest mb-3">Volume agregado por sigla</p>
+                <div className="space-y-2">
+                  {rankPartidos.map((p, i) => {
+                    const max = rankPartidos[0]?.valor_total || 1;
+                    const pct = p.valor_total / max * 100;
+                    const fmt = p.valor_total >= 1e9 ? `R$ ${(p.valor_total/1e9).toFixed(2)}B` : `R$ ${(p.valor_total/1e6).toFixed(0)}M`;
+                    return (
+                      <div key={p.partido} className="w-full">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bebas text-gray-700 text-xs w-4 shrink-0">{i+1}</span>
+                            <span className="font-mono text-[10px] tracking-widest px-1.5 py-0.5 border shrink-0" style={badgeStyle(p.partido)}>{p.partido}</span>
+                            <span className="text-gray-600 text-[10px] truncate">{p.total_politicos} parlamentares</span>
+                          </div>
+                          <span className="font-bebas text-[#03A9F4] text-xs shrink-0">{fmt}</span>
+                        </div>
+                        <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden ml-6">
+                          <div className="h-full bg-[#03A9F4]/70" style={{ width: `${Math.max(pct, 2)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-[#1a1a1a] flex items-center justify-between flex-wrap gap-2">
+              <p className="font-mono text-[9px] text-gray-700 tracking-widest uppercase">
+                Fonte: Portal da Transparência (gov.br) · dados agregados de todos os anos coletados
+              </p>
+              <button onClick={() => navigate('/painel')} className="font-bebas text-[#FFD700]/60 hover:text-[#FFD700] text-xs tracking-widest border border-[#FFD700]/20 hover:border-[#FFD700] px-3 py-1.5 transition-colors">
+                VER PAINEL COMPLETO →
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── FEDERAL ── */}
         <NivelBlock

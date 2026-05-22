@@ -205,14 +205,13 @@ export function BrasilPage() {
                       <div className="absolute top-0 left-0 right-0 h-px opacity-40 transition-opacity group-hover/estado:opacity-100"
                         style={{ backgroundColor: cor }} />
 
-                      <p className="font-bebas text-2xl leading-none mb-1 transition-colors group-hover/estado:text-[#FFD700]"
-                        style={{ color: cor }}>
+                      <p className="font-bebas text-5xl leading-none mb-2 text-[#FFD700] transition-transform group-hover/estado:scale-105">
                         {estado.uf}
                       </p>
-                      <p className="font-mono text-[9px] tracking-wide text-gray-600 leading-tight">
+                      <p className="font-mono text-xs tracking-wide text-[#FFD700]/70 leading-tight">
                         {estado.nome}
                       </p>
-                      <p className="font-mono text-[8px] text-gray-800 mt-1">
+                      <p className="font-mono text-[10px] text-[#FFD700]/50 mt-1">
                         {estado.totalMunicipios} mun.
                       </p>
                     </button>

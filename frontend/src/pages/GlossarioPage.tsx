@@ -20,6 +20,12 @@ const TERMOS: Termo[] = [
     fonte: 'Portal da Transparência (gov.br)',
   },
   {
+    termo: 'Autor Coletivo',
+    simples: 'Emendas que não têm um parlamentar único como dono — vêm de uma comissão, de uma bancada (todos os deputados de um estado) ou de um relator do orçamento. Ficam separadas do ranking individual.',
+    detalhe: 'Exemplos no Portal da Transparência: "COM. DA SAÚDE" (Comissão de Saúde da Câmara), "BANCADA DO RIO DE JANEIRO" (todos os deputados federais do RJ juntos), "RELATOR GERAL" (relator do orçamento). Esses autores movimentam bilhões, mas a indicação é colegiada — então não faz sentido somar no perfil de um político individual. Por isso o Horus exclui essas linhas das listagens de parlamentares (mas mantém no banco para auditoria).',
+    fonte: 'Portal da Transparência (gov.br)',
+  },
+  {
     termo: 'Valor empenhado',
     simples: 'É o dinheiro que foi "prometido" — o governo reservou no orçamento. É como colocar dinheiro em uma conta separada com um destino específico.',
     detalhe: 'Empenhar é o primeiro estágio da execução. O dinheiro empenhado ainda não saiu do cofre do governo — é só uma reserva.',

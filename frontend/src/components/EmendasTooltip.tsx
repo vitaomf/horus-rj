@@ -64,6 +64,26 @@ export function EmendasTooltip() {
                   </div>
                 ))}
               </div>
+
+              {/* Links pra páginas completas */}
+              <div className="border-t border-[#1a1a1a] mt-3 pt-3 flex flex-col gap-2">
+                <a
+                  href="/glossario"
+                  onClick={() => setAberto(false)}
+                  className="flex items-center justify-between font-bebas text-[#FFD700]/70 hover:text-[#FFD700] text-xs tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-2 transition-colors"
+                >
+                  <span>VER GLOSSÁRIO COMPLETO</span>
+                  <span>→</span>
+                </a>
+                <a
+                  href="/painel"
+                  onClick={() => setAberto(false)}
+                  className="flex items-center justify-between font-bebas text-gray-500 hover:text-[#FFD700] text-xs tracking-widest border border-[#1a1a1a] hover:border-[#FFD700]/40 px-3 py-2 transition-colors"
+                >
+                  <span>PAINEL DE EVIDÊNCIAS</span>
+                  <span>→</span>
+                </a>
+              </div>
             </div>
           </div>
         </>
