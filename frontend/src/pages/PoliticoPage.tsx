@@ -1597,7 +1597,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>{/* fim flex flex-col direita */}
             </div>{/* fim grid */}
 
-            {/* ── MAPA DE ATUAÇÃO NACIONAL ── */}
+            {/* ── MAPA DE ATUAÇÃO NACIONAL ── (só quando há emendas) */}
+            {data.total_emendas > 0 ? (
             <div className="max-w-7xl mx-auto mt-5 mb-8">
                 <Suspense fallback={
                     <div className="border border-[#1a1a1a] h-[380px] flex flex-col items-center justify-center gap-3 bg-black">
@@ -1614,13 +1615,31 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         politicoId={data.id}
                         height={380}
                         onMunicipioClick={(municipio, uf) => {
-                            // Reusa o filtro existente — formato armazenado é "CIDADE - UF"
                             setCidadeFiltro(`${municipio.toUpperCase()} - ${uf}`);
                             setPaginaAtual(1);
                         }}
                     />
                 </Suspense>
             </div>
+            ) : (
+                /* Sem emendas — substitui o mapa por mensagem útil */
+                <div className="max-w-7xl mx-auto mt-5 mb-8 border border-[#1a1a1a] bg-[#0a0a0a] p-8 text-center">
+                    <p className="font-mono text-[9px] tracking-[0.4em] text-gray-600 uppercase mb-2">Mapa de Atuação Federal</p>
+                    <p className="font-bebas text-2xl tracking-widest text-gray-500 mb-3">SEM EMENDAS FEDERAIS</p>
+                    <p className="text-[12px] text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                        Este parlamentar não possui emendas individuais registradas no Portal da Transparência.
+                        Emendas individuais são instrumentos de deputados federais e senadores —
+                        {perfilTipo?.tipo_principal && perfilTipo.tipo_principal !== 'deputado_federal' && perfilTipo.tipo_principal !== 'senador' && (
+                            <> este perfil parece ser de outro tipo de cargo ({(perfilTipo.tipo_principal as string).replace(/_/g, ' ')}), que tem outras atribuições.</>
+                        )}
+                    </p>
+                    {votos && votos.votos.length > 0 && (
+                        <p className="font-mono text-[9px] tracking-widest text-[#FFD700]/40 mt-3">
+                            VEJA A BASE ELEITORAL ABAIXO ↓
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* ── VOCÊ SABIA? ── */}
             {data.total_emendas > 0 && (
