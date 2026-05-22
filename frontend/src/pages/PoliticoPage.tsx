@@ -597,10 +597,29 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             <div className="flex items-center gap-3 mb-3 flex-wrap">
                                 <span className="border border-[#FFD700]/40 text-[#FFD700] font-bebas tracking-widest px-3 py-1 text-sm">{data.partido}</span>
                                 <span className="font-mono text-[10px] text-gray-600 tracking-widest uppercase">{data.cargo}</span>
-                                {/* #42 mandatos */}
-                                {bioData?.historico && bioData.historico.length > 0 && (
+                                {/* mandatos (do banco enriquecido ou da bio live) */}
+                                {(() => {
+                                    const n = (data.mandatos?.length ?? 0) || (bioData?.historico?.length ?? 0);
+                                    return n > 0 ? (
+                                        <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
+                                            {n} {n === 1 ? 'mandato' : 'mandatos'}
+                                        </span>
+                                    ) : null;
+                                })()}
+                                {/* Idade (se data_nascimento existe no banco enriquecido) */}
+                                {data.data_nascimento && (() => {
+                                    const ano = new Date(data.data_nascimento + 'T00:00:00').getFullYear();
+                                    const idade = new Date().getFullYear() - ano;
+                                    return (
+                                        <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
+                                            {idade} anos
+                                        </span>
+                                    );
+                                })()}
+                                {/* UF de nascimento */}
+                                {data.uf_nascimento && (
                                     <span className="font-mono text-[8px] tracking-widest border border-[#2a2a2a] px-2 py-1 text-gray-600">
-                                        {bioData.historico.length} {bioData.historico.length === 1 ? 'mandato' : 'mandatos'}
+                                        nascido(a) em {data.uf_nascimento}
                                     </span>
                                 )}
                             </div>
@@ -701,7 +720,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             <div className="px-4 md:px-12">
 
             {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
-            {((bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
+            {((data.mandatos?.length ?? 0) > 0 || (bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
                 <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
 
                     {/* Linha do tempo */}
@@ -747,14 +766,18 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     type Ev = { ano: number; tipo: string; titulo: string; desc?: string; cor: string; partido?: string };
                                     const eventos: Ev[] = [];
 
-                                    // Nascimento
-                                    if (bioData?.dataNascimento) {
-                                        const ano = new Date(bioData.dataNascimento + 'T00:00:00').getFullYear();
-                                        eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${bioData.municipioNascimento || ''}${bioData.ufNascimento ? ' (' + bioData.ufNascimento + ')' : ''}`, cor: '#94a3b8' });
+                                    // Nascimento (prefere banco enriquecido sobre bio live)
+                                    const dataNasc = data.data_nascimento || bioData?.dataNascimento;
+                                    const munNasc = data.municipio_nascimento || bioData?.municipioNascimento;
+                                    const ufNasc = data.uf_nascimento || bioData?.ufNascimento;
+                                    if (dataNasc) {
+                                        const ano = new Date(dataNasc + 'T00:00:00').getFullYear();
+                                        eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${munNasc || ''}${ufNasc ? ' (' + ufNasc + ')' : ''}`, cor: '#94a3b8' });
                                     }
 
-                                    // Mandatos legislativos
-                                    (bioData?.historico || []).forEach(m => {
+                                    // Mandatos legislativos (banco enriquecido tem prioridade)
+                                    const mandatos = (data.mandatos && data.mandatos.length > 0) ? data.mandatos : (bioData?.historico || []);
+                                    mandatos.forEach(m => {
                                         const ano = m.anoInicio || 0;
                                         const partidoInicio = m.partidos[0] || '';
                                         const partidoFim = m.partidos[m.partidos.length - 1] || partidoInicio;
