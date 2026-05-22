@@ -1136,6 +1136,164 @@ def distribuicao_municipios(request: Request, politico_id: int, uf: str):
         conn.close()
 
 
+@app.get("/api/politicos/{politico_id}/trajetoria")
+@limiter.limit("30/minute")
+def trajetoria_politico(request: Request, politico_id: int):
+    """
+    Linha do tempo eleitoral: agrega cada candidatura/mandato do parlamentar
+    cruzando eleitos_estaduais, eleitos_municipais e mandatos_json (Câmara).
+    Retorna ordenado por ano descendente.
+    """
+    conn = get_db_connection()
+    try:
+        # Pega nome + nome_urna para match
+        cols_p = {r[1] for r in conn.execute("PRAGMA table_info(politicos)").fetchall()}
+        cols_select = "nome, nome_urna" if "nome_urna" in cols_p else "nome, nome as nome_urna"
+        cols_select += ", mandatos_json" if "mandatos_json" in cols_p else ""
+        row = conn.execute(f"SELECT {cols_select} FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Não encontrado")
+
+        nome = row["nome"] or ""
+        nome_urna = row["nome_urna"] or nome
+        nomes_busca = list({nome.upper(), nome_urna.upper()})
+
+        eventos = []
+
+        # 1. eleitos_estaduais (deputados federais, estaduais, senadores, governadores 2022)
+        for tabela, nivel in [("eleitos_estaduais", "estadual"), ("eleitos_municipais", "municipal")]:
+            try:
+                placeholders = ",".join("?" * len(nomes_busca))
+                rs = conn.execute(f"""
+                    SELECT uf, cargo, ano_eleicao, mandato, partido, sigla_situacao, sq_candidato
+                           {", municipio" if tabela == "eleitos_municipais" else ""}
+                    FROM {tabela}
+                    WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+                    ORDER BY ano_eleicao DESC
+                """, nomes_busca + nomes_busca).fetchall()
+                for r in rs:
+                    eventos.append({
+                        "tipo": "eleicao",
+                        "nivel": nivel,
+                        "uf": r["uf"],
+                        "municipio": r["municipio"] if tabela == "eleitos_municipais" else None,
+                        "cargo": r["cargo"],
+                        "ano": r["ano_eleicao"],
+                        "mandato": r["mandato"],
+                        "partido": r["partido"],
+                        "situacao": r["sigla_situacao"],
+                        "sq_candidato": r["sq_candidato"],
+                    })
+            except Exception:
+                pass
+
+        # 2. mandatos_json (Câmara federal histórico)
+        try:
+            mj = row["mandatos_json"] if "mandatos_json" in row.keys() else None
+        except Exception:
+            mj = None
+        if mj:
+            try:
+                for m in json.loads(mj):
+                    eventos.append({
+                        "tipo": "mandato",
+                        "nivel": "federal",
+                        "cargo": "deputado_federal",
+                        "ano": m.get("anoInicio"),
+                        "ano_fim": m.get("anoFim"),
+                        "mandato": f'{m.get("anoInicio")}-{m.get("anoFim")}' if m.get("anoInicio") else None,
+                        "legislatura": m.get("idLegislatura"),
+                        "partidos": m.get("partidos", []),
+                        "partido": (m.get("partidos") or [None])[-1],
+                    })
+            except Exception:
+                pass
+
+        # 3. Total de votos (se temos votos_candidato)
+        sqs = [e.get("sq_candidato") for e in eventos if e.get("sq_candidato")]
+        votos_por_sq = {}
+        try:
+            if sqs:
+                placeholders = ",".join("?" * len(sqs))
+                rs = conn.execute(f"""
+                    SELECT sq_candidato, SUM(votos) as total, COUNT(DISTINCT municipio) as muns
+                    FROM votos_candidato WHERE sq_candidato IN ({placeholders})
+                    GROUP BY sq_candidato
+                """, sqs).fetchall()
+                for r in rs:
+                    votos_por_sq[r["sq_candidato"]] = {"total": r["total"], "municipios": r["muns"]}
+        except Exception:
+            pass
+
+        for e in eventos:
+            sq = e.get("sq_candidato")
+            if sq and sq in votos_por_sq:
+                e["votos_total"] = votos_por_sq[sq]["total"]
+                e["votos_municipios"] = votos_por_sq[sq]["municipios"]
+
+        eventos.sort(key=lambda x: (x.get("ano") or 0), reverse=True)
+        return {"trajetoria": eventos, "tem_votos": bool(votos_por_sq)}
+    except HTTPException: raise
+    except Exception as e:
+        logger.error("Erro em /trajetoria: %s", e, exc_info=True)
+        return {"trajetoria": [], "tem_votos": False}
+    finally:
+        conn.close()
+
+
+@app.get("/api/politicos/{politico_id}/votos")
+@limiter.limit("30/minute")
+def votos_politico(request: Request, politico_id: int, ano: Optional[int] = Query(None)):
+    """Votos por município de um parlamentar (todas eleições onde aparece)."""
+    conn = get_db_connection()
+    try:
+        cols_p = {r[1] for r in conn.execute("PRAGMA table_info(politicos)").fetchall()}
+        cols_select = "nome, nome_urna" if "nome_urna" in cols_p else "nome, nome as nome_urna"
+        row = conn.execute(f"SELECT {cols_select} FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Não encontrado")
+
+        nomes = list({(row["nome"] or "").upper(), (row["nome_urna"] or "").upper()})
+        nomes = [n for n in nomes if n]
+        if not nomes:
+            return {"votos": [], "total": 0}
+
+        placeholders = ",".join("?" * len(nomes))
+        params: list = list(nomes) + list(nomes)
+        sql_ano = ""
+        if ano:
+            sql_ano = " AND v.ano = ?"
+            params.append(ano)
+
+        rs = conn.execute(f"""
+            SELECT v.ano, v.uf, v.municipio,
+                   SUM(v.votos) as votos,
+                   e.cargo, e.partido
+            FROM votos_candidato v
+            JOIN (
+                SELECT sq_candidato, cargo, partido FROM eleitos_estaduais
+                WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+                UNION
+                SELECT sq_candidato, cargo, partido FROM eleitos_municipais
+                WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+            ) e ON e.sq_candidato = v.sq_candidato
+            WHERE 1=1 {sql_ano}
+            GROUP BY v.ano, v.uf, v.municipio, e.cargo, e.partido
+            ORDER BY votos DESC
+            LIMIT 1000
+        """, params + nomes + nomes).fetchall()
+
+        votos = [dict(r) for r in rs]
+        total = sum(v["votos"] for v in votos)
+        return {"votos": votos, "total": total}
+    except HTTPException: raise
+    except Exception as e:
+        logger.error("Erro em /votos: %s", e, exc_info=True)
+        return {"votos": [], "total": 0}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}/emendas")
 @limiter.limit("60/minute")
 def emendas_politico_paginadas(

@@ -224,6 +224,20 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         partido?: string;
         uf?: string;
     } | null>(null);
+    const [trajetoria, setTrajetoria] = useState<{
+        trajetoria: Array<{
+            tipo: string; nivel: string; uf?: string; municipio?: string | null;
+            cargo?: string; ano?: number; ano_fim?: number;
+            mandato?: string; partido?: string; partidos?: string[];
+            situacao?: string; sq_candidato?: string;
+            votos_total?: number; votos_municipios?: number;
+        }>;
+        tem_votos: boolean;
+    } | null>(null);
+    const [votos, setVotos] = useState<{
+        votos: Array<{ ano: number; uf: string; municipio: string; votos: number; cargo: string; partido: string }>;
+        total: number;
+    } | null>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -258,6 +272,16 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/wikipedia`)
             .then(res => setWikiData(res.data))
             .catch(() => setWikiData({ encontrado: false }));
+
+        // Trajetória eleitoral (eleitos_* + mandatos_json + votos TSE)
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/trajetoria`)
+            .then(res => setTrajetoria(res.data))
+            .catch(() => setTrajetoria(null));
+
+        // Votos por município
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/votos`)
+            .then(res => setVotos(res.data))
+            .catch(() => setVotos(null));
 
         // Ranking nacional/partido/UF
         axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/ranking`)
@@ -718,6 +742,135 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             {/* ── CONTEÚDO RESTANTE ── */}
             <div className="px-4 md:px-12">
+
+            {/* ── TRAJETÓRIA ELEITORAL (cargos + votos por município) ── */}
+            {trajetoria && trajetoria.trajetoria.length > 0 && (
+                <div className="max-w-7xl mx-auto mb-10">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <p className="font-bebas text-[#FFD700] text-xl tracking-widest">TRAJETÓRIA ELEITORAL</p>
+                                <p className="text-gray-600 text-[11px] uppercase tracking-widest">
+                                    Cargos eleitos · TSE + Câmara · {trajetoria.trajetoria.length} eventos
+                                </p>
+                            </div>
+                            {trajetoria.tem_votos && (
+                                <div className="text-right">
+                                    <p className="font-bebas text-2xl text-[#FFD700]">
+                                        {(votos?.total ?? 0).toLocaleString('pt-BR')}
+                                    </p>
+                                    <p className="font-mono text-[8px] tracking-widest text-gray-700">VOTOS TOTAIS</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Linha do tempo */}
+                        <div className="relative">
+                            <div className="absolute left-2 top-1 bottom-1 w-px bg-[#1a1a1a]" />
+                            <div className="space-y-3">
+                                {trajetoria.trajetoria.map((ev, i) => {
+                                    const cargoLabel: Record<string, string> = {
+                                        deputado_federal: 'Deputado Federal',
+                                        deputado_estadual: 'Deputado Estadual',
+                                        senador: 'Senador',
+                                        governador: 'Governador',
+                                        vice_governador: 'Vice-Governador',
+                                        prefeito: 'Prefeito',
+                                        vice_prefeito: 'Vice-Prefeito',
+                                        vereador: 'Vereador',
+                                    };
+                                    const cor = ev.nivel === 'federal' ? '#FFD700'
+                                              : ev.nivel === 'estadual' ? '#03A9F4'
+                                              : '#4CAF50';
+                                    const cargo = cargoLabel[ev.cargo || ''] || ev.cargo || ev.tipo;
+                                    return (
+                                        <div key={i} className="relative flex gap-4 pl-7">
+                                            <div className="absolute left-0 top-1.5 w-[15px] h-[15px] border-2 z-10"
+                                                style={{ borderColor: cor, backgroundColor: '#0a0a0a' }} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-baseline gap-3 flex-wrap">
+                                                    <span className="font-bebas text-2xl leading-none" style={{ color: cor }}>
+                                                        {ev.ano}
+                                                    </span>
+                                                    <span className="font-bebas text-sm text-white tracking-wide">{cargo}</span>
+                                                    {ev.uf && (
+                                                        <span className="text-[10px] font-bold tracking-widest text-gray-500 border border-[#2a2a2a] px-1.5 py-0.5">
+                                                            {ev.municipio ? `${ev.municipio}/${ev.uf}` : ev.uf}
+                                                        </span>
+                                                    )}
+                                                    {ev.partido && (
+                                                        <span className="text-[10px] font-bold tracking-widest text-gray-500 border border-[#2a2a2a] px-1.5 py-0.5">
+                                                            {ev.partido}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] mt-0.5 text-gray-500">
+                                                    {ev.mandato && <span>Mandato {ev.mandato}</span>}
+                                                    {ev.situacao && <span className="text-green-500/70">· {ev.situacao}</span>}
+                                                    {ev.votos_total !== undefined && (
+                                                        <span className="text-[#FFD700]/60">
+                                                            · {ev.votos_total.toLocaleString('pt-BR')} votos
+                                                            {ev.votos_municipios && ` em ${ev.votos_municipios} municípios`}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── VOTOS POR MUNICÍPIO (top 20) ── */}
+            {votos && votos.votos.length > 0 && (
+                <div className="max-w-7xl mx-auto mb-10">
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <div>
+                                <p className="font-bebas text-[#FFD700] text-xl tracking-widest">VOTOS POR MUNICÍPIO</p>
+                                <p className="text-gray-600 text-[11px] uppercase tracking-widest">
+                                    Top municípios onde recebeu mais votos · fonte TSE
+                                </p>
+                            </div>
+                            <p className="font-mono text-[9px] tracking-widest text-gray-700">
+                                {votos.votos.length} registros · {votos.total.toLocaleString('pt-BR')} votos
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            {votos.votos.slice(0, 20).map((v, i) => {
+                                const max = votos.votos[0].votos;
+                                const pct = max > 0 ? (v.votos / max) * 100 : 0;
+                                return (
+                                    <div key={i} className="flex items-center gap-3 px-2 py-2 hover:bg-[#080808] transition-colors">
+                                        <span className="font-mono text-[8px] text-gray-700 w-6 tabular-nums">{String(i+1).padStart(2,'0')}</span>
+                                        <span className="font-bebas text-xs tracking-widest text-[#FFD700]/70 w-8">{v.uf}</span>
+                                        <span className="font-bebas text-sm text-white flex-1 truncate">{v.municipio}</span>
+                                        <div className="flex-1 h-1.5 bg-[#111]">
+                                            <div className="h-full bg-[#FFD700]/60 transition-all"
+                                                style={{ width: `${pct}%` }} />
+                                        </div>
+                                        <span className="font-bebas text-sm text-[#FFD700] w-24 text-right tabular-nums">
+                                            {v.votos.toLocaleString('pt-BR')}
+                                        </span>
+                                        <span className="font-mono text-[8px] text-gray-700 w-12">{v.ano}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {votos.votos.length > 20 && (
+                            <p className="text-center font-mono text-[8px] tracking-widest text-gray-700 mt-3">
+                                · {votos.votos.length - 20} municípios adicionais ·
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
 
             {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
             {((data.mandatos?.length ?? 0) > 0 || (bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
