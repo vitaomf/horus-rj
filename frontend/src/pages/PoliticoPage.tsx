@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2, GitCompare, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, AlertCircle, FileText, ExternalLink, Star, Share2, GitCompare, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
@@ -110,9 +110,17 @@ interface DadosCampanha {
 interface PoliticoData {
     id: number;
     nome: string;
+    nome_urna?: string | null;
     partido: string;
     cargo: string;
     foto_url?: string | null;
+    data_nascimento?: string | null;
+    municipio_nascimento?: string | null;
+    uf_nascimento?: string | null;
+    escolaridade?: string | null;
+    profissao?: string | null;
+    bio_texto?: string | null;
+    mandatos?: MandatoHistorico[];
     total_emendas: number;
     valor_total: number;
     dados_campanha?: DadosCampanha | null;
@@ -196,10 +204,25 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
     const { registrar: registrarRecente } = useRecentesVistos();
     const [atividade, setAtividade] = useState<AtividadeLegislativa | null>(null);
     const [loadingAtividade, setLoadingAtividade] = useState(false);
-    const [cruzamento, setCruzamento] = useState<{
-        camada_geografica: { municipio: string; valor_emendas: number; num_emendas: number; valor_contratos: number; num_contratos: number }[];
-        camada_financeira: { doador: string; documento: string; valor_doacao: number; valor_contratos: number; num_contratos: number; municipios: string }[];
-        tem_cruzamento: boolean;
+    const [wikiData, setWikiData] = useState<{
+        encontrado: boolean;
+        titulo?: string;
+        resumo?: string;
+        formacao?: string | null;
+        profissao?: string | null;
+        cargos?: { cargo: string; inicio?: string | null; fim?: string | null }[];
+        eventos?: { ano: number; trecho: string }[];
+        url?: string;
+    } | null>(null);
+    const [ranking, setRanking] = useState<{
+        nacional_valor?: { posicao: number | null; de: number };
+        nacional_emendas?: { posicao: number | null; de: number };
+        partido_valor?: { posicao: number | null; de: number };
+        partido_emendas?: { posicao: number | null; de: number };
+        uf_valor?: { posicao: number | null; de: number };
+        uf_emendas?: { posicao: number | null; de: number };
+        partido?: string;
+        uf?: string;
     } | null>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
@@ -231,9 +254,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
         fetchData();
 
-        // Cruzamento emendas × contratos (carrega em paralelo)
-        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/cruzamento`)
-            .then(res => setCruzamento(res.data))
+        // Biografia complementar do Wikipedia
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/wikipedia`)
+            .then(res => setWikiData(res.data))
+            .catch(() => setWikiData({ encontrado: false }));
+
+        // Ranking nacional/partido/UF
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/ranking`)
+            .then(res => setRanking(res.data))
             .catch(() => {});
     }, [politicoId]);
 
@@ -311,57 +339,55 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     };
 
-    // Bio irônica gerada automaticamente a partir dos padrões de gasto
-    const getBioIronica = (): string => {
-        if (!data) return '';
-        const total = data.valor_total;
-        const numMuns = data.municipios_beneficiados.length;
-        const topMun = data.municipios_beneficiados[0];
-        const topMunPct = topMun ? Math.round((topMun.valor / total) * 100) : 0;
-        const anos = data.emendas_por_ano.map(a => a.ano);
-        const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
-        const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
-        const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
-        const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s+a.valor_total,0)/medEleit.length : 0;
-        const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s+a.valor_total,0)/medNorm.length  : 0;
-        const ehEleitoreiro = avgNorm > 0 && avgEleit > avgNorm * 1.8;
+    // Download CSV — exporta resumo + emendas detalhadas
+    const baixarRelatorioCSV = () => {
+        if (!data) return;
+        const lines: string[] = [];
+        const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-        // Área dominante
-        const porArea = data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
-            const k = e.objetivo || 'sem área';
-            acc[k] = (acc[k]||0) + e.valor;
-            return acc;
-        }, {});
-        const topArea = Object.entries(porArea).sort(([,a],[,b]) => b-a)[0]?.[0] || 'diversas áreas';
-        const topAreaPct = Math.round((porArea[topArea]||0) / total * 100);
+        lines.push('# HORUS — RELATÓRIO DO PARLAMENTAR');
+        lines.push(`# Nome,${esc(data.nome)}`);
+        lines.push(`# Partido,${esc(data.partido || '—')}`);
+        lines.push(`# Cargo,${esc(data.cargo || '—')}`);
+        lines.push(`# Total de emendas,${data.total_emendas}`);
+        lines.push(`# Valor total empenhado,${data.valor_total.toFixed(2)}`);
+        lines.push(`# Municípios beneficiados,${data.municipios_beneficiados.length}`);
+        lines.push(`# Gerado em,${new Date().toISOString()}`);
+        lines.push(`# Fonte,Portal da Transparência (gov.br) + TSE`);
+        lines.push('');
 
-        const totalFmt = total >= 1e9
-            ? `R$ ${(total/1e9).toFixed(1)} bilhões`
-            : `R$ ${(total/1e6).toFixed(0)} milhões`;
-
-        let bio = `Parlamentar com ${anos.length} ano${anos.length!==1?'s':''} de atividade rastreada, `;
-        bio += `tendo destinado ${totalFmt} em emendas parlamentares ao Rio de Janeiro. `;
-
-        if (topMunPct >= 40) {
-            bio += `Fiel ao método da concentração: ${topMunPct}% dos recursos foram para ${topMun.nome.replace(' - RJ','')} — `;
-            bio += `que, por coincidência ou não, lidera sua lista de municípios favoritos. `;
-        } else {
-            bio += `Distribuiu verbas por ${numMuns} municípios diferentes — generosidade digna de nota, `;
-            bio += `ou estratégia eleitoral bem calibrada, dependendo do ângulo. `;
+        if (data.emendas_por_ano.length > 0) {
+            lines.push('## EMENDAS POR ANO');
+            lines.push('ano,total_emendas,valor_total');
+            data.emendas_por_ano.forEach(a =>
+                lines.push(`${a.ano},${a.total},${a.valor_total.toFixed(2)}`));
+            lines.push('');
         }
 
-        if (topAreaPct >= 50) {
-            bio += `Especialista declarado em ${topArea} (${topAreaPct}% do total investido). `;
+        if (data.municipios_beneficiados.length > 0) {
+            lines.push('## MUNICÍPIOS BENEFICIADOS');
+            lines.push('municipio,num_emendas,valor_total');
+            data.municipios_beneficiados.forEach(m =>
+                lines.push(`${esc(m.nome)},${m.total},${m.valor.toFixed(2)}`));
+            lines.push('');
         }
 
-        if (ehEleitoreiro) {
-            const mult = (avgEleit/avgNorm).toFixed(1);
-            bio += `Curiosidade: seus investimentos crescem ${mult}× em anos eleitorais. Coincidências acontecem.`;
-        } else {
-            bio += `Dados coletados do Portal da Transparência do Governo Federal.`;
+        if (data.ultimas_emendas.length > 0) {
+            lines.push('## EMENDAS DETALHADAS');
+            lines.push('ano,valor,valor_empenhado,valor_pago,objetivo,municipio_destino,descricao,fonte_url');
+            data.ultimas_emendas.forEach(e =>
+                lines.push([e.ano, e.valor.toFixed(2), e.valor_empenhado.toFixed(2), e.valor_pago.toFixed(2),
+                    esc(e.objetivo), esc(e.municipio_destino), esc(e.descricao), esc(e.fonte_url || '')].join(',')));
         }
 
-        return bio;
+        const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const slug = data.nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
+        a.href = url; a.download = `horus-relatorio-${slug}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast('Relatório CSV baixado', 'success');
     };
 
     const getBioReal = (): string => {
@@ -414,6 +440,20 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
     return (
         <div className="animate-fade-in pb-12 relative z-10">
+
+            {/* Fundo de documentos oficiais — paralax sutil */}
+            <div
+                aria-hidden="true"
+                className="fixed inset-0 pointer-events-none -z-10"
+                style={{
+                    backgroundImage: `url('/img/documentos-bg.svg')`,
+                    backgroundSize: '1400px auto',
+                    backgroundRepeat: 'repeat',
+                    backgroundPosition: 'center top',
+                    opacity: 0.08,
+                    mixBlendMode: 'screen',
+                }}
+            />
 
             {/* ── HEADER COMPACT STICKY ── */}
             <div className={`sticky top-16 z-[40] transition-all duration-300 border-b border-[#FFD700]/20
@@ -504,6 +544,15 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 <GitCompare className="w-3 h-3" />
                                 COMPARAR
                             </button>
+                            {/* Download CSV */}
+                            <button
+                                onClick={baixarRelatorioCSV}
+                                title="Baixar relatório completo em CSV"
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#FFD700]/40 text-[#FFD700]/80 hover:border-[#FFD700] hover:text-[#FFD700] hover:bg-[#FFD700]/10 transition-all px-3 py-1.5"
+                            >
+                                <Download className="w-3 h-3" />
+                                BAIXAR CSV
+                            </button>
                         </div>
                     </div>
 
@@ -536,9 +585,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 <span className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase">{data.cargo}</span>
                             </div>
 
-                            <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-5xl md:text-7xl lg:text-8xl mb-4">
-                                {data.nome}
+                            <h1 className="font-bebas text-white leading-none uppercase tracking-wide text-5xl md:text-7xl lg:text-8xl mb-2">
+                                {data.nome_urna || data.nome}
                             </h1>
+                            {data.nome_urna && data.nome_urna.toUpperCase() !== data.nome.toUpperCase() && (
+                                <p className="font-mono text-[10px] tracking-widest text-gray-600 uppercase mb-3">
+                                    Nome civil: {data.nome}
+                                </p>
+                            )}
 
                             <div className="flex items-center gap-3 mb-3 flex-wrap">
                                 <span className="border border-[#FFD700]/40 text-[#FFD700] font-bebas tracking-widest px-3 py-1 text-sm">{data.partido}</span>
@@ -551,42 +605,38 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 )}
                             </div>
 
-                            {/* Métricas inline */}
+                            {/* Dashboard KPIs — 6 cards compactos */}
                             {(() => {
-                                // #35 badge concentração
                                 const topMun = data.municipios_beneficiados[0];
-                                const topPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
-                                const concentrado = topPct >= 80;
-                                // #37 por dia (mandato 4 anos = 1461 dias)
-                                const porDia = data.valor_total > 0 ? data.valor_total / (data.emendas_por_ano.length * 365 || 365) : 0;
+                                const topMunPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
+                                const porArea = data.ultimas_emendas.reduce((acc: Record<string, number>, e) => {
+                                    const k = e.objetivo || 'Não informado';
+                                    acc[k] = (acc[k] || 0) + e.valor;
+                                    return acc;
+                                }, {});
+                                const topArea = Object.entries(porArea).sort(([, a], [, b]) => (b as number) - (a as number))[0];
+                                const anosAtivos = data.emendas_por_ano.length;
+                                const fmtCompact = (v: number) => v >= 1e9 ? `R$ ${(v/1e9).toFixed(2)}B` : v >= 1e6 ? `R$ ${(v/1e6).toFixed(1)}M` : `R$ ${(v/1e3).toFixed(0)}K`;
+
+                                const kpis = [
+                                    { label: 'Emendas', value: String(data.total_emendas), sub: 'no total', cor: '#FFD700' },
+                                    { label: 'Valor empenhado', value: fmtCompact(data.valor_total), sub: 'soma de todos os anos', cor: '#FFD700' },
+                                    { label: 'Municípios', value: String(data.municipios_beneficiados.length), sub: 'atingidos', cor: '#4ade80' },
+                                    { label: 'Anos ativos', value: String(anosAtivos), sub: 'com emendas', cor: '#60a5fa' },
+                                    { label: 'Top município', value: topMun ? topMun.nome.replace(/\s*-\s*[A-Z]{2}$/,'').slice(0, 12) : '—', sub: topMun ? `${topMunPct}% do total` : '', cor: '#f59e0b' },
+                                    { label: 'Área predileta', value: topArea ? String(topArea[0]).slice(0, 14) : '—', sub: topArea ? `${(((topArea[1] as number) / data.valor_total) * 100).toFixed(0)}% do total` : '', cor: '#c084fc' },
+                                ];
+
                                 return (
-                                    <>
-                                        <div className="grid grid-cols-2 gap-px bg-[#FFD700]/10 mb-3 max-w-xs">
-                                            <div className="bg-black p-4">
-                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Emendas</div>
-                                                <div className="font-bebas text-4xl text-white">{data.total_emendas}</div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-[#FFD700]/10 mb-4">
+                                        {kpis.map((k, i) => (
+                                            <div key={i} className="bg-black p-3 min-w-0">
+                                                <div className="font-mono text-[8px] tracking-[0.25em] uppercase mb-1.5 truncate" style={{ color: `${k.cor}66` }}>{k.label}</div>
+                                                <div className="font-bebas text-2xl leading-none truncate" style={{ color: k.cor }} title={k.value}>{k.value}</div>
+                                                {k.sub && <div className="font-mono text-[8px] tracking-widest text-gray-600 mt-1 truncate">{k.sub}</div>}
                                             </div>
-                                            <div className="bg-black p-4">
-                                                <div className="font-mono text-[9px] tracking-[0.3em] text-[#FFD700]/30 uppercase mb-1">Total</div>
-                                                <div className="font-bebas text-4xl text-[#FFD700]">{formatMillions(data.valor_total)}</div>
-                                            </div>
-                                        </div>
-                                        {/* #37 por dia */}
-                                        {porDia > 0 && (
-                                            <p className="font-mono text-[9px] tracking-widest text-gray-700 mb-3 max-w-xs">
-                                                ≈ {formatMillions(porDia * 30)}/mês empenhado em emendas
-                                            </p>
-                                        )}
-                                        {/* #35 badge concentração */}
-                                        {concentrado && (
-                                            <div className="flex items-center gap-2 border border-yellow-600/40 bg-yellow-900/10 px-3 py-2 mb-3 max-w-xs">
-                                                <span className="text-yellow-500 text-sm">⚠</span>
-                                                <p className="font-mono text-[8px] tracking-widest text-yellow-600/80">
-                                                    {topPct}% das emendas foram para {topMun.nome.replace(' - RJ','')} · concentração elevada
-                                                </p>
-                                            </div>
-                                        )}
-                                    </>
+                                        ))}
+                                    </div>
                                 );
                             })()}
 
@@ -624,20 +674,23 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {/* Bio real (Câmara API) */}
                         {getBioReal() && (
-                            <p className="text-gray-300 text-sm font-sans leading-relaxed mb-4">
+                            <p className="text-gray-300 text-sm font-sans leading-relaxed mb-3">
                                 {getBioReal()}
                             </p>
                         )}
 
-                        {/* Bio irônica (análise de gastos) */}
-                        <div className="bg-[#080808] border border-[#1a1a1a] p-4 mb-5">
-                            <p className="font-bebas text-[10px] tracking-widest text-gray-600 mb-2">
-                                ANÁLISE AUTOMÁTICA — DADOS PÚBLICOS
-                            </p>
-                            <p className="text-gray-400 text-sm font-sans leading-relaxed">
-                                {getBioIronica()}
-                            </p>
-                        </div>
+                        {/* Bio Wikipedia (texto livre) */}
+                        {data.bio_texto && (
+                            <div className="bg-[#080808] border-l-2 border-[#FFD700]/30 px-4 py-3 mb-4">
+                                <p className="font-mono text-[8px] tracking-widest text-gray-700 mb-2">
+                                    BIOGRAFIA · WIKIPEDIA
+                                </p>
+                                <p className="text-gray-400 text-sm font-sans leading-relaxed">
+                                    {data.bio_texto}
+                                </p>
+                            </div>
+                        )}
+
 
                     </div>
                 </div>
@@ -648,13 +701,42 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             <div className="px-4 md:px-12">
 
             {/* ── LINHA DO TEMPO + LIGAÇÕES POLÍTICAS ─────────────────────── */}
-            {bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length) && (
+            {((bioData && (bioData.historico?.length || bioData.orgaos?.length || bioData.redeSocial?.length)) || wikiData?.encontrado) && (
                 <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
 
                     {/* Linha do tempo */}
                     <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6">
                         <p className="font-bebas text-[#FFD700] text-xl tracking-widest mb-1">TRAJETÓRIA POLÍTICA</p>
-                        <p className="text-gray-600 text-[11px] uppercase tracking-widest mb-6">Linha do tempo · dados oficiais</p>
+                        <p className="text-gray-600 text-[11px] uppercase tracking-widest mb-6">Linha do tempo · Câmara dos Deputados + Wikipedia</p>
+
+                        {/* Biografia (Wikipedia) */}
+                        {wikiData?.encontrado && wikiData.resumo && (
+                            <div className="mb-6 pb-6 border-b border-[#1a1a1a]">
+                                <p className="text-gray-300 text-sm leading-relaxed">{wikiData.resumo}</p>
+                                {(wikiData.formacao || wikiData.profissao) && (
+                                    <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 text-[11px]">
+                                        {wikiData.formacao && (
+                                            <div>
+                                                <span className="font-bebas tracking-widest text-gray-600 mr-2">FORMAÇÃO</span>
+                                                <span className="text-gray-300">{wikiData.formacao}</span>
+                                            </div>
+                                        )}
+                                        {wikiData.profissao && (
+                                            <div>
+                                                <span className="font-bebas tracking-widest text-gray-600 mr-2">PROFISSÃO</span>
+                                                <span className="text-gray-300">{wikiData.profissao}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {wikiData.url && (
+                                    <a href={wikiData.url} target="_blank" rel="noopener noreferrer"
+                                        className="inline-block mt-3 text-[10px] font-mono tracking-widest text-gray-600 hover:text-[#FFD700] uppercase transition-colors">
+                                        Ver artigo completo na Wikipedia →
+                                    </a>
+                                )}
+                            </div>
+                        )}
 
                         <div className="relative">
                             {/* Linha vertical */}
@@ -666,13 +748,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     const eventos: Ev[] = [];
 
                                     // Nascimento
-                                    if (bioData.dataNascimento) {
+                                    if (bioData?.dataNascimento) {
                                         const ano = new Date(bioData.dataNascimento + 'T00:00:00').getFullYear();
                                         eventos.push({ ano, tipo: 'nascimento', titulo: `Nascimento`, desc: `${bioData.municipioNascimento || ''}${bioData.ufNascimento ? ' (' + bioData.ufNascimento + ')' : ''}`, cor: '#94a3b8' });
                                     }
 
                                     // Mandatos legislativos
-                                    (bioData.historico || []).forEach(m => {
+                                    (bioData?.historico || []).forEach(m => {
                                         const ano = m.anoInicio || 0;
                                         const partidoInicio = m.partidos[0] || '';
                                         const partidoFim = m.partidos[m.partidos.length - 1] || partidoInicio;
@@ -695,6 +777,35 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                         const receita = data.dados_campanha.total_receitas;
                                         const fmt = receita >= 1e6 ? `R$ ${(receita/1e6).toFixed(1)}M` : `R$ ${(receita/1e3).toFixed(0)}K`;
                                         eventos.push({ ano, tipo: 'campanha', titulo: `Campanha 2022`, desc: `${data.dados_campanha.situacao} · ${fmt} arrecadados`, cor: '#4ade80' });
+                                    }
+
+                                    // Cargos prévios do Wikipedia (vereador, prefeito, senador, ministro, etc.)
+                                    if (wikiData?.encontrado && wikiData.cargos) {
+                                        wikiData.cargos.forEach(c => {
+                                            const ano = parseInt((c.inicio || '').match(/(\d{4})/)?.[1] || '0');
+                                            if (ano > 1900 && ano < 2100) {
+                                                const titulo = c.cargo.length > 60 ? c.cargo.slice(0, 60) + '…' : c.cargo;
+                                                const desc = c.fim ? `Até ${c.fim} · fonte: Wikipedia` : 'fonte: Wikipedia';
+                                                eventos.push({ ano, tipo: 'cargo', titulo, desc, cor: '#a78bfa' });
+                                            }
+                                        });
+                                    }
+
+                                    // Eventos extraídos do resumo Wikipedia (anos mencionados no texto)
+                                    if (wikiData?.encontrado && wikiData.eventos) {
+                                        const anosJaUsados = new Set(eventos.map(e => e.ano));
+                                        wikiData.eventos.forEach(ev => {
+                                            if (!anosJaUsados.has(ev.ano)) {
+                                                eventos.push({
+                                                    ano: ev.ano,
+                                                    tipo: 'wiki',
+                                                    titulo: 'Marco biográfico',
+                                                    desc: ev.trecho,
+                                                    cor: '#64748b',
+                                                });
+                                                anosJaUsados.add(ev.ano);
+                                            }
+                                        });
                                     }
 
                                     // Ordena e renderiza
@@ -727,9 +838,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     <div className="flex flex-col gap-4">
 
                         {/* Partidos */}
-                        {(bioData.historico?.length ?? 0) > 0 && (() => {
+                        {(bioData?.historico?.length ?? 0) > 0 && (() => {
                             const todosPartidos: string[] = [];
-                            (bioData.historico || []).forEach(m => m.partidos.forEach(p => { if (!todosPartidos.includes(p)) todosPartidos.push(p); }));
+                            (bioData?.historico || []).forEach(m => m.partidos.forEach(p => { if (!todosPartidos.includes(p)) todosPartidos.push(p); }));
                             return (
                                 <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                     <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">TRAJETÓRIA PARTIDÁRIA</p>
@@ -782,11 +893,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         ) : null}
 
                         {/* Órgãos / Comissões */}
-                        {(bioData.orgaos?.length ?? 0) > 0 && (
+                        {(bioData?.orgaos?.length ?? 0) > 0 && (
                             <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                 <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">CARGOS E COMISSÕES</p>
                                 <div className="space-y-2">
-                                    {(bioData.orgaos || []).map((o, i) => (
+                                    {(bioData?.orgaos || []).map((o, i) => (
                                         <div key={i} className="flex flex-col">
                                             <span className="text-white text-xs font-medium leading-snug">{o.nome}</span>
                                             {o.titulo && <span className="text-gray-600 text-[10px]">{o.titulo}</span>}
@@ -797,11 +908,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         )}
 
                         {/* Redes sociais */}
-                        {(bioData.redeSocial?.length ?? 0) > 0 && (
+                        {(bioData?.redeSocial?.length ?? 0) > 0 && (
                             <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                 <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">REDES SOCIAIS</p>
                                 <div className="flex flex-col gap-1.5">
-                                    {(bioData.redeSocial || []).map((url, i) => {
+                                    {(bioData?.redeSocial || []).map((url, i) => {
                                         const rede = url.includes('twitter') || url.includes('x.com') ? 'Twitter/X'
                                             : url.includes('facebook') ? 'Facebook'
                                             : url.includes('instagram') ? 'Instagram'
@@ -849,16 +960,28 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                         {!loadingAtividade && !atividade && (
                             <div className="text-center py-10">
-                                <p className="text-gray-500 font-bebas text-lg tracking-widest mb-1">PARLAMENTAR NÃO ENCONTRADO NA CÂMARA API</p>
-                                <p className="text-gray-700 text-xs">Pode ser senador, ex-deputado ou nome com grafia diferente da Câmara dos Deputados.</p>
+                                {bioData ? (
+                                    <>
+                                        <p className="text-gray-500 font-bebas text-lg tracking-widest mb-1">SEM ATIVIDADE LEGISLATIVA NO PERÍODO</p>
+                                        <p className="text-gray-700 text-xs">A Câmara dos Deputados não retornou PLs autorais nem votações nominais nos últimos 90 dias. Pode estar em recesso parlamentar ou sem atuação no plenário.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-gray-500 font-bebas text-lg tracking-widest mb-1">DADOS LEGISLATIVOS NÃO DISPONÍVEIS</p>
+                                        <p className="text-gray-700 text-xs">A API da Câmara dos Deputados cobre apenas deputados federais. Se este parlamentar é senador, ex-deputado ou tem grafia diferente do registro oficial, os dados de PLs e votações não aparecem aqui.</p>
+                                    </>
+                                )}
                             </div>
                         )}
 
-                        {atividade && atividade.pls.length === 0 && (
-                            <p className="text-gray-500 text-center py-8 font-bebas text-lg tracking-widest">NENHUM PROJETO ENCONTRADO</p>
+                        {atividade && atividade.pls.length === 0 && atividade.votacoes.length === 0 && (
+                            <div className="text-center py-8">
+                                <p className="text-gray-500 font-bebas text-lg tracking-widest mb-1">NENHUM PROJETO OU VOTAÇÃO NO PERÍODO</p>
+                                <p className="text-gray-700 text-xs">Câmara API consultada · janela de 90 dias · sem atividade autoral nem voto nominal registrado</p>
+                            </div>
                         )}
 
-                        {atividade && atividade.pls.length > 0 && (() => {
+                        {atividade && (atividade.pls.length > 0 || atividade.votacoes.length > 0) && (() => {
                             // Indexa votos por identificador do PL
                             const votoPorPl = new Map<string, Votacao>();
                             atividade.votacoes.forEach(v => {
@@ -875,9 +998,28 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 REQ: 'Requerimento',
                             };
 
+                            // Agrupa PLs por ano de apresentação para linha cronológica
+                            const plsPorAno: Record<string, typeof atividade.pls> = {};
+                            atividade.pls.forEach(pl => {
+                                const ano = (pl.data || '').slice(0, 4) || String(pl.ano);
+                                if (!plsPorAno[ano]) plsPorAno[ano] = [];
+                                plsPorAno[ano].push(pl);
+                            });
+                            const anosOrdenados = Object.keys(plsPorAno).sort((a, b) => b.localeCompare(a));
+
                             return (
-                                <div className="space-y-3">
-                                    {atividade.pls.map((pl, i) => {
+                                <div className="space-y-6">
+                                {anosOrdenados.map(ano => (
+                                    <div key={ano}>
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <span className="font-bebas text-[#FFD700] text-3xl tracking-widest leading-none">{ano}</span>
+                                            <span className="font-mono text-[10px] tracking-widest text-gray-600 uppercase">
+                                                {plsPorAno[ano].length} {plsPorAno[ano].length === 1 ? 'projeto' : 'projetos'} apresentado{plsPorAno[ano].length === 1 ? '' : 's'}
+                                            </span>
+                                            <div className="flex-1 h-px bg-[#1a1a1a]" />
+                                        </div>
+                                        <div className="space-y-3 pl-2 border-l border-[#1a1a1a] ml-2">
+                                {plsPorAno[ano].map((pl, i) => {
                                         const voto = votoPorPl.get(`${pl.tipo}-${pl.numero}-${pl.ano}`);
 
                                         // Badge baseado no status real do PL (vindo da Câmara API)
@@ -954,6 +1096,46 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             </div>
                                         );
                                     })}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Votações sem PL autoral correspondente — mostra como "votos nominais recentes" */}
+                                {(() => {
+                                    const votosSemPL = atividade.votacoes.filter(v => {
+                                        if (!v.pl_tipo || !v.pl_numero || !v.pl_ano) return true;
+                                        return !atividade.pls.find(pl => `${pl.tipo}-${pl.numero}-${pl.ano}` === `${v.pl_tipo}-${v.pl_numero}-${v.pl_ano}`);
+                                    });
+                                    if (votosSemPL.length === 0) return null;
+                                    return (
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-3 mt-4">
+                                                <span className="font-bebas text-[#FFD700]/60 text-xl tracking-widest leading-none">VOTOS RECENTES</span>
+                                                <span className="font-mono text-[10px] tracking-widest text-gray-600 uppercase">
+                                                    {votosSemPL.length} {votosSemPL.length === 1 ? 'voto registrado' : 'votos registrados'}
+                                                </span>
+                                                <div className="flex-1 h-px bg-[#1a1a1a]" />
+                                            </div>
+                                            <div className="space-y-2 pl-2 border-l border-[#1a1a1a] ml-2">
+                                                {votosSemPL.map((v, i) => {
+                                                    const cor = v.voto === 'Sim' ? '#4ade80' : v.voto === 'Não' ? '#f87171' : '#facc15';
+                                                    return (
+                                                        <div key={i} className="bg-[#0a0a0a]/40 border border-[#1a1a1a] px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-gray-300 text-xs truncate">{v.descricao || `${v.pl_tipo} ${v.pl_numero}/${v.pl_ano}`}</p>
+                                                                {v.pl_ementa && <p className="text-gray-600 text-[10px] truncate mt-0.5">{v.pl_ementa}</p>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <span className="font-bebas tracking-widest text-sm" style={{ color: cor }}>VOTOU {v.voto.toUpperCase()}</span>
+                                                                <span className="text-gray-700 text-[10px] font-mono">{v.data}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                                 </div>
                             );
                         })()}
@@ -1121,23 +1303,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     const topMun = data.municipios_beneficiados[0];
                     const topMunPct = topMun ? topMun.valor / data.valor_total : 0;
                     const anoMaisAtivo = [...data.emendas_por_ano].sort((a,b) => b.valor_total - a.valor_total)[0];
-                    const numMuns = data.municipios_beneficiados.length;
-                    const ANOS_ELEITORAIS = [2014, 2018, 2022, 2026];
-                    const medEleit = data.emendas_por_ano.filter(a => ANOS_ELEITORAIS.includes(a.ano));
-                    const medNorm  = data.emendas_por_ano.filter(a => !ANOS_ELEITORAIS.includes(a.ano));
-                    const avgEleit = medEleit.length ? medEleit.reduce((s,a) => s + a.valor_total, 0) / medEleit.length : 0;
-                    const avgNorm  = medNorm.length  ? medNorm.reduce((s,a) => s + a.valor_total, 0) / medNorm.length  : 0;
-                    const tags: { label: string; desc: string; cor: string; emoji: string }[] = [];
-                    if (numMuns >= 20)     tags.push({ label: 'DISTRIBUIDOR', desc: `Enviou verbas para ${numMuns} municípios`, cor: '#4ade80', emoji: '🌐' });
-                    else if (numMuns >= 8) tags.push({ label: 'EQUILIBRADO',  desc: `Atende ${numMuns} municípios no total`,   cor: '#60a5fa', emoji: '⚖️' });
-                    else                   tags.push({ label: 'CONCENTRADOR', desc: `Foca em apenas ${numMuns} município${numMuns>1?'s':''}`, cor: '#f97316', emoji: '🎯' });
-                    if (topAreaPct >= 0.6)      tags.push({ label: 'ESPECIALISTA', desc: `${(topAreaPct*100).toFixed(0)}% do total vai para ${topAreaLabel}`, cor: '#c084fc', emoji: '🔬' });
-                    else if (topAreaPct >= 0.4) tags.push({ label: 'FOCADO',       desc: `Prioriza ${topAreaLabel} (${(topAreaPct*100).toFixed(0)}%)`, cor: '#a78bfa', emoji: '🎯' });
-                    else                        tags.push({ label: 'GENERALISTA',  desc: 'Investe em múltiplas áreas sem foco dominante', cor: '#94a3b8', emoji: '📊' });
-                    if (avgNorm > 0 && avgEleit > avgNorm * 1.8)
-                        tags.push({ label: 'ELEITOREIRO', desc: `Gastou ${(avgEleit/avgNorm).toFixed(1)}× mais em anos eleitorais`, cor: '#ef4444', emoji: '🗳️' });
-                    if (topMunPct >= 0.4)
-                        tags.push({ label: 'CLIENTELISTA', desc: `${(topMunPct*100).toFixed(0)}% vai para ${topMun?.nome.replace(' - RJ','')}`, cor: '#f59e0b', emoji: '📍' });
 
                     return (
                         <>
@@ -1189,21 +1354,39 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                 </div>
                             </div>
 
-                            {/* Tags comportamentais */}
-                            <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
-                                <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-3">ANÁLISE DE COMPORTAMENTO</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {tags.map(t => (
-                                        <div key={t.label} className="flex items-center gap-2 bg-[#0a0a0a]/60 border border-[#2a2a2a] px-3 py-2 hover:border-[#444] transition-colors">
-                                            <span className="text-base shrink-0">{t.emoji}</span>
-                                            <div>
-                                                <span className="font-bebas tracking-widest text-xs" style={{ color: t.cor }}>{t.label}</span>
-                                                <p className="text-gray-500 text-[10px] leading-tight">{t.desc}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            {/* Distribuição proporcional — top municípios destinatários */}
+                            {data.municipios_beneficiados.length > 0 && (
+                                <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
+                                    <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-1">PARA ONDE FOI O DINHEIRO</p>
+                                    <p className="text-gray-600 text-[10px] uppercase tracking-widest mb-4">Top municípios destinatários · proporção sobre o total</p>
+                                    <div className="space-y-2.5">
+                                        {data.municipios_beneficiados.slice(0, 8).map((mun, i) => {
+                                            const pct = mun.valor / data.valor_total * 100;
+                                            const fmt = mun.valor >= 1e6 ? `R$ ${(mun.valor/1e6).toFixed(1)}M` : `R$ ${(mun.valor/1e3).toFixed(0)}K`;
+                                            return (
+                                                <div key={i}>
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="font-bebas text-gray-600 text-xs w-5 shrink-0">{i+1}</span>
+                                                            <span className="text-gray-300 text-xs truncate">{mun.nome.replace(' - RJ','')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <span className="font-bebas text-[#FFD700] text-sm">{fmt}</span>
+                                                            <span className="font-mono text-gray-600 text-[10px] w-9 text-right">{pct.toFixed(0)}%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full bg-[#0a0a0a] h-1.5 overflow-hidden ml-7">
+                                                        <div className="h-full bg-[#FFD700]/70" style={{ width: `${Math.max(pct, 2)}%` }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {data.municipios_beneficiados.length > 8 && (
+                                        <p className="text-gray-600 text-[10px] mt-3">+ {data.municipios_beneficiados.length - 8} outros municípios</p>
+                                    )}
                                 </div>
-                            </div>
+                            )}
                         </>
                     );
                 })()}
@@ -1245,96 +1428,55 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             )}
 
-            {/* ── CRUZAMENTO EMENDAS × CONTRATOS ──────────────────────────── */}
-            {cruzamento !== null && (
+            {/* ── COMPARAÇÃO COM PARES (ranking nacional/partido/UF) ───────── */}
+            {ranking && ranking.nacional_valor && (data.total_emendas > 0) && (
                 <div className="max-w-7xl mx-auto mt-8 mb-8">
-                    <div className={`bg-[#0a0a0a] border overflow-hidden ${cruzamento.tem_cruzamento ? 'border-red-900/40' : 'border-[#1a1a1a]'}`}>
-                        <div className={`border-b px-5 py-3 flex items-center gap-3 ${cruzamento.tem_cruzamento ? 'bg-red-950/30 border-red-900/40' : 'border-[#1a1a1a]'}`}>
-                            {cruzamento.tem_cruzamento
-                                ? <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-                                : <ShieldCheck className="w-5 h-5 text-green-500/60 shrink-0" />
-                            }
+                    <div className="bg-[#0a0a0a] border border-[#1a1a1a]">
+                        <div className="border-b border-[#1a1a1a] px-5 py-3 flex items-center gap-3">
+                            <TrendingUp className="w-5 h-5 text-[#FFD700]/70 shrink-0" />
                             <div>
-                                <p className={`font-bebas text-lg tracking-widest ${cruzamento.tem_cruzamento ? 'text-red-400' : 'text-gray-600'}`}>
-                                    {cruzamento.tem_cruzamento ? 'CRUZAMENTO INVESTIGATIVO' : 'SEM CRUZAMENTOS DETECTADOS'}
-                                </p>
+                                <p className="font-bebas text-lg tracking-widest text-[#FFD700]">COMPARAÇÃO COM PARES</p>
                                 <p className="text-gray-600 text-[10px] font-mono tracking-widest">
-                                    {cruzamento.tem_cruzamento
-                                        ? 'Emendas parlamentares × contratos federais nos mesmos municípios'
-                                        : 'Nenhuma sobreposição emenda→contrato encontrada nos dados disponíveis'}
+                                    Posição deste parlamentar em rankings por valor distribuído e por número de emendas
                                 </p>
                             </div>
                         </div>
-
-                        {cruzamento.tem_cruzamento && (
-                        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Camada 1: Geográfica */}
-                            {cruzamento.camada_geografica.length > 0 && (
-                                <div>
-                                    <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
-                                        📍 MUNICÍPIOS COM EMENDAS E CONTRATOS
-                                    </p>
-                                    <div className="space-y-2">
-                                        {cruzamento.camada_geografica.map((row, i) => (
-                                            <div key={i} className="bg-[#080808] border border-[#1a1a1a] p-3">
-                                                <p className="font-bebas text-white text-base tracking-wide mb-1">{row.municipio}</p>
-                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                                    <div>
-                                                        <span className="text-gray-600">EMENDAS</span>
-                                                        <p className="text-[#FFD700] font-bebas text-sm">
-                                                            R$ {(row.valor_emendas/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_emendas}x)</span>
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-gray-600">CONTRATOS</span>
-                                                        <p className="text-red-400 font-bebas text-sm">
-                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M <span className="text-gray-600">({row.num_contratos}x)</span>
-                                                        </p>
-                                                    </div>
+                        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#1a1a1a]">
+                            {([
+                                { label: 'NACIONAL', rValor: ranking.nacional_valor, rEmendas: ranking.nacional_emendas, cor: '#FFD700' },
+                                ...(ranking.partido_valor ? [{ label: `PARTIDO · ${ranking.partido}`, rValor: ranking.partido_valor, rEmendas: ranking.partido_emendas, cor: '#60a5fa' }] : []),
+                                ...(ranking.uf_valor ? [{ label: `UF · ${ranking.uf}`, rValor: ranking.uf_valor, rEmendas: ranking.uf_emendas, cor: '#4ade80' }] : []),
+                            ] as { label: string; rValor: { posicao: number | null; de: number }; rEmendas?: { posicao: number | null; de: number }; cor: string }[]).map((g, i) => {
+                                const pctValor = g.rValor.posicao && g.rValor.de ? (1 - (g.rValor.posicao - 1) / g.rValor.de) * 100 : 0;
+                                return (
+                                    <div key={i} className="bg-black p-4">
+                                        <p className="font-mono text-[9px] tracking-[0.3em] text-gray-600 uppercase mb-3 truncate" title={g.label}>{g.label}</p>
+                                        <div className="mb-3">
+                                            <div className="flex items-baseline gap-2 mb-1">
+                                                <span className="font-bebas text-3xl leading-none" style={{ color: g.cor }}>#{g.rValor.posicao ?? '—'}</span>
+                                                <span className="font-mono text-[10px] text-gray-600">de {g.rValor.de}</span>
+                                            </div>
+                                            <p className="font-mono text-[9px] tracking-widest text-gray-600 uppercase">por valor distribuído</p>
+                                            <div className="w-full bg-[#0a0a0a] h-1 overflow-hidden mt-1">
+                                                <div className="h-full transition-all" style={{ width: `${Math.max(pctValor, 2)}%`, backgroundColor: g.cor + 'aa' }} />
+                                            </div>
+                                            <p className="font-mono text-[8px] text-gray-700 mt-1">topo {Math.max(1, 100 - pctValor).toFixed(0)}%</p>
+                                        </div>
+                                        {g.rEmendas && (
+                                            <div className="border-t border-[#1a1a1a] pt-2">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="font-bebas text-xl leading-none text-gray-300">#{g.rEmendas.posicao ?? '—'}</span>
+                                                    <span className="font-mono text-[9px] text-gray-700">de {g.rEmendas.de} · por nº de emendas</span>
                                                 </div>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Camada 2: Financeira */}
-                            {cruzamento.camada_financeira.length > 0 && (
-                                <div>
-                                    <p className="font-bebas text-gray-400 text-sm tracking-widest mb-3 flex items-center gap-2">
-                                        💰 DOADORES QUE TAMBÉM SÃO CONTRATADOS
-                                    </p>
-                                    <div className="space-y-2">
-                                        {cruzamento.camada_financeira.map((row, i) => (
-                                            <div key={i} className="bg-[#080808] border border-red-900/30 p-3">
-                                                <p className="font-bebas text-white text-sm tracking-wide mb-1 truncate">{row.doador}</p>
-                                                {row.municipios && (
-                                                    <p className="text-gray-600 text-[10px] mb-1 truncate">📍 {row.municipios}</p>
-                                                )}
-                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                                    <div>
-                                                        <span className="text-gray-600">DOAÇÃO</span>
-                                                        <p className="text-green-400 font-bebas text-sm">
-                                                            R$ {(row.valor_doacao/1e3).toFixed(0)}K
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-gray-600">CONTRATOS</span>
-                                                        <p className="text-red-400 font-bebas text-sm">
-                                                            R$ {(row.valor_contratos/1e6).toFixed(1)}M
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <p className="text-gray-700 text-[10px] mt-3 font-mono italic">
-                                        * Cruzamento por CNPJ e nome. Verificar antes de publicar.
-                                    </p>
-                                </div>
-                            )}
+                                );
+                            })}
                         </div>
-                        )}
+                        <p className="px-5 pb-3 text-gray-600 text-[10px] font-mono">
+                            Posição calculada sobre todos os parlamentares com pelo menos 1 emenda registrada no Portal da Transparência.
+                        </p>
                     </div>
                 </div>
             )}
@@ -1622,10 +1764,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                         href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/consulta?codigoEmenda=${emenda.codigo_emenda}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="mt-3 inline-flex items-center gap-2 text-gray-500 hover:text-[#FFD700] text-[10px] font-bebas tracking-widest border border-[#2a2a2a] hover:border-[#FFD700]/40 px-3 py-1.5 transition-all w-fit"
+                                                        title="Abrir esta emenda no Portal da Transparência (gov.br) — fonte oficial"
+                                                        className="mt-3 inline-flex items-center gap-2 text-[#FFD700] hover:text-white text-xs font-bebas tracking-widest border border-[#FFD700]/40 hover:border-[#FFD700] bg-[#FFD700]/[0.03] hover:bg-[#FFD700]/10 px-3 py-2 transition-all w-fit"
                                                     >
-                                                        <ExternalLink className="w-3 h-3" />
-                                                        VER COMPROVAÇÃO OFICIAL
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                        <span>VER NO GOV.BR <span className="text-[#FFD700]/60 text-[9px] ml-1">↗ portaltransparencia</span></span>
                                                     </a>
                                                 </div>
                                             </div>

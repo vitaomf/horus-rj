@@ -2,6 +2,7 @@ import sqlite3
 import math
 import unicodedata
 import os
+import json
 import logging
 from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -513,19 +514,33 @@ def eleitos_municipais(request: Request,
               AND ano_eleicao = 2024
         """, (uf_u, mun_n)).fetchall()
 
+        # Resolve politico_id por match de nome (case-insensitive)
+        nomes_upper = list({(r["nome"] or '').upper() for r in rows if r["nome"]})
+        politico_por_nome: dict = {}
+        if nomes_upper:
+            placeholders = ",".join("?" * len(nomes_upper))
+            pol_rows = conn.execute(
+                f"SELECT id, nome FROM politicos WHERE UPPER(nome) IN ({placeholders})",
+                nomes_upper
+            ).fetchall()
+            for p in pol_rows:
+                politico_por_nome[(p["nome"] or '').upper()] = p["id"]
+
         prefeito  = None
         vice      = None
         vereadores: list = []
 
         for r in rows:
+            nome_up = (r["nome"] or '').upper()
             d = {
-                "id":        r["id"],
-                "nome":      r["nome"],
-                "nome_urna": r["nome_urna"],
-                "partido":   r["partido"],
-                "numero":    r["numero"],
-                "foto_url":  r["foto_url"],
-                "situacao":  r["sigla_situacao"],
+                "id":          r["id"],
+                "nome":        r["nome"],
+                "nome_urna":   r["nome_urna"],
+                "partido":     r["partido"],
+                "numero":      r["numero"],
+                "foto_url":    r["foto_url"],
+                "situacao":    r["sigla_situacao"],
+                "politico_id": politico_por_nome.get(nome_up),
             }
             if   r["cargo"] == "prefeito":      prefeito = d
             elif r["cargo"] == "vice_prefeito": vice     = d
@@ -632,9 +647,12 @@ def obter_total_politicos():
     """
     conn = get_db_connection()
     try:
+        # Conta apenas políticos com pelo menos 1 emenda registrada — exclui stubs de
+        # governadores/prefeitos criados a partir das tabelas de eleitos TSE.
         resultado = conn.execute(f"""
-            SELECT COUNT(id) as total
+            SELECT COUNT(DISTINCT p.id) as total
             FROM politicos p
+            JOIN emendas e ON e.politico_id = p.id
             WHERE {NOT_AUTOR_COLETIVO_SQL}
         """).fetchone()
         return {"total": resultado["total"]}
@@ -1172,9 +1190,18 @@ def obter_detalhes_politico(request: Request, politico_id: int):
     try:
         tem_foto_col = _FOTO_COL
 
+        # Verifica colunas enriquecidas (presente após scripts/enriquecer_politicos.py)
+        cur = conn.execute("PRAGMA table_info(politicos)")
+        cols = {r[1] for r in cur.fetchall()}
+        enr_select = ""
+        if "nome_urna" in cols:
+            enr_select = """, p.nome_urna, p.data_nascimento, p.municipio_nascimento,
+                            p.uf_nascimento, p.escolaridade, p.profissao,
+                            p.bio_texto, p.mandatos_json"""
+
         if tem_foto_col:
-            politico_info = conn.execute("""
-                SELECT p.id, p.nome, p.partido, p.cargo, p.foto_url,
+            politico_info = conn.execute(f"""
+                SELECT p.id, p.nome, p.partido, p.cargo, p.foto_url{enr_select},
                        COUNT(e.id) as total_emendas,
                        SUM(e.valor) as valor_total
                 FROM politicos p
@@ -1183,8 +1210,8 @@ def obter_detalhes_politico(request: Request, politico_id: int):
                 GROUP BY p.id
             """, (politico_id,)).fetchone()
         else:
-            politico_info = conn.execute("""
-                SELECT p.id, p.nome, p.partido, p.cargo, NULL as foto_url,
+            politico_info = conn.execute(f"""
+                SELECT p.id, p.nome, p.partido, p.cargo, NULL as foto_url{enr_select},
                        COUNT(e.id) as total_emendas,
                        SUM(e.valor) as valor_total
                 FROM politicos p
@@ -1287,12 +1314,28 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             for r in ultimas_emendas_rows
         ]
 
+        def _get(col):
+            try: return politico_info[col]
+            except (IndexError, KeyError): return None
+
+        mandatos_json = _get("mandatos_json")
+        try: mandatos_list = json.loads(mandatos_json) if mandatos_json else []
+        except Exception: mandatos_list = []
+
         return {
             "id": politico_info["id"],
             "nome": politico_info["nome"],
+            "nome_urna": _get("nome_urna"),
             "partido": politico_info["partido"],
             "cargo": politico_info["cargo"],
             "foto_url": politico_info["foto_url"] if tem_foto_col else None,
+            "data_nascimento": _get("data_nascimento"),
+            "municipio_nascimento": _get("municipio_nascimento"),
+            "uf_nascimento": _get("uf_nascimento"),
+            "escolaridade": _get("escolaridade"),
+            "profissao": _get("profissao"),
+            "bio_texto": _get("bio_texto"),
+            "mandatos": mandatos_list,
             "total_emendas": politico_info["total_emendas"] or 0,
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "dados_campanha": dados_campanha,
@@ -1777,6 +1820,226 @@ def bio_camara(request: Request, nome: str = Query(..., description="Nome do par
         }
     except Exception as e:
         return {"encontrado": False, "erro": str(e)}
+
+
+# ── Wikipedia: biografia complementar para enriquecer trajetória política ──
+_WIKI_TABLE_CHECKED = {"ok": False}
+
+def _garantir_tabela_wiki(conn):
+    """Cria tabela bio_wikipedia se não existir. Cache de 30 dias."""
+    if _WIKI_TABLE_CHECKED["ok"]:
+        return
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bio_wikipedia (
+            politico_id INTEGER PRIMARY KEY,
+            titulo      TEXT,
+            resumo      TEXT,
+            formacao    TEXT,
+            profissao   TEXT,
+            cargos_json TEXT,
+            eventos_json TEXT,
+            url         TEXT,
+            fetched_at  TEXT
+        )
+    """)
+    conn.commit()
+    _WIKI_TABLE_CHECKED["ok"] = True
+
+
+@app.get("/api/politicos/{politico_id}/ranking")
+@limiter.limit("60/minute")
+def politico_ranking(request: Request, politico_id: int):
+    """Posição do político em rankings: nacional, dentro do partido e da UF.
+    Usado pelo dashboard do perfil. Sempre por valor_total e total_emendas."""
+    conn = get_db_connection()
+    try:
+        # Dados básicos do político-alvo
+        alvo = conn.execute(f"""
+            SELECT p.id, p.nome, p.partido, p.uf,
+                   COUNT(e.id) AS total_emendas,
+                   COALESCE(SUM(e.valor), 0) AS valor_total
+            FROM politicos p
+            LEFT JOIN emendas e ON e.politico_id = p.id
+            WHERE p.id = ? AND {NOT_AUTOR_COLETIVO_SQL}
+            GROUP BY p.id
+        """, (politico_id,)).fetchone()
+
+        if not alvo:
+            raise HTTPException(404, "Político não encontrado")
+
+        valor = float(alvo["valor_total"])
+        nemend = int(alvo["total_emendas"])
+        partido = alvo["partido"]
+        uf = alvo["uf"]
+
+        def _pos(scope_sql: str, params: tuple, metric: str) -> dict:
+            # Conta quantos estão à frente + tamanho do grupo
+            row = conn.execute(f"""
+                WITH agg AS (
+                    SELECT p.id,
+                           COUNT(e.id) AS n_emendas,
+                           COALESCE(SUM(e.valor), 0) AS v_total
+                    FROM politicos p
+                    LEFT JOIN emendas e ON e.politico_id = p.id
+                    WHERE {NOT_AUTOR_COLETIVO_SQL} AND ({scope_sql})
+                    GROUP BY p.id
+                    HAVING n_emendas > 0
+                )
+                SELECT COUNT(*) AS total,
+                       SUM(CASE WHEN {metric} > ? THEN 1 ELSE 0 END) AS acima
+                FROM agg
+            """, params + (valor if metric == 'v_total' else nemend,)).fetchone()
+            total = int(row["total"] or 0)
+            acima = int(row["acima"] or 0)
+            return {"posicao": acima + 1 if (valor > 0 or nemend > 0) else None,
+                    "de": total}
+
+        result = {
+            "politico_id": politico_id,
+            "valor_total": valor,
+            "total_emendas": nemend,
+            "partido": partido,
+            "uf": uf,
+            "nacional_valor":  _pos("1=1", (), "v_total"),
+            "nacional_emendas": _pos("1=1", (), "n_emendas"),
+        }
+        if partido:
+            result["partido_valor"]   = _pos("UPPER(p.partido) = UPPER(?)", (partido,), "v_total")
+            result["partido_emendas"] = _pos("UPPER(p.partido) = UPPER(?)", (partido,), "n_emendas")
+        if uf:
+            result["uf_valor"]   = _pos("UPPER(p.uf) = UPPER(?)", (uf,), "v_total")
+            result["uf_emendas"] = _pos("UPPER(p.uf) = UPPER(?)", (uf,), "n_emendas")
+        return result
+    finally:
+        conn.close()
+
+
+@app.get("/api/politicos/{politico_id}/wikipedia")
+@limiter.limit("20/minute")
+def wiki_politico(request: Request, politico_id: int):
+    """Biografia complementar via Wikipedia. Cache 30 dias em SQLite."""
+    import urllib.request, urllib.parse, json as _json, re as _re
+    from datetime import datetime as _dt, timedelta as _td
+
+    conn = get_db_connection()
+    try:
+        _garantir_tabela_wiki(conn)
+        row = conn.execute("SELECT * FROM bio_wikipedia WHERE politico_id = ?", (politico_id,)).fetchone()
+        if row:
+            fetched = _dt.fromisoformat(row["fetched_at"]) if row["fetched_at"] else None
+            if fetched and (_dt.now() - fetched) < _td(days=30):
+                return {
+                    "encontrado": bool(row["resumo"]),
+                    "titulo": row["titulo"],
+                    "resumo": row["resumo"],
+                    "formacao": row["formacao"],
+                    "profissao": row["profissao"],
+                    "cargos": _json.loads(row["cargos_json"] or "[]"),
+                    "eventos": _json.loads(row["eventos_json"] or "[]"),
+                    "url": row["url"],
+                    "cache": True,
+                }
+
+        pol = conn.execute("SELECT nome FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+        if not pol:
+            raise HTTPException(404, "Político não encontrado")
+        nome = pol["nome"]
+
+        # Normaliza nome para busca (Title Case mantém acentos)
+        nome_busca = ' '.join(p.capitalize() for p in nome.split())
+
+        def _fetch_json(url):
+            req = urllib.request.Request(url, headers={"User-Agent": "HorusRJ/1.0 (transparência pública RJ)"})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                return _json.loads(r.read())
+
+        # 1. Busca o artigo (a API resolve redirects automaticamente)
+        nome_enc = urllib.parse.quote(nome_busca)
+        try:
+            summary = _fetch_json(f"https://pt.wikipedia.org/api/rest_v1/page/summary/{nome_enc}")
+        except Exception:
+            summary = None
+
+        if not summary or summary.get("type") == "disambiguation":
+            # Cache negativo curto pra não martelar a API
+            conn.execute("""INSERT OR REPLACE INTO bio_wikipedia
+                (politico_id, titulo, resumo, formacao, profissao, cargos_json, eventos_json, url, fetched_at)
+                VALUES (?, NULL, NULL, NULL, NULL, '[]', '[]', NULL, ?)""",
+                (politico_id, _dt.now().isoformat()))
+            conn.commit()
+            return {"encontrado": False, "motivo": "não localizado na Wikipedia"}
+
+        titulo = summary.get("title") or nome_busca
+        resumo = summary.get("extract") or ""
+        url_artigo = (summary.get("content_urls", {}) or {}).get("desktop", {}).get("page", "")
+
+        # 2. Wikitexto para extrair infobox (formação, profissão, cargos)
+        formacao = profissao = None
+        cargos = []
+        eventos = []
+        try:
+            titulo_enc = urllib.parse.quote(titulo.replace(' ', '_'))
+            wt = _fetch_json(f"https://pt.wikipedia.org/w/api.php?action=parse&page={titulo_enc}&prop=wikitext&format=json&section=0")
+            wikitext = wt.get("parse", {}).get("wikitext", {}).get("*", "")
+
+            def _campo(nome_campo):
+                m = _re.search(r'\|\s*' + nome_campo + r'\s*=\s*([^\n|]+)', wikitext, _re.IGNORECASE)
+                if not m:
+                    return None
+                v = m.group(1).strip()
+                v = _re.sub(r'<ref[^>]*>.*?</ref>', '', v, flags=_re.DOTALL)
+                v = _re.sub(r'<ref[^/]*/>', '', v)
+                v = _re.sub(r'\[\[([^|\]]+)\|([^\]]+)\]\]', r'\2', v)
+                v = _re.sub(r'\[\[([^\]]+)\]\]', r'\1', v)
+                v = _re.sub(r"'''?([^']+)'''?", r'\1', v)
+                v = _re.sub(r'\{\{[^}]+\}\}', '', v)
+                return v.strip().rstrip('.,;').strip() or None
+
+            formacao = _campo('alma_mater') or _campo('formação') or _campo('formacao') or _campo('educação')
+            profissao = _campo('ocupação') or _campo('ocupacao') or _campo('profissão') or _campo('profissao')
+
+            # Cargos prévios — campos comuns: cargo, cargo2..., cargo_anterior
+            for n in range(1, 9):
+                suf = '' if n == 1 else str(n)
+                c = _campo(f'cargo{suf}')
+                inicio = _campo(f'mandato_inicio{suf}') or _campo(f'a_inicio{suf}')
+                fim = _campo(f'mandato_fim{suf}') or _campo(f'a_fim{suf}')
+                if c:
+                    cargos.append({"cargo": c, "inicio": inicio, "fim": fim})
+
+            # Eventos extraídos do resumo: anos no formato (em 1996), (1996), "em 1996"
+            anos_no_resumo = sorted({int(y) for y in _re.findall(r'\b(19\d{2}|20\d{2})\b', resumo)})
+            for a in anos_no_resumo[:8]:
+                # Pega ~120 chars de contexto em torno do ano
+                m = _re.search(r'([^.]*\b' + str(a) + r'\b[^.]*\.)', resumo)
+                if m:
+                    eventos.append({"ano": a, "trecho": m.group(1).strip()[:200]})
+        except Exception:
+            pass
+
+        # Salva no cache
+        conn.execute("""INSERT OR REPLACE INTO bio_wikipedia
+            (politico_id, titulo, resumo, formacao, profissao, cargos_json, eventos_json, url, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (politico_id, titulo, resumo, formacao, profissao,
+             _json.dumps(cargos, ensure_ascii=False),
+             _json.dumps(eventos, ensure_ascii=False),
+             url_artigo, _dt.now().isoformat()))
+        conn.commit()
+
+        return {
+            "encontrado": True,
+            "titulo": titulo,
+            "resumo": resumo,
+            "formacao": formacao,
+            "profissao": profissao,
+            "cargos": cargos,
+            "eventos": eventos,
+            "url": url_artigo,
+            "cache": False,
+        }
+    finally:
+        conn.close()
 
 
 @app.get("/api/status/coleta")
