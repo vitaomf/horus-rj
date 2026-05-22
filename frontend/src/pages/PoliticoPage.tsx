@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
+import { PerfilPorCargo } from '../components/PerfilPorCargo';
 import { useFavoritos } from '../hooks/useFavoritos';
 import { useRecentesVistos } from '../hooks/useRecentesVistos';
 import { useToast } from '../components/Toast';
@@ -238,6 +239,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         votos: Array<{ ano: number; uf: string; municipio: string; votos: number; cargo: string; partido: string }>;
         total: number;
     } | null>(null);
+    const [perfilTipo, setPerfilTipo] = useState<any>(null);
     const tabelaRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -282,6 +284,11 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/votos`)
             .then(res => setVotos(res.data))
             .catch(() => setVotos(null));
+
+        // Perfil por tipo de cargo (detecta automaticamente)
+        axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/perfil_tipo`)
+            .then(res => setPerfilTipo(res.data))
+            .catch(() => setPerfilTipo(null));
 
         // Ranking nacional/partido/UF
         axios.get(`${API_BASE_URL}/api/politicos/${politicoId}/ranking`)
@@ -742,6 +749,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             {/* ── CONTEÚDO RESTANTE ── */}
             <div className="px-4 md:px-12">
+
+            {/* ── PERFIL POR TIPO DE CARGO (template adaptativo) ── */}
+            <PerfilPorCargo dados={perfilTipo} />
 
             {/* ── TRAJETÓRIA ELEITORAL (cargos + votos por município) ── */}
             {trajetoria && trajetoria.trajetoria.length > 0 && (

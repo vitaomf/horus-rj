@@ -1136,6 +1136,192 @@ def distribuicao_municipios(request: Request, politico_id: int, uf: str):
         conn.close()
 
 
+@app.get("/api/politicos/{politico_id}/perfil_tipo")
+@limiter.limit("30/minute")
+def perfil_tipo(request: Request, politico_id: int):
+    """
+    Detecta o cargo principal e dispara métricas específicas para o tipo:
+      - deputado_federal: emendas, comissões, votações Câmara
+      - senador: emendas, presença Senado
+      - deputado_estadual: projetos ALE, votos
+      - governador / vice: vetos, decretos, orçamento (placeholders)
+      - prefeito / vice: orçamento municipal, vetos (placeholders)
+      - vereador: projetos câmara, presença (placeholders)
+
+    Retorna:
+      tipo_principal: string
+      hierarquia_nivel: 'federal' | 'estadual' | 'municipal'
+      poder: 'legislativo' | 'executivo'
+      metricas: { ... } específicas do tipo
+      roadmap: [coletas planejadas que ainda não rodaram]
+    """
+    conn = get_db_connection()
+    try:
+        # Hierarquia de prioridade dos cargos (mais alto primeiro)
+        HIERARQUIA = [
+            ("presidente", "federal", "executivo"),
+            ("vice_presidente", "federal", "executivo"),
+            ("governador", "estadual", "executivo"),
+            ("vice_governador", "estadual", "executivo"),
+            ("senador", "federal", "legislativo"),
+            ("deputado_federal", "federal", "legislativo"),
+            ("prefeito", "municipal", "executivo"),
+            ("vice_prefeito", "municipal", "executivo"),
+            ("deputado_estadual", "estadual", "legislativo"),
+            ("vereador", "municipal", "legislativo"),
+        ]
+
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(politicos)").fetchall()}
+        sel = "nome, nome_urna" if "nome_urna" in cols else "nome, nome as nome_urna"
+        sel += ", partido, cargo"
+        row = conn.execute(f"SELECT {sel} FROM politicos WHERE id = ?", (politico_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Não encontrado")
+
+        nomes = list({(row["nome"] or "").upper(), (row["nome_urna"] or "").upper()})
+        nomes = [n for n in nomes if n]
+        if not nomes:
+            return {"tipo_principal": None, "metricas": {}}
+
+        # Busca todos os cargos do parlamentar (eleitos + emendas indicam dep federal)
+        cargos_encontrados = []
+        placeholders = ",".join("?" * len(nomes))
+
+        for tabela in ("eleitos_estaduais", "eleitos_municipais"):
+            try:
+                rs = conn.execute(f"""
+                    SELECT cargo, ano_eleicao, uf, mandato, sigla_situacao FROM {tabela}
+                    WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+                    ORDER BY ano_eleicao DESC
+                """, nomes + nomes).fetchall()
+                for r in rs:
+                    cargos_encontrados.append({
+                        "cargo": (r["cargo"] or "").lower().replace(" ", "_"),
+                        "ano": r["ano_eleicao"], "uf": r["uf"],
+                        "mandato": r["mandato"], "situacao": r["sigla_situacao"],
+                    })
+            except Exception: pass
+
+        # Se tem emendas, é deputado federal/senador (fallback se TSE não tem)
+        r_emendas = conn.execute("SELECT COUNT(*) FROM emendas WHERE politico_id = ?", (politico_id,)).fetchone()
+        n_emendas = r_emendas[0] if r_emendas else 0
+        if n_emendas > 0 and not any(c["cargo"] in ("deputado_federal", "senador") for c in cargos_encontrados):
+            cargos_encontrados.append({"cargo": "deputado_federal", "ano": None, "uf": None,
+                                       "mandato": None, "situacao": "Detectado via emendas"})
+
+        # Cargo principal: pega o mais alto da hierarquia (preferência por mais recente)
+        tipo_principal = None
+        nivel = None
+        poder = None
+        for cargo_h, niv, pod in HIERARQUIA:
+            matches = [c for c in cargos_encontrados if c["cargo"] == cargo_h]
+            if matches:
+                tipo_principal = cargo_h
+                nivel = niv
+                poder = pod
+                break
+
+        # Constrói métricas baseadas no tipo
+        metricas: dict = {}
+        roadmap: list = []
+
+        if tipo_principal in ("deputado_federal", "senador"):
+            # Tem emendas — métricas de eficiência legislativa
+            r = conn.execute("""
+                SELECT COUNT(*) as n,
+                       SUM(valor) as total,
+                       SUM(COALESCE(valor_pago, 0)) as pago,
+                       SUM(COALESCE(valor_empenhado, valor, 0)) as empenhado
+                FROM emendas WHERE politico_id = ?
+            """, (politico_id,)).fetchone()
+            empenhado = float(r["empenhado"] or 0)
+            pago = float(r["pago"] or 0)
+            metricas["emendas"] = {
+                "total_emendas": r["n"] or 0,
+                "valor_total": float(r["total"] or 0),
+                "valor_pago": pago,
+                "valor_empenhado": empenhado,
+                "pct_executado": round((pago / empenhado * 100) if empenhado > 0 else 0, 1),
+            }
+            roadmap.extend([
+                {"item": "Presença em sessões plenárias", "fonte": "Câmara API /deputados/{id}/discursos", "status": "pendente"},
+                {"item": "Projetos de lei apresentados", "fonte": "Câmara API /proposicoes", "status": "pendente"},
+                {"item": "Votações nominais", "fonte": "Câmara API /votacoes/votos", "status": "parcial — só perfil ativo"},
+            ])
+        elif tipo_principal in ("deputado_estadual",):
+            metricas["legislativo_estadual"] = {
+                "obs": "Sem agregação automática — cada ALE tem seu portal próprio",
+            }
+            roadmap.extend([
+                {"item": "Projetos apresentados na ALE", "fonte": "Portal da Assembleia (por UF)", "status": "pendente"},
+                {"item": "Presença em sessões", "fonte": "Portal da ALE", "status": "pendente"},
+                {"item": "Votações estaduais", "fonte": "Portal da ALE", "status": "pendente"},
+            ])
+        elif tipo_principal in ("governador", "vice_governador"):
+            metricas["executivo_estadual"] = {
+                "obs": "Vetos e decretos exigem coleta do Diário Oficial estadual",
+            }
+            roadmap.extend([
+                {"item": "Vetos a leis estaduais", "fonte": "DO Estadual", "status": "pendente"},
+                {"item": "Decretos publicados", "fonte": "DO Estadual", "status": "pendente"},
+                {"item": "Execução orçamentária do estado", "fonte": "Portal Transparência estadual", "status": "pendente"},
+            ])
+        elif tipo_principal in ("prefeito", "vice_prefeito"):
+            metricas["executivo_municipal"] = {
+                "obs": "Vetos municipais e decretos exigem coleta do Diário Oficial do município",
+            }
+            roadmap.extend([
+                {"item": "Vetos a leis municipais", "fonte": "DO municipal", "status": "pendente"},
+                {"item": "Decretos publicados", "fonte": "DO municipal", "status": "pendente"},
+                {"item": "Execução orçamentária da prefeitura", "fonte": "Portal Transparência municipal", "status": "pendente"},
+            ])
+        elif tipo_principal == "vereador":
+            metricas["legislativo_municipal"] = {
+                "obs": "Câmaras municipais não têm padrão nacional — cada uma tem seu portal",
+            }
+            roadmap.extend([
+                {"item": "Projetos apresentados na Câmara Municipal", "fonte": "Portal da CM (por município)", "status": "pendente"},
+                {"item": "Presença em sessões", "fonte": "Portal da CM", "status": "pendente"},
+            ])
+        elif tipo_principal == "presidente":
+            roadmap.extend([
+                {"item": "Vetos a leis federais", "fonte": "Planalto", "status": "pendente"},
+                {"item": "Medidas Provisórias editadas", "fonte": "Planalto", "status": "pendente"},
+            ])
+
+        # Votos eleitorais (sempre que disponíveis)
+        try:
+            rv = conn.execute(f"""
+                SELECT SUM(votos) as total, COUNT(DISTINCT municipio) as muns
+                FROM votos_candidato v
+                JOIN (
+                    SELECT sq_candidato FROM eleitos_estaduais
+                    WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+                    UNION
+                    SELECT sq_candidato FROM eleitos_municipais
+                    WHERE UPPER(nome) IN ({placeholders}) OR UPPER(nome_urna) IN ({placeholders})
+                ) e ON e.sq_candidato = v.sq_candidato
+            """, nomes + nomes + nomes + nomes).fetchone()
+            if rv and rv["total"]:
+                metricas["votos_eleitorais"] = {"total": rv["total"] or 0, "municipios": rv["muns"] or 0}
+        except Exception: pass
+
+        return {
+            "tipo_principal": tipo_principal,
+            "hierarquia_nivel": nivel,
+            "poder": poder,
+            "cargos_encontrados": cargos_encontrados,
+            "metricas": metricas,
+            "roadmap": roadmap,
+        }
+    except HTTPException: raise
+    except Exception as e:
+        logger.error("Erro em /perfil_tipo: %s", e, exc_info=True)
+        return {"tipo_principal": None, "metricas": {}, "roadmap": []}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}/trajetoria")
 @limiter.limit("30/minute")
 def trajetoria_politico(request: Request, politico_id: int):
