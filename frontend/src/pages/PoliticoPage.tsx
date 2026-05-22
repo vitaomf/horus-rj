@@ -7,6 +7,9 @@ import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
 import { PerfilPorCargo } from '../components/PerfilPorCargo';
+import { LayoutPrefeito } from '../components/layouts/LayoutPrefeito';
+import { LayoutVereador } from '../components/layouts/LayoutVereador';
+import { LayoutGovernador } from '../components/layouts/LayoutGovernador';
 import { useFavoritos } from '../hooks/useFavoritos';
 import { useRecentesVistos } from '../hooks/useRecentesVistos';
 import { useToast } from '../components/Toast';
@@ -469,6 +472,21 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         );
     }
 
+    // ── Roteamento de layout por tipo de cargo ────────────────────────────
+    // Cada tipo (prefeito, vereador, governador) tem um perfil dedicado
+    // com foco diferente. Deputados federais/senadores usam o layout padrão
+    // (que tem foco em emendas, base eleitoral nacional, votações da Câmara).
+    const tipo = perfilTipo?.tipo_principal;
+    if (tipo === 'prefeito' || tipo === 'vice_prefeito') {
+        return <LayoutPrefeito data={data} fotoUrl={fotoUrl} perfilTipo={perfilTipo} trajetoria={trajetoria} votos={votos} navigate={navigate} />;
+    }
+    if (tipo === 'vereador') {
+        return <LayoutVereador data={data} fotoUrl={fotoUrl} perfilTipo={perfilTipo} trajetoria={trajetoria} votos={votos} navigate={navigate} />;
+    }
+    if (tipo === 'governador' || tipo === 'vice_governador') {
+        return <LayoutGovernador data={data} fotoUrl={fotoUrl} perfilTipo={perfilTipo} trajetoria={trajetoria} votos={votos} navigate={navigate} />;
+    }
+    // Default: layout legislativo federal (deputado federal / senador / deputado estadual)
     return (
         <div className="animate-fade-in pb-12 relative z-10">
 
