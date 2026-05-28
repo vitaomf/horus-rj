@@ -1583,8 +1583,10 @@ def emendas_politico_paginadas(
         offset = (pagina - 1) * limite
 
         rows = conn.execute(f"""
-            SELECT id, ano, valor, descricao, objetivo, status, codigo_emenda,
-                   municipio_destino, uf, fonte_url
+            SELECT id, ano, valor, descricao, objetivo, codigo_emenda,
+                   municipio_destino, uf, fonte_url,
+                   COALESCE(valor_empenhado, valor, 0) AS valor_empenhado,
+                   COALESCE(valor_pago, 0)             AS valor_pago
             FROM emendas
             WHERE {where_sql}
             ORDER BY ano DESC, valor DESC
@@ -1592,7 +1594,7 @@ def emendas_politico_paginadas(
         """, params + [limite, offset]).fetchall()
 
         return {
-            "resultados": [dict(r) for r in rows],
+            "resultados": [{**dict(r), "status": "CADASTRADA"} for r in rows],
             "total": total,
             "pagina": pagina,
             "total_paginas": total_paginas,
