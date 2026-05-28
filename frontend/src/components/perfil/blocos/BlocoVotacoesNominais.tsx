@@ -120,7 +120,8 @@ export function BlocoVotacoesNominais({ cor, politicoId }: Props) {
               const c = COR_VOTO[v.voto] || cor;
               return (
                 <div key={`${v.id_votacao}-${i}`}
-                     className="flex items-stretch gap-3 bg-[#0a0a0a]/40 border border-[#1a1a1a] hover:border-[#333] transition-colors px-4 py-3">
+                     className="flex items-stretch gap-3 bg-[#0a0a0a]/40 border border-[#1a1a1a] hover:border-[#333] transition-colors px-4 py-3"
+                     style={{ borderLeft: `2px solid ${c}` }}>
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] text-gray-300 leading-snug line-clamp-2">
                       {v.descricao || v.id_votacao}

@@ -32,6 +32,11 @@ logger = logging.getLogger("horus-api")
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
 _use_turso = bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
+# Config parcial é quase sempre erro de deploy (esqueceu uma das duas vars) —
+# avisa em vez de cair pro SQLite local silenciosamente.
+if bool(TURSO_DATABASE_URL) != bool(TURSO_AUTH_TOKEN):
+    _faltando = "TURSO_AUTH_TOKEN" if TURSO_DATABASE_URL else "TURSO_DATABASE_URL"
+    logger.warning("Turso configurado pela metade (falta %s) — usando SQLite local.", _faltando)
 if _use_turso:
     try:
         import libsql_experimental as libsql  # noqa: F401 — só importa se disponível (Linux/Koyeb)
