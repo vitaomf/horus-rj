@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -68,10 +69,21 @@ class CacheMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(CacheMiddleware)
 
+# Compressão GZip — reduz payloads JSON grandes (estatísticas, listas de emendas)
+# em ~70-85%. minimum_size evita comprimir respostas pequenas (overhead).
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Filtro: rankings públicos só consideram parlamentares individuais.
 # Autores coletivos (bancadas, comissões, relatores) são marcados em
 # coleta_emendas.py com cargo='Autor Coletivo' e excluídos via este predicado.
 NOT_AUTOR_COLETIVO_SQL = "COALESCE(p.cargo, '') != 'Autor Coletivo'"
+
+# As 27 UFs oficiais do Brasil — exclui valores espúrios (BR, MULT, REG, EXT, etc.)
+# usados em distribuição geográfica e filtros de mapa.
+UFS_OFICIAIS = frozenset({
+    'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+    'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+})
 
 # CORS: em produção definir ALLOWED_ORIGINS no .env (ex: "https://horus.dominio.com.br")
 # Padrão local: apenas localhost:5173 (Vite dev) e localhost:7291 (API próprio)
@@ -131,7 +143,7 @@ def obter_municipios_heatmap(request: Request):
     try:
         # Query SQL para agrupar emendas por município e somar os valores
         cur.execute("""
-            SELECT 
+            SELECT
                 UPPER(municipio_destino) as nome,
                 SUM(valor) as valor_total,
                 COUNT(*) as total_emendas
@@ -139,6 +151,7 @@ def obter_municipios_heatmap(request: Request):
             WHERE municipio_destino IS NOT NULL AND municipio_destino != ''
             GROUP BY UPPER(municipio_destino)
             ORDER BY valor_total DESC
+            LIMIT 2000
         """)
         rows = cur.fetchall()
         return [
@@ -345,11 +358,13 @@ def stats_estado(request: Request, uf: str):
             FROM emendas
             WHERE UPPER(uf) = ?
         """, (uf_upper,)).fetchone()
+        if not row:
+            return {"total_emendas": 0, "valor_total": 0.0, "parlamentares": 0, "municipios": 0}
         return {
-            "total_emendas":  row[0],
-            "valor_total":    float(row[1]),
-            "parlamentares":  row[2],
-            "municipios":     row[3],
+            "total_emendas":  row[0] or 0,
+            "valor_total":    float(row[1] or 0),
+            "parlamentares":  row[2] or 0,
+            "municipios":     row[3] or 0,
         }
     except Exception as e:
         logger.error("Erro em /estados/%s/stats: %s", uf, e)
@@ -602,19 +617,20 @@ def listar_emendas(municipio_id: int):
                 raise HTTPException(status_code=404, detail="Município não encontrado.")
             nome_municipio = mun_row["nome"]
         except sqlite3.OperationalError:
-            # Se não existe a tabela de município, a gente pega pelo ID fake do endpoint anterior (ordem alfabética)
-            municipios = conn.execute("SELECT DISTINCT municipio_destino FROM emendas WHERE municipio_destino != '' ORDER BY municipio_destino").fetchall()
+            municipios = conn.execute(
+                "SELECT DISTINCT municipio_destino FROM emendas WHERE municipio_destino != '' ORDER BY municipio_destino LIMIT 10000"
+            ).fetchall()
             if municipio_id <= 0 or municipio_id > len(municipios):
                 raise HTTPException(status_code=404, detail="Município não encontrado.")
             nome_municipio = municipios[municipio_id - 1]["municipio_destino"]
-            
-        # Busca as emendas usando o JOIN
+
         query = """
-            SELECT e.*, p.nome as politico_nome, p.partido as politico_partido 
-            FROM emendas e 
-            LEFT JOIN politicos p ON e.politico_id = p.id 
+            SELECT e.*, p.nome as politico_nome, p.partido as politico_partido
+            FROM emendas e
+            LEFT JOIN politicos p ON e.politico_id = p.id
             WHERE e.municipio_destino = ?
             ORDER BY e.valor DESC
+            LIMIT 500
         """
         emendas = conn.execute(query, (nome_municipio,)).fetchall()
         return [dict(e) for e in emendas]
@@ -1069,8 +1085,6 @@ def distribuicao_emendas_por_uf(request: Request, politico_id: int):
     Retorna o volume de emendas de um parlamentar agregado por UF.
     Usado para colorir o mapa de atuação nacional.
     """
-    UFS_OFICIAIS = {'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
-                    'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'}
     conn = get_db_connection()
     try:
         rows = conn.execute("""
@@ -1095,10 +1109,6 @@ def distribuicao_emendas_por_uf(request: Request, politico_id: int):
         conn.close()
 
 
-_UFS_OFICIAIS = {'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
-                 'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'}
-
-
 @app.get("/api/politicos/{politico_id}/distribuicao_municipios")
 @limiter.limit("60/minute")
 def distribuicao_municipios(request: Request, politico_id: int, uf: str):
@@ -1107,7 +1117,7 @@ def distribuicao_municipios(request: Request, politico_id: int, uf: str):
     Usado para drill-down do mapa de atuação (clique no estado → zoom em municípios).
     """
     uf_u = uf.upper().strip()
-    if uf_u not in _UFS_OFICIAIS:
+    if uf_u not in UFS_OFICIAIS:
         return []
     conn = get_db_connection()
     try:
@@ -1200,7 +1210,8 @@ def perfil_tipo(request: Request, politico_id: int):
                         "ano": r["ano_eleicao"], "uf": r["uf"],
                         "mandato": r["mandato"], "situacao": r["sigla_situacao"],
                     })
-            except Exception: pass
+            except Exception as _e:
+                logger.warning("perfil_tipo: erro ao buscar cargos TSE para %s: %s", politico_id, _e)
 
         # Se tem emendas, é deputado federal/senador (fallback se TSE não tem)
         r_emendas = conn.execute("SELECT COUNT(*) FROM emendas WHERE politico_id = ?", (politico_id,)).fetchone()
@@ -1304,7 +1315,8 @@ def perfil_tipo(request: Request, politico_id: int):
             """, nomes + nomes + nomes + nomes).fetchone()
             if rv and rv["total"]:
                 metricas["votos_eleitorais"] = {"total": rv["total"] or 0, "municipios": rv["muns"] or 0}
-        except Exception: pass
+        except Exception as _e:
+            logger.warning("perfil_tipo: erro ao buscar votos eleitorais para %s: %s", politico_id, _e)
 
         return {
             "tipo_principal": tipo_principal,
@@ -1466,7 +1478,7 @@ def votos_politico(request: Request, politico_id: int, ano: Optional[int] = Quer
             WHERE 1=1 {sql_ano}
             GROUP BY v.ano, v.uf, v.municipio, e.cargo, e.partido
             ORDER BY votos DESC
-            LIMIT 1000
+            LIMIT 200
         """, params + nomes + nomes).fetchall()
 
         votos = [dict(r) for r in rs]
@@ -1476,6 +1488,66 @@ def votos_politico(request: Request, politico_id: int, ano: Optional[int] = Quer
     except Exception as e:
         logger.error("Erro em /votos: %s", e, exc_info=True)
         return {"votos": [], "total": 0}
+    finally:
+        conn.close()
+
+
+@app.get("/api/politicos/{politico_id}/votacoes_nominais")
+@limiter.limit("30/minute")
+def votacoes_nominais_politico(
+    request: Request, politico_id: int,
+    pagina: int = Query(1, ge=1),
+    limite: int = Query(30, ge=1, le=100),
+    voto: Optional[str] = Query(None),
+):
+    """Votações nominais de um deputado federal com seu respectivo voto."""
+    conn = get_db_connection()
+    try:
+        tabelas = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        if "votacoes_votos" not in tabelas:
+            return {"votacoes": [], "total": 0, "resumo": {}, "disponivel": False}
+
+        where = ["vv.politico_id = ?"]
+        params: list = [politico_id]
+        if voto and voto.strip():
+            where.append("LOWER(vv.voto) = LOWER(?)"); params.append(voto.strip())
+        where_sql = " AND ".join(where)
+
+        _row = conn.execute(
+            f"SELECT COUNT(*) FROM votacoes_votos vv WHERE {where_sql}", params
+        ).fetchone()
+        total = _row[0] if _row else 0
+
+        offset = (pagina - 1) * limite
+        rows = conn.execute(f"""
+            SELECT vv.id_votacao, vv.voto, vv.data_hora,
+                   v.data, v.descricao, v.aprovacao, v.sigla_orgao
+            FROM votacoes_votos vv
+            LEFT JOIN votacoes v ON vv.id_votacao = v.id_votacao
+            WHERE {where_sql}
+            ORDER BY vv.data_hora DESC
+            LIMIT ? OFFSET ?
+        """, params + [limite, offset]).fetchall()
+
+        # Resumo de votos
+        resumo_rows = conn.execute("""
+            SELECT voto, COUNT(*) as total
+            FROM votacoes_votos WHERE politico_id = ?
+            GROUP BY voto ORDER BY total DESC
+        """, (politico_id,)).fetchall()
+        resumo = {r["voto"]: r["total"] for r in resumo_rows}
+
+        return {
+            "votacoes": [dict(r) for r in rows],
+            "total": total,
+            "total_paginas": max(1, -(-total // limite)),
+            "pagina": pagina,
+            "resumo": resumo,
+            "disponivel": True,
+        }
+    except Exception as e:
+        logger.error("Erro em /votacoes_nominais: %s", e, exc_info=True)
+        return {"votacoes": [], "total": 0, "resumo": {}, "disponivel": False}
     finally:
         conn.close()
 
@@ -2394,9 +2466,8 @@ def status_coleta():
         cur = conn.cursor()
 
         # Apenas as 27 UFs oficiais do Brasil — exclui BR, MULT, REG, EXT, etc.
-        UFS_OFICIAIS = ('AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
-                        'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO')
-        placeholders = ','.join('?' * len(UFS_OFICIAIS))
+        ufs_tuple = tuple(UFS_OFICIAIS)
+        placeholders = ','.join('?' * len(ufs_tuple))
 
         # Emendas por UF (só estados reais)
         cur.execute(f"""
@@ -2404,7 +2475,7 @@ def status_coleta():
             FROM emendas
             WHERE uf IN ({placeholders})
             GROUP BY uf ORDER BY total DESC
-        """, UFS_OFICIAIS)
+        """, ufs_tuple)
         emendas_por_uf = [
             {"uf": r["uf"], "total": r["total"], "ano_min": r["ano_min"], "ano_max": r["ano_max"]}
             for r in cur.fetchall()
@@ -2412,7 +2483,8 @@ def status_coleta():
 
         # Totais gerais
         cur.execute("SELECT COUNT(*) FROM emendas")
-        total_emendas = cur.fetchone()[0]
+        _row = cur.fetchone()
+        total_emendas = _row[0] if _row else 0
         ufs_com_dados = len(emendas_por_uf)  # já filtrado — sempre ≤ 27
 
         # Parlamentares por casa
@@ -2558,8 +2630,16 @@ def relatorio_inconsistencias(request: Request):
         """).fetchone()
         r["anomalia_pago_maior_empenhado"] = row[0] if row else 0
 
-        # 6. Emendas sem UF
-        row = conn.execute("SELECT COUNT(*) FROM emendas WHERE uf IS NULL OR TRIM(uf) = ''").fetchone()
+        # 6. Emendas sem UF — exclui emendas estaduais/nacionais (município = "UF" ou "Nacional")
+        row = conn.execute("""
+            SELECT COUNT(*) FROM emendas
+            WHERE (uf IS NULL OR TRIM(uf) = '')
+              AND municipio_destino NOT LIKE '%(UF)%'
+              AND municipio_destino NOT LIKE '%Nacional%'
+              AND municipio_destino NOT LIKE '%NACIONAL%'
+              AND municipio_destino NOT LIKE '%Federal%'
+              AND (municipio_destino IS NOT NULL AND TRIM(municipio_destino) != '')
+        """).fetchone()
         r["emendas_sem_uf"] = row[0] if row else 0
 
         # 7. Anos com cobertura parcial (menos de 100 emendas no ano)
