@@ -39,7 +39,7 @@ export function BlocoEquipe({ cor, nivel, membros }: Props) {
             <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] p-3 flex items-center gap-3">
               <div className="w-10 h-12 bg-[#0d0d0d] border border-[#1a1a1a] overflow-hidden shrink-0">
                 {m.foto_url ? (
-                  <img src={m.foto_url} alt={m.nome} className="w-full h-full object-cover object-top" />
+                  <img src={m.foto_url} alt={m.nome} loading="lazy" className="w-full h-full object-cover object-top" />
                 ) : (
                   <span className="w-full h-full flex items-center justify-center font-bebas text-sm"
                         style={{ color: `${cor}50` }}>

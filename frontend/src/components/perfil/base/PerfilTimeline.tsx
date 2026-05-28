@@ -97,7 +97,7 @@ export function PerfilTimeline({ eventos, cor, modo = 'simples', politicoId, car
               >
                 <div className="aspect-[3/4] bg-[#0d0d0d] overflow-hidden relative">
                   {ev.foto_url ? (
-                    <img src={ev.foto_url} alt={label}
+                    <img src={ev.foto_url} alt={label} loading="lazy"
                       className={`w-full h-full object-cover object-top ${ativoCargo ? '' : 'grayscale-[40%]'} group-hover:grayscale-0 transition-all`} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center font-bebas text-4xl"
