@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
-import { PerfilPorCargo } from '../components/PerfilPorCargo';
+import { BlocoVotacoesNominais } from '../components/perfil/blocos';
 import { LayoutPrefeito } from '../components/layouts/LayoutPrefeito';
 import { LayoutVereador } from '../components/layouts/LayoutVereador';
 import { LayoutGovernador } from '../components/layouts/LayoutGovernador';
@@ -529,7 +529,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     : 'pointer-events-none opacity-0 h-0 overflow-hidden mb-0'}`}>
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <button onClick={onVoltar} className="text-[#FFD700]/60 hover:text-[#FFD700] transition-colors cursor-pointer">
+                        <button onClick={onVoltar} aria-label="Voltar" title="Voltar" className="text-[#FFD700]/60 hover:text-[#FFD700] transition-colors cursor-pointer">
                             <ArrowLeft className="w-4 h-4" />
                         </button>
                         <div className="w-8 h-8 overflow-hidden border border-[#FFD700]/40 shrink-0" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%)' }}>
@@ -785,9 +785,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
             {/* ── CONTEÚDO RESTANTE ── */}
             <div className="px-4 md:px-12">
-
-            {/* ── PERFIL POR TIPO DE CARGO (template adaptativo) ── */}
-            <PerfilPorCargo dados={perfilTipo} />
 
             {/* ── TRAJETÓRIA ELEITORAL (cargos + votos por município) ── */}
             {trajetoria && trajetoria.trajetoria.length > 0 && (
@@ -1656,6 +1653,13 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             VEJA A BASE ELEITORAL ABAIXO ↓
                         </p>
                     )}
+                </div>
+            )}
+
+            {/* ── VOTAÇÕES NOMINAIS (deputados federais e senadores) ── */}
+            {(data.cargo === 'Deputado Federal' || data.cargo === 'Parlamentar Federal' || data.cargo === 'Senador') && (
+                <div className="max-w-7xl mx-auto mb-6">
+                    <BlocoVotacoesNominais cor="#FFD700" politicoId={data.id} />
                 </div>
             )}
 

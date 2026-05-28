@@ -9,6 +9,7 @@ import { NavProvider } from './contexts/NavContext';
 import { BackToTop } from './components/BackToTop';
 import { ToastProvider } from './components/Toast';
 import { FavoritosPanel } from './components/FavoritosPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ── Lazy loading ──────────────────────────────────────────────────────────────
 const HomePage          = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
@@ -113,7 +114,8 @@ function Navbar({
             <SearchBar onSelectMunicipio={onSelectMunicipio} onSelectPolitico={onSelectPolitico} />
           </div>
 
-          <button className="md:hidden text-[#FFD700] p-2" onClick={() => setMenuAberto(!menuAberto)}>
+          <button className="md:hidden text-[#FFD700] p-2" onClick={() => setMenuAberto(!menuAberto)}
+            aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'} aria-expanded={menuAberto}>
             {menuAberto ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -225,6 +227,7 @@ function App() {
         <BackToTop />
         <FavoritosPanel />
 
+        <ErrorBoundary>
         <Suspense fallback={<PageSpinner />}>
           <Routes>
             {/* ── RJ = homepage ── */}
@@ -285,6 +288,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </div>
     </NavProvider>
     </ToastProvider>
