@@ -32,7 +32,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-20 right-4 z-[999] flex flex-col gap-2 pointer-events-none">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed bottom-20 right-4 z-[999] flex flex-col gap-2 pointer-events-none"
+      >
         {toasts.map(t => {
           const Icon = ICON[t.type];
           const c    = COLOR[t.type];
@@ -40,7 +45,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={t.id}
               className="flex items-center gap-3 px-4 py-3 border shadow-[0_8px_30px_rgba(0,0,0,0.9)] max-w-sm pointer-events-auto animate-in slide-in-from-right-4 fade-in duration-200"
-              style={{ backgroundColor: '#0a0a0a', borderColor: c.border + '60', background: c.bg }}
+              style={{ borderColor: c.border + '60', background: `linear-gradient(${c.bg}, ${c.bg}), #0a0a0a` }}
             >
               <Icon className="w-4 h-4 shrink-0" style={{ color: c.text }} />
               <p className="font-mono text-[10px] tracking-widest flex-1" style={{ color: c.text === '#FFD700' ? '#ccc' : c.text }}>
@@ -48,6 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </p>
               <button
                 onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+                aria-label="Fechar notificação"
                 className="text-gray-600 hover:text-white transition-colors shrink-0"
               >
                 <X className="w-3 h-3" />
