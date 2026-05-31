@@ -15,7 +15,6 @@ export const PARTIDO_COR: Record<string, string> = {
   NOVO:           '#E07000',
   PSOL:           '#6622CC',
   REDE:           '#00AA55',
-  'PCdoB':        '#AA0000',
   PCDOB:          '#AA0000',
   PV:             '#007700',
   PODE:           '#0099CC',
@@ -35,9 +34,11 @@ export const PARTIDO_COR: Record<string, string> = {
 };
 
 export function corPartido(sigla: string | null | undefined): string {
-  if (!sigla) return '#555';
+  // Sempre 7 chars (#RRGGBB) para que cor + sufixo de alfa (ex: '55') resulte
+  // em hex valido (#RRGGBBAA). '#666' + '55' viraria '#66655' (5 chars, invalido).
+  if (!sigla) return '#555555';
   const key = sigla.trim().toUpperCase();
-  return PARTIDO_COR[key] ?? '#666';
+  return PARTIDO_COR[key] ?? '#666666';
 }
 
 export function badgeStyle(sigla: string | null | undefined) {
