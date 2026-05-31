@@ -15,6 +15,48 @@ Emenda parlamentar é **uma das dimensões** da atuação política, não o eixo
 
 Antes de adicionar UI nova ou priorizar coleta, perguntar: **isso responde "quem representa meu lugar e o que ele faz" ou só "quanto de emenda ele mandou"?** Se for só emenda, balancear com pelo menos uma outra dimensão.
 
+## Índices territoriais em cascata (Brasil → Região → Estado → Município)
+
+O mapa nacional e cada nível de drill-down deve carregar índices contextuais do território — não só dados do parlamentar. Cidadão entra pelo lugar e enxerga **a realidade daquele lugar** antes (ou ao lado) de quem o representa.
+
+**Indicadores prioritários** (pelo menos esses na primeira leva):
+
+| Indicador | Fonte | Granularidade nativa | Cascata |
+|---|---|---|---|
+| IDH-M | PNUD Atlas Brasil | município (2010 oficial; estimativas anuais) | μ por região; UF agregada; município direto |
+| Saneamento (% esgoto coletado/tratado) | SNIS / MDR | município (anual) | μ ponderada por população |
+| Criminalidade (homicídios/100k hab) | Atlas da Violência IPEA + SINESP | município (anual com lag) | μ por região; UF direta; município com fallback p/ UF se ausente |
+| Desmatamento | INPE PRODES (Amazônia Legal) + MapBiomas (demais biomas) | município (anual) | soma absoluta + % do território; cascata aditiva |
+| Alfabetismo / Escolaridade | IBGE Censo 2022 | município | μ ponderada |
+
+**Regras de cascata e exibição**:
+
+- **Brasil**: indicador médio nacional + ranking dos extremos (5 melhores / 5 piores estados).
+- **Região**: média ponderada por população, posição no ranking nacional, evolução nos últimos 5 anos quando a fonte permitir.
+- **Estado**: valor direto, posição entre os 27, comparativo com média da região e do Brasil.
+- **Município**: valor direto quando a fonte cobre; fallback para média do estado com flag explícita "*estimado pela média estadual*".
+- **Sem dado**: mostrar "—" e a fonte/ano da última medição, **nunca** zero (é mentira estatística).
+- **Posicionamento estético no mapa**: cantos do mapa, painel lateral compacto OU sobreposição on-hover — nunca poluir o mapa em si.
+
+**Coleta**: scripts dedicados em `scripts/coleta_indices_*.py`, persistidos em tabelas `indices_municipio`, `indices_estado` com `(codigo_ibge, ano, indicador, valor)`. Idempotente. Endpoint REST `/api/indices/{nivel}/{id}` retorna os indicadores em um GET único.
+
+## Top 10 funções de um parlamentar federal
+
+Lista canônica usada para classificar "atuação". Cada perfil de parlamentar deve mostrar evidência (ou ausência reconhecida) em cada uma:
+
+1. **Legislar** — apresentar e relatar PLs, PLPs, PECs, PDLs
+2. **Votar** — comparecer e votar nominalmente nas proposições (presença + posição)
+3. **Aprovar e fiscalizar o Orçamento** — LDO, LOA, e execução orçamentária
+4. **Apresentar emendas individuais e de bancada** — destino, objeto, execução (empenhado→pago)
+5. **Atuar em comissões temáticas e CPIs** — membro, relator, presidente
+6. **Pedir informações ao Executivo** — requerimentos formais ao Governo
+7. **Representar o eleitor** — gabinete, audiências, agenda no estado
+8. **Participar de viagens oficiais e missões** — comitivas, eventos, custo público
+9. **Articular politicamente** — liderança partidária, bloco, governo/oposição, autoria de obstrução
+10. **Discursar e debater em plenário** — discursos registrados, pronunciamentos, ordem do dia
+
+Para senador, acrescenta-se "aprovar nomeações" (ministros do STF/TCU, embaixadores) e "ratificar tratados internacionais". Para deputado estadual e vereador, a lista se ajusta ao escopo (LDO/LOA estadual/municipal, CPI estadual/municipal etc.).
+
 ## Stack
 
 - **Backend**: FastAPI + uvicorn, SQLite, APScheduler — Python 3.x
