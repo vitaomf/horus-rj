@@ -183,11 +183,13 @@ async function fetchDetalhe(id: number): Promise<DetalheCompar | null> {
     const r = await fetch(`${API_BASE_URL}/api/politicos/${id}`);
     const d = await r.json();
     const anos = (d.emendas_por_ano ?? []).map((a: { ano: number }) => a.ano);
-    const estados = new Set((d.ultimas_emendas ?? []).map((e: { municipio_destino: string }) => {
-      const m = e.municipio_destino ?? '';
-      const uf = m.match(/- ([A-Z]{2})$/)?.[1];
-      return uf ?? m;
-    })).size;
+    // total_estados agregado (backend novo); fallback: extrai UF do top 100 (incompleto)
+    const estados = typeof d.total_estados === 'number'
+      ? d.total_estados
+      : new Set((d.ultimas_emendas ?? []).map((e: { municipio_destino: string }) => {
+          const m = e.municipio_destino ?? '';
+          return m.match(/- ([A-Z]{2})$/)?.[1] ?? m;
+        })).size;
     // Usa total agregado real (backend retorna COUNT(DISTINCT...)); fallback para len(municipios_beneficiados) se backend antigo
     const muns = typeof d.total_municipios === 'number' ? d.total_municipios : (d.municipios_beneficiados ?? []).length;
     const empenhado = (d.ultimas_emendas ?? []).reduce((s: number, e: { valor_empenhado?: number; valor?: number }) => s + (e.valor_empenhado || e.valor || 0), 0);

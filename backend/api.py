@@ -1672,6 +1672,14 @@ def obter_detalhes_politico(request: Request, politico_id: int):
         ).fetchone()
         total_municipios_distintos = _tmrow[0] if _tmrow and _tmrow[0] is not None else 0
 
+        # Total de UFs distintas alcançadas — só conta UFs oficiais (filtra MULTIPLO, etc.)
+        _terow = conn.execute(
+            f"SELECT COUNT(DISTINCT uf) FROM emendas "
+            f"WHERE politico_id = ? AND uf IN ({','.join('?'*len(UFS_OFICIAIS))})",
+            (politico_id, *UFS_OFICIAIS)
+        ).fetchone()
+        total_estados_distintos = _terow[0] if _terow and _terow[0] is not None else 0
+
         # 3. Emendas por Ano
         ano_rows = conn.execute("""
             SELECT ano,
@@ -1771,6 +1779,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             "total_emendas": politico_info["total_emendas"] or 0,
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "total_municipios": total_municipios_distintos,
+            "total_estados": total_estados_distintos,
             "dados_campanha": dados_campanha,
             "municipios_beneficiados": municipios_beneficiados,
             "emendas_por_ano": emendas_por_ano,
