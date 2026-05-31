@@ -1,6 +1,19 @@
-# Horus RJ
+# Horus
 
-Site de transparência pública do Rio de Janeiro. Coleta emendas parlamentares, contratos federais e dados de campanha (TSE) de 3 APIs oficiais, cruza num SQLite local e expõe num painel React. **Ferramenta de análise jornalística** — dev solo, roda no desktop e fica público via ngrok com domínio fixo.
+Site de transparência política nacional. Permite que o cidadão acesse e enxergue, pelo lugar onde mora, **quem são seus políticos, o que cada um faz e o que deveria fazer**. Coleta dados de APIs oficiais (Portal da Transparência, TSE, Câmara), cruza num SQLite local e expõe num painel React.
+
+## REGRA FUNDAMENTAL — não é "site de emendas"
+
+Emenda parlamentar é **uma das dimensões** da atuação política, não o eixo do produto. O HORUS retrata o político como pessoa pública completa. A régua de prioridade para qualquer nova feature, refactor ou texto exibido é, na ordem:
+
+1. **Mapeamento territorial** — quem representa o lugar onde o usuário mora (federal, estadual, municipal)
+2. **Atuação legislativa** — projetos de lei apresentados, votações nominais, comissões, presença, alinhamento
+3. **Resultado/desempenho** — indicadores objetivos do mandato (presença, autoria, impacto)
+4. **Mapeamento das emendas** — pra onde direcionou verba, com que objetivo
+5. **Relatórios e patrimônio** — bens declarados, evolução patrimonial, prestação de contas
+6. **Conduta** — escândalos, processos, inquéritos, sanções
+
+Antes de adicionar UI nova ou priorizar coleta, perguntar: **isso responde "quem representa meu lugar e o que ele faz" ou só "quanto de emenda ele mandou"?** Se for só emenda, balancear com pelo menos uma outra dimensão.
 
 ## Stack
 
@@ -116,3 +129,13 @@ Ordem proposta — ajustar conforme necessidade editorial:
 - **Pago** (estágio 3): dinheiro efetivamente transferido (pode ser < empenhado)
 - **TSE / DivulgaCandContas**: fonte dos dados de campanha eleitoral
 - **Portal da Transparência**: API gov federal para emendas e contratos
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
