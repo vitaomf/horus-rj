@@ -68,14 +68,17 @@ def status_cache(uf: str = ""):
     garantir_pasta()
     label = f" ({uf})" if uf else ""
     print(f"\n=== STATUS DO CACHE{label} ===")
-    for ano in range(2014, datetime.now().year + 1):
+    ano_atual = datetime.now().year
+    for ano in range(2014, ano_atual + 1):
         path = caminho_cache(ano, uf)
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
                 info = json.load(f)
-            modificado = os.path.getmtime(path)
-            dias = (datetime.now().timestamp() - modificado) / 86400
-            valido = "[ok] valido" if dias < 7 else "[!] expirado"
+            # Mesmo TTL escalonado usado em cache_existe()
+            if cache_existe(ano, force_refresh=False, uf=uf):
+                valido = "[ok] valido"
+            else:
+                valido = "[!] expirado"
             print(f"  {ano}: {info['total']} emendas | "
                   f"coletado {info['coletado_em'][:10]} | {valido}")
         else:
