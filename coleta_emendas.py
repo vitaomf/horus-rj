@@ -12,8 +12,9 @@ from cache_manager import cache_existe, salvar_cache, carregar_cache, status_cac
 # Bancadas, comissões e relatores não são parlamentares individuais e precisam
 # ser segregados pra rankings/listagens públicas não ficarem distorcidos.
 _AUTOR_COLETIVO_PATTERNS = (
-    'BANCADA', 'COMISS', 'RELATOR', 'FRENTE',
-    'ASSEMBL', 'EXECUTIVO', 'MINIST', 'COMITÊ', 'COMITE'
+    'BANCADA', 'COMISS', 'COM.', 'COM ', 'RELATOR', 'FRENTE',
+    'ASSEMBL', 'EXECUTIVO', 'MINIST', 'COMITÊ', 'COMITE',
+    'SEM INFORMA',
 )
 
 def _classificar_cargo(nome: str) -> str:
@@ -33,9 +34,34 @@ def processar_valor(valor_str):
         return 0.0
 
 import re as _re
+import unicodedata as _ud
+
+# Nome do estado (sem acento, UPPER) → sigla UF. Usado quando municipio_destino
+# eh "NOME ESTADO (UF)" (destino estadual; antes ficava com uf vazia e perdiamos
+# 65% das emendas no mapa nacional — ver scripts/backfill_uf_emendas.py).
+_NOME_UF = {
+    "ACRE":"AC","ALAGOAS":"AL","AMAPA":"AP","AMAZONAS":"AM","BAHIA":"BA",
+    "CEARA":"CE","DISTRITO FEDERAL":"DF","ESPIRITO SANTO":"ES","GOIAS":"GO",
+    "MARANHAO":"MA","MATO GROSSO":"MT","MATO GROSSO DO SUL":"MS",
+    "MINAS GERAIS":"MG","PARA":"PA","PARAIBA":"PB","PARANA":"PR","PERNAMBUCO":"PE",
+    "PIAUI":"PI","RIO DE JANEIRO":"RJ","RIO GRANDE DO NORTE":"RN",
+    "RIO GRANDE DO SUL":"RS","RONDONIA":"RO","RORAIMA":"RR","SANTA CATARINA":"SC",
+    "SAO PAULO":"SP","SERGIPE":"SE","TOCANTINS":"TO",
+}
+
+def _sem_acento(s: str) -> str:
+    return "".join(c for c in _ud.normalize("NFD", s) if _ud.category(c) != "Mn")
 
 def _extrair_uf(municipio: str) -> str:
-    """Extrai sigla de UF de strings como 'NITERÓI - RJ' ou 'SÃO PAULO - SP'."""
+    """Extrai sigla de UF do nome do destino.
+
+    Cobertura:
+      'NITERÓI - RJ'       → 'RJ'
+      'NITEROI (RJ)'       → 'RJ'
+      'RJ'                 → 'RJ'
+      'AMAZONAS (UF)'      → 'AM'  (destino estadual)
+      'Nacional', 'Sul'    → ''    (cross-state, sem UF)
+    """
     if not municipio:
         return ""
     s = municipio.upper().strip()
@@ -47,6 +73,10 @@ def _extrair_uf(municipio: str) -> str:
         return m.group(1)
     if _re.match(r'^[A-Z]{2}$', s):
         return s
+    # 'NOME ESTADO (UF)' — extrai pela primeira parte
+    if s.endswith(' (UF)'):
+        nome = _sem_acento(s[:-5].strip())
+        return _NOME_UF.get(nome, "")
     return ""
 
 def processar_emendas_lote(dados, cursor, filtro_uf: str = ""):
