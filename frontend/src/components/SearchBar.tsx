@@ -20,15 +20,31 @@ interface GlobalResult {
   leis: any[];
 }
 
+type FlatItem =
+  | { kind: 'municipio';    nome: string }
+  | { kind: 'parlamentar';  id: number }
+  | { kind: 'emenda' };
+
 export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelectPolitico }) => {
   const [query, setQuery]               = useState('');
   const [result, setResult]             = useState<GlobalResult>({ municipios: [], parlamentares: [], emendas: [], leis: [] });
   const [isSearching, setIsSearching]   = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isFocused, setIsFocused]       = useState(false);
+  const [selectedIdx, setSelectedIdx]   = useState(-1);
   const dropdownRef                     = useRef<HTMLDivElement>(null);
   const inputRef                        = useRef<HTMLInputElement>(null);
   const navigate                        = useNavigate();
+
+  // Lista achatada (na ordem de exibição) para navegação por teclado
+  const flatItems: FlatItem[] = [
+    ...result.municipios.map(m => ({ kind: 'municipio' as const, nome: m.nome })),
+    ...result.parlamentares.map(p => ({ kind: 'parlamentar' as const, id: p.id })),
+    ...(result.emendas.length > 0 ? [{ kind: 'emenda' as const }] : []),
+  ];
+
+  // Reseta seleção quando os resultados mudam
+  useEffect(() => { setSelectedIdx(-1); }, [result]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,9 +111,27 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
           ref={inputRef}
           type="text"
           placeholder="BUSCAR..."
+          aria-label="Buscar municípios, parlamentares ou emendas"
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => { setIsFocused(true); if (query.length >= 3) setShowDropdown(true); }}
+          onKeyDown={e => {
+            if (flatItems.length === 0) return;
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setSelectedIdx(i => (i + 1) % flatItems.length);
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setSelectedIdx(i => (i <= 0 ? flatItems.length - 1 : i - 1));
+            } else if (e.key === 'Enter' && selectedIdx >= 0) {
+              e.preventDefault();
+              const it = flatItems[selectedIdx];
+              fechar();
+              if (it.kind === 'municipio')        onSelectMunicipio(it.nome);
+              else if (it.kind === 'parlamentar') onSelectPolitico(it.id);
+              else                                navigate(`/busca?tab=emendas&q=${encodeURIComponent(query)}`);
+            }
+          }}
           className={`
             w-full bg-black border text-white py-2 pl-9 pr-4
             font-mono text-xs tracking-[0.2em] placeholder-gray-700
@@ -153,12 +187,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
               {/* MUNICÍPIOS */}
               {result.municipios.length > 0 && (
                 <Grupo titulo="Municípios" icone={MapPin} cor="#03A9F4">
-                  {result.municipios.map(m => (
+                  {result.municipios.map((m, i) => (
                     <ResultItem
                       key={`mun-${m.id}`}
                       principal={m.nome}
                       tag="MUN"
                       tagCor="#03A9F4"
+                      highlighted={selectedIdx === i}
                       onClick={() => { fechar(); onSelectMunicipio(m.nome); }}
                     />
                   ))}
@@ -168,29 +203,31 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelectMunicipio, onSelec
               {/* PARLAMENTARES */}
               {result.parlamentares.length > 0 && (
                 <Grupo titulo="Parlamentares" icone={User} cor="#FFD700">
-                  {result.parlamentares.map(p => (
+                  {result.parlamentares.map((p, i) => (
                     <ResultItem
                       key={`pol-${p.id}`}
                       principal={p.nome}
                       secundario={p.partido}
                       tag="PAR"
                       tagCor="#FFD700"
+                      highlighted={selectedIdx === result.municipios.length + i}
                       onClick={() => { fechar(); onSelectPolitico(p.id); }}
                     />
                   ))}
                 </Grupo>
               )}
 
-              {/* EMENDAS */}
+              {/* EMENDAS — Enter abre a busca avançada (sem item individual no flat list) */}
               {result.emendas.length > 0 && (
                 <Grupo titulo="Emendas" icone={FileText} cor="#4CAF50">
-                  {result.emendas.map(e => (
+                  {result.emendas.map((e, i) => (
                     <ResultItem
                       key={`eme-${e.id}`}
                       principal={(e.descricao || e.objetivo || '—').slice(0, 70) + ((e.descricao || e.objetivo || '').length > 70 ? '…' : '')}
                       secundario={`${e.ano} · ${e.politico_nome ?? '—'}`}
                       tag="EME"
                       tagCor="#4CAF50"
+                      highlighted={i === 0 && selectedIdx === result.municipios.length + result.parlamentares.length}
                       onClick={() => {
                         fechar();
                         // Navega para busca avançada com a query pré-preenchida na aba emendas
@@ -250,13 +287,22 @@ function Grupo({ titulo, icone: Icon, cor, children }: {
   );
 }
 
-function ResultItem({ principal, secundario, tag, tagCor, onClick }: {
+function ResultItem({ principal, secundario, tag, tagCor, onClick, highlighted = false }: {
   principal: string; secundario?: string; tag: string; tagCor: string; onClick: () => void;
+  highlighted?: boolean;
 }) {
+  const itemRef = useRef<HTMLButtonElement>(null);
+  // Rola pra dentro do viewport quando vira o item ativo via teclado
+  useEffect(() => {
+    if (highlighted && itemRef.current) {
+      itemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [highlighted]);
   return (
     <button
+      ref={itemRef}
       onClick={onClick}
-      className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-[#0d0d0d] transition-colors group border-b border-[#111] last:border-b-0"
+      className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors group border-b border-[#111] last:border-b-0 ${highlighted ? 'bg-[#FFD700]/10' : 'hover:bg-[#0d0d0d]'}`}
     >
       {/* Tag lateral */}
       <span
