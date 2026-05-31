@@ -2637,14 +2637,17 @@ def relatorio_inconsistencias(request: Request):
         """).fetchone()
         r["anomalia_pago_maior_empenhado"] = row[0] if row else 0
 
-        # 6. Emendas sem UF — exclui emendas estaduais/nacionais (município = "UF" ou "Nacional")
+        # 6. Emendas sem UF — exclui destinos que legitimamente não têm UF única:
+        # estaduais (`NOME (UF)`), nacionais, federais, multi-estado e macrorregiões.
         row = conn.execute("""
             SELECT COUNT(*) FROM emendas
             WHERE (uf IS NULL OR TRIM(uf) = '')
               AND municipio_destino NOT LIKE '%(UF)%'
-              AND municipio_destino NOT LIKE '%Nacional%'
-              AND municipio_destino NOT LIKE '%NACIONAL%'
-              AND municipio_destino NOT LIKE '%Federal%'
+              AND UPPER(municipio_destino) NOT LIKE '%NACIONAL%'
+              AND UPPER(municipio_destino) NOT LIKE '%FEDERAL%'
+              AND UPPER(municipio_destino) NOT LIKE '%M_LTIPLO%'
+              AND UPPER(municipio_destino) NOT LIKE '%EXTERIOR%'
+              AND UPPER(municipio_destino) NOT IN ('NORTE', 'NORDESTE', 'CENTRO-OESTE', 'SUDESTE', 'SUL')
               AND (municipio_destino IS NOT NULL AND TRIM(municipio_destino) != '')
         """).fetchone()
         r["emendas_sem_uf"] = row[0] if row else 0
