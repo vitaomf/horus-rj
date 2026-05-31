@@ -97,7 +97,7 @@ const Legenda: React.FC<{ escala: Escala; valoresMin: number; valoresMax: number
 
   return (
     <div className="absolute bottom-3 right-3 bg-black/90 border border-[#FFD700]/15 p-3 z-20 pointer-events-none">
-      <p className="font-mono text-[7px] tracking-[0.45em] text-[#FFD700]/40 uppercase mb-2 pb-1.5 border-b border-[#1a1a1a]">
+      <p className="font-mono text-[7px] tracking-[0.4em] text-[#FFD700]/40 uppercase mb-2 pb-1.5 border-b border-[#1a1a1a]">
         Volume de Emendas
       </p>
       {faixas.map(({ cor, label }, i) => (
@@ -346,7 +346,7 @@ export function MapaAtuacaoParlamentar({ politicoId, height = 400, onUfClick, on
         {view.kind === 'nacional' ? (
           <>
             <div>
-              <p className="font-mono text-[8px] tracking-[0.45em] text-[#FFD700]/40 uppercase">
+              <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/40 uppercase">
                 Zona de Atuação · Distribuição Nacional
               </p>
               <p className="font-bebas text-lg tracking-widest text-white leading-tight">MAPA DE ATUAÇÃO</p>
@@ -370,7 +370,7 @@ export function MapaAtuacaoParlamentar({ politicoId, height = 400, onUfClick, on
                 VOLTAR
               </button>
               <div>
-                <p className="font-mono text-[8px] tracking-[0.45em] text-[#FFD700]/40 uppercase">
+                <p className="font-mono text-[8px] tracking-[0.4em] text-[#FFD700]/40 uppercase">
                   Zona de Atuação · {view.nome}
                 </p>
                 <p className="font-bebas text-lg tracking-widest text-white leading-tight">

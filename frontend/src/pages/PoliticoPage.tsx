@@ -717,7 +717,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-[#FFD700]/10 mb-4">
                                         {kpis.map((k, i) => (
                                             <div key={i} className="bg-black p-3 min-w-0">
-                                                <div className="font-mono text-[8px] tracking-[0.25em] uppercase mb-1.5 truncate" style={{ color: `${k.cor}66` }}>{k.label}</div>
+                                                <div className="font-mono text-[8px] tracking-[0.3em] uppercase mb-1.5 truncate" style={{ color: `${k.cor}66` }}>{k.label}</div>
                                                 <div className="font-bebas text-2xl leading-none truncate" style={{ color: k.cor }} title={k.value}>{k.value}</div>
                                                 {k.sub && <div className="font-mono text-[8px] tracking-widest text-gray-600 mt-1 truncate">{k.sub}</div>}
                                             </div>
