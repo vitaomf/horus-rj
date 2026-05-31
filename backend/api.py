@@ -1680,6 +1680,31 @@ def obter_detalhes_politico(request: Request, politico_id: int):
         ).fetchone()
         total_estados_distintos = _terow[0] if _terow and _terow[0] is not None else 0
 
+        # Resumo de atuação legislativa: votações nominais agregadas.
+        # Aderente à régua de prioridade do CLAUDE.md — perfil não fala só de emenda.
+        votacoes_resumo = None
+        _tabs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        if "votacoes_votos" in _tabs:
+            _vrows = conn.execute(
+                "SELECT voto, COUNT(*) c FROM votacoes_votos WHERE politico_id = ? GROUP BY voto",
+                (politico_id,)
+            ).fetchall()
+            _total_v = sum(r["c"] for r in _vrows)
+            if _total_v > 0:
+                _por_voto = {r["voto"]: r["c"] for r in _vrows}
+                votacoes_resumo = {
+                    "total": _total_v,
+                    "sim": _por_voto.get("Sim", 0),
+                    "nao": _por_voto.get("Não", 0),
+                    "abstencao": _por_voto.get("Abstenção", 0),
+                    "obstrucao": _por_voto.get("Obstrução", 0),
+                    "outros": _total_v - sum(
+                        _por_voto.get(k, 0) for k in ("Sim", "Não", "Abstenção", "Obstrução")
+                    ),
+                }
+
         # 3. Emendas por Ano
         ano_rows = conn.execute("""
             SELECT ano,
@@ -1780,6 +1805,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "total_municipios": total_municipios_distintos,
             "total_estados": total_estados_distintos,
+            "votacoes_resumo": votacoes_resumo,
             "dados_campanha": dados_campanha,
             "municipios_beneficiados": municipios_beneficiados,
             "emendas_por_ano": emendas_por_ano,
