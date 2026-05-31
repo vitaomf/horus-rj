@@ -1646,7 +1646,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
         if not politico_info:
             raise HTTPException(status_code=404, detail="Político não encontrado")
 
-        # 2. Municípios Beneficiados
+        # 2. Municípios Beneficiados — top 10 + contagem agregada
         municipios_rows = conn.execute("""
             SELECT UPPER(municipio_destino) as nome,
                    COUNT(id) as total,
@@ -1662,6 +1662,15 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             {"nome": r["nome"], "total": r["total"], "valor": float(r["valor"]) if r["valor"] else 0}
             for r in municipios_rows
         ]
+
+        # Total agregado de municípios distintos (CompararPage precisa do total real,
+        # não dos 10 do ranking).
+        _tmrow = conn.execute(
+            "SELECT COUNT(DISTINCT UPPER(municipio_destino)) FROM emendas "
+            "WHERE politico_id = ? AND municipio_destino IS NOT NULL AND municipio_destino != ''",
+            (politico_id,)
+        ).fetchone()
+        total_municipios_distintos = _tmrow[0] if _tmrow and _tmrow[0] is not None else 0
 
         # 3. Emendas por Ano
         ano_rows = conn.execute("""
@@ -1761,6 +1770,7 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             "mandatos": mandatos_list,
             "total_emendas": politico_info["total_emendas"] or 0,
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
+            "total_municipios": total_municipios_distintos,
             "dados_campanha": dados_campanha,
             "municipios_beneficiados": municipios_beneficiados,
             "emendas_por_ano": emendas_por_ano,

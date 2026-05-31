@@ -7,6 +7,24 @@ import { badgeStyle } from '../utils/partidoCores';
 const FONT_DECO   = "'Cinzel Decorative', serif";
 const FONT_CINZEL = "'Cinzel', serif";
 
+type NivelPolitico = 'federal' | 'estadual' | 'municipal' | 'desconhecido';
+
+function nivelCargo(cargo: string | null): NivelPolitico {
+  if (!cargo) return 'desconhecido';
+  const c = cargo.toLowerCase();
+  if (c.includes('senador') || c.includes('deputado federal') || c.includes('parlamentar federal') || c.includes('presidente')) return 'federal';
+  if (c.includes('governador') || c.includes('deputado estadual') || c.includes('vice-governador')) return 'estadual';
+  if (c.includes('prefeito') || c.includes('vice-prefeito') || c.includes('vereador')) return 'municipal';
+  return 'desconhecido';
+}
+
+const NIVEL_LABEL: Record<NivelPolitico, string> = {
+  federal: 'Federal',
+  estadual: 'Estadual',
+  municipal: 'Municipal',
+  desconhecido: '?',
+};
+
 interface PoliticoResumido {
   id: number; nome: string; partido: string | null; cargo: string | null;
   total_emendas: number; valor_total: number; foto_url?: string | null;
@@ -68,6 +86,9 @@ function BuscaPolitico({ label, selecionado, onSelecionar }: {
           className="block w-full text-center hover:opacity-80 transition-opacity">
           <p className="font-bebas text-lg tracking-wider text-[#FFD700] leading-tight">{selecionado.nome}</p>
           <p className="font-mono text-[8px] tracking-widest text-gray-600 mt-1">{selecionado.partido} · {selecionado.cargo}</p>
+          <span className="inline-block font-mono text-[7px] tracking-widest border px-1.5 py-0.5 mt-1.5 text-gray-600 border-gray-800">
+            {NIVEL_LABEL[nivelCargo(selecionado.cargo)]}
+          </span>
         </button>
       </div>
     );
@@ -167,7 +188,8 @@ async function fetchDetalhe(id: number): Promise<DetalheCompar | null> {
       const uf = m.match(/- ([A-Z]{2})$/)?.[1];
       return uf ?? m;
     })).size;
-    const muns = (d.municipios_beneficiados ?? []).length;
+    // Usa total agregado real (backend retorna COUNT(DISTINCT...)); fallback para len(municipios_beneficiados) se backend antigo
+    const muns = typeof d.total_municipios === 'number' ? d.total_municipios : (d.municipios_beneficiados ?? []).length;
     const empenhado = (d.ultimas_emendas ?? []).reduce((s: number, e: { valor_empenhado?: number; valor?: number }) => s + (e.valor_empenhado || e.valor || 0), 0);
     const pago = (d.ultimas_emendas ?? []).reduce((s: number, e: { valor_pago?: number }) => s + (e.valor_pago || 0), 0);
     return { anos_ativos: anos, estados, municipios: muns, valor_pago: pago, valor_empenhado: empenhado };
@@ -254,6 +276,18 @@ export function CompararPage() {
                 {polB.partido && <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border" style={badgeStyle(polB.partido)}>{polB.partido}</span>}
               </button>
             </div>
+
+            {/* Aviso de níveis diferentes */}
+            {nivelCargo(polA.cargo) !== nivelCargo(polB.cargo) &&
+              nivelCargo(polA.cargo) !== 'desconhecido' && nivelCargo(polB.cargo) !== 'desconhecido' && (
+              <div className="border-b border-amber-900/40 bg-amber-950/20 px-6 py-3 flex items-start gap-3">
+                <span className="text-amber-500 font-mono text-[10px] mt-0.5">⚠</span>
+                <p className="font-mono text-[8px] tracking-widest text-amber-600/80 uppercase leading-relaxed">
+                  Níveis diferentes — {NIVEL_LABEL[nivelCargo(polA.cargo)]} vs {NIVEL_LABEL[nivelCargo(polB.cargo)]}.
+                  Comparar cargos de esferas distintas pode ser enganoso: orçamentos e atribuições não são equivalentes.
+                </p>
+              </div>
+            )}
 
             {/* Métricas */}
             <div className="p-6 space-y-0">
