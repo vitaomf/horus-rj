@@ -44,7 +44,7 @@ def buscar_wikipedia(sess: requests.Session, nome: str) -> str | None:
 
     for slug in candidatos:
         try:
-            r = sess.get(f"https://pt.wikipedia.org/api/rest_v1/page/summary/{slug}", timeout=10)
+            r = sess.get(f"https://pt.wikipedia.org/api/rest_v1/page/summary/{slug}", timeout=3)
             if r.status_code != 200: continue
             d = r.json()
             extract = norm(d.get("extract", ""))
@@ -55,9 +55,13 @@ def buscar_wikipedia(sess: requests.Session, nome: str) -> str | None:
             descr = (d.get("description") or "").lower()
             if any(t in extract_low or t in descr for t in TERMOS_POLITICOS):
                 return extract
-        except Exception:
-            pass
-        time.sleep(0.2)
+            time.sleep(0.1)  # só dorme após 200 OK
+        except (requests.Timeout, requests.ConnectionError):
+            # Falhas transitórias de rede: pula candidato, tenta próximo
+            continue
+        except Exception as e:
+            # Erro inesperado (JSON malformado, parse, etc): log curto e continua
+            print(f"  [wiki] erro em '{slug}': {type(e).__name__}: {str(e)[:80]}", file=sys.stderr)
     return None
 
 def main():
@@ -77,16 +81,17 @@ def main():
         return
 
     where = "(bio_texto IS NULL OR bio_texto = '')" if not force else "1=1"
+    # COALESCE para NULL-safe: politicos sem cargo cadastrado nao sao perdidos pelo filtro
     c.execute(f"""
         SELECT id, nome, nome_urna FROM politicos
         WHERE {where}
-          AND cargo != 'Autor Coletivo'
-          AND nome NOT LIKE 'Sem inform%'
-          AND nome NOT LIKE 'COM.%'
-          AND nome NOT LIKE 'COMISSAO%'
-          AND nome NOT LIKE '%BANCADA%'
-          AND nome NOT LIKE 'RELATOR%'
-          AND nome NOT LIKE '%LIDER%'
+          AND COALESCE(cargo, '') != 'Autor Coletivo'
+          AND COALESCE(nome, '') NOT LIKE 'Sem inform%'
+          AND COALESCE(nome, '') NOT LIKE 'COM.%'
+          AND COALESCE(nome, '') NOT LIKE 'COMISSAO%'
+          AND COALESCE(nome, '') NOT LIKE '%BANCADA%'
+          AND COALESCE(nome, '') NOT LIKE 'RELATOR%'
+          AND COALESCE(nome, '') NOT LIKE '%LIDER%'
     """)
     rows = c.fetchall()
     print(f"Total a buscar: {len(rows)}")
@@ -115,7 +120,7 @@ def main():
         if idx % 50 == 0:
             conn.commit()
             print(f"  {idx}/{len(rows)} | encontrados: {encontrados} | sem-bio: {nao}")
-        time.sleep(0.3)  # Respeitar rate limit Wikipedia
+        time.sleep(0.15)  # Respeitar rate limit Wikipedia
 
     conn.commit()
     conn.close()
