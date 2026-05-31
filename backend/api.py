@@ -2566,7 +2566,11 @@ def health():
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"db error: {e}")
 
-    # Lê erros recentes do scheduler (últimas 5 linhas)
+    # Lê erros recentes do scheduler. Filtra só linhas com timestamp no início
+    # (formato "YYYY-MM-DD HH:MM:SS | job | msg") — descarta continuações de
+    # stacktrace de logs antigos que eram multi-linha.
+    import re as _re
+    _ts_pattern = _re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \| ")
     erros_recentes = []
     errors_file = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -2575,10 +2579,10 @@ def health():
     if os.path.exists(errors_file):
         try:
             with open(errors_file, encoding="utf-8") as f:
-                linhas = f.readlines()
-            erros_recentes = [l.strip() for l in linhas[-5:] if l.strip()]
-        except Exception:
-            pass
+                linhas = [l.strip() for l in f.readlines()]
+            erros_recentes = [l for l in linhas if _ts_pattern.match(l)][-5:]
+        except Exception as _e:
+            logger.warning("health: erro lendo coleta_errors.log: %s", _e)
 
     return {
         "status": "ok",

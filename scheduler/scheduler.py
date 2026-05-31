@@ -1,6 +1,6 @@
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
-import subprocess, logging, sqlite3, os, traceback
+import subprocess, logging, sqlite3, os, traceback, shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -56,9 +56,12 @@ def _executar(job_name: str, script_relativo: str):
             saida = (result.stdout or "")[-500:]
             log.info(f"[{job_name}] Concluído com sucesso.\n{saida}")
         else:
-            erro = (result.stderr or result.stdout or "sem output")[-800:]
+            erro = (result.stderr or result.stdout or "sem output")[-1200:]
             log.error(f"[{job_name}] Falhou (código {result.returncode}):\n{erro}")
-            _registrar_erro(job_name, f"exit {result.returncode}: {erro[:200]}")
+            # Pega as últimas linhas relevantes do traceback, achata em uma linha
+            # (o /api/health expõe cada erro como entrada single-line)
+            erro_single = " | ".join(line.strip() for line in erro.strip().splitlines() if line.strip())
+            _registrar_erro(job_name, f"exit {result.returncode}: {erro_single[-600:]}")
     except subprocess.TimeoutExpired:
         msg = "timeout após 10800s (3h)"
         log.error(f"[{job_name}] {msg}")
@@ -79,6 +82,35 @@ def coletar_contratos():
 
 def coletar_tse():
     _executar("tse", "backend/collectors/coleta_tse.py")
+
+def coletar_votacoes_camara():
+    _executar("votacoes_camara", "scripts/coleta_votacoes_camara.py")
+
+def backup_banco():
+    """Copia o banco com SQLite backup API (safe mid-write) e mantém últimos 7 dias."""
+    db_path = PROJECT_ROOT / "transparencia_rj.db"
+    backup_dir = PROJECT_ROOT / "backups" / "auto"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    destino = backup_dir / f"transparencia_rj_{ts}.db"
+
+    try:
+        src = sqlite3.connect(str(db_path))
+        dst = sqlite3.connect(str(destino))
+        src.backup(dst)
+        dst.close()
+        src.close()
+        size_kb = destino.stat().st_size // 1024
+        log.info(f"[backup] Banco copiado → {destino.name} ({size_kb} KB)")
+
+        # Rotação: apaga backups auto com mais de 7 dias
+        for old in sorted(backup_dir.glob("*.db"))[:-7]:
+            old.unlink()
+            log.info(f"[backup] Antigo removido: {old.name}")
+    except Exception as e:
+        log.error(f"[backup] Falhou: {e}")
+        _registrar_erro("backup", str(e)[:200])
 
 def status_banco():
     db_path = PROJECT_ROOT / "transparencia_rj.db"
@@ -108,6 +140,14 @@ scheduler.add_job(coletar_contratos, CronTrigger(hour=3, minute=30),
 # Coleta TSE toda segunda às 3h da manhã (dados mudam raramente)
 scheduler.add_job(coletar_tse, CronTrigger(day_of_week="mon", hour=3, minute=0),
     id="tse_semanal", name="Coleta semanal TSE (seg 3h)")
+
+# Votações nominais Câmara — semanal às 4h30 (após emendas/contratos)
+scheduler.add_job(coletar_votacoes_camara, CronTrigger(day_of_week="sun", hour=4, minute=30),
+    id="votacoes_semanal", name="Coleta semanal votações Câmara (dom 4h30)")
+
+# Backup diário às 4h (após as coletas)
+scheduler.add_job(backup_banco, CronTrigger(hour=4, minute=0),
+    id="backup_diario", name="Backup diário do banco (4h)")
 
 # Status a cada 6h
 scheduler.add_job(status_banco, CronTrigger(hour="0,6,12,18"),
