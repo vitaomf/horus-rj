@@ -35,8 +35,8 @@ export function NavProvider({ children }: { children: ReactNode }) {
     const regiaoMatch = path.match(/^\/regiao\/([^/]+)/);
     // /estado/:uf
     const estadoMatch = path.match(/^\/estado\/([^/]+)/);
-    // /municipio/:uf/:slug ou /municipios/:uf/:slug
-    const municipioMatch = path.match(/^\/municipio[s]?\/([^/]+)\/([^/]+)/);
+    // /municipios/:nome (formato real do App.tsx — nome com sufixo " - UF")
+    const municipioMatch = path.match(/^\/municipios?\/([^/]+)/);
 
     let regiao: Regiao | null = null;
     let estado: Estado | null = null;
@@ -56,14 +56,19 @@ export function NavProvider({ children }: { children: ReactNode }) {
         breadcrumbs.push({ label: estado.nome.toUpperCase(), path: `/estado/${estado.uf.toLowerCase()}` });
       }
     } else if (municipioMatch) {
-      estado = getEstado(municipioMatch[1].toUpperCase()) ?? null;
+      // Nome no formato "MUNICIPIO - UF" — extrai a UF do sufixo
+      const nomeMunicipio = decodeURIComponent(municipioMatch[1]);
+      const ufMatch = nomeMunicipio.match(/\s-\s([A-Z]{2})\s*$/i);
+      const uf = ufMatch ? ufMatch[1].toUpperCase() : '';
+      const nomeBase = ufMatch ? nomeMunicipio.slice(0, ufMatch.index).trim() : nomeMunicipio.trim();
+      estado = uf ? getEstado(uf) ?? null : null;
       nivelMapa = 'municipio';
       if (estado) {
         regiao = getRegiaoByUF(estado.uf) ?? null;
         if (regiao) breadcrumbs.push({ label: regiao.nome.toUpperCase(), path: `/regiao/${regiao.slug}` });
         breadcrumbs.push({ label: estado.nome.toUpperCase(), path: `/estado/${estado.uf.toLowerCase()}` });
-        breadcrumbs.push({ label: municipioMatch[2].toUpperCase().replace(/-/g, ' '), path: path });
       }
+      breadcrumbs.push({ label: nomeBase.toUpperCase(), path });
     }
 
     return { regiao, estado, nivelMapa, breadcrumbs };
