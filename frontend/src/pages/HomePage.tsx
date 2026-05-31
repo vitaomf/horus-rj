@@ -27,63 +27,167 @@ interface HomePageProps {
 }
 
 const TOTAL_MUNICIPIOS_BR = 5570;
-const TOTAL_PARLAMENTARES_FEDERAIS = 594;
 
-const UFS_BRASIL = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
-  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
-];
+const CORES_GRAFICO = ['#FFD700','#03A9F4','#4CAF50','#FF5722','#9C27B0','#FF9800','#E91E63','#607D8B'];
 
-interface UfStat { uf: string; total: number; }
+interface EstatDados {
+  valor_total_geral: number;
+  por_objetivo: { objetivo: string; total: number; valor_total: number }[];
+  por_ano: { ano: number; total_emendas: number; valor_total: number }[];
+  por_partido: { partido: string; valor_total: number; total_politicos: number }[];
+}
 
-function HeatmapEstados() {
-  const [stats, setStats] = useState<UfStat[]>([]);
+function GraficoInvestimentos() {
+  const [dados, setDados] = useState<EstatDados | null>(null);
+
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/status/coleta`)
+    fetch(`${API_BASE_URL}/api/estatisticas`)
       .then(r => r.json())
-      .then(d => setStats(d.emendas_por_uf ?? []))
+      .then(setDados)
       .catch(() => {});
   }, []);
 
-  const map = new Map(stats.map(s => [s.uf, s.total]));
-  const max = Math.max(...stats.map(s => s.total), 1);
+  const fmtB = (v: number) => {
+    if (v >= 1e9) return `R$ ${(v / 1e9).toFixed(1)}B`;
+    if (v >= 1e6) return `R$ ${(v / 1e6).toFixed(0)}M`;
+    if (v >= 1e3) return `R$ ${(v / 1e3).toFixed(0)}K`;
+    return `R$ ${v.toFixed(0)}`;
+  };
 
-  function cor(uf: string) {
-    const v = map.get(uf) ?? 0;
-    if (!v) return { bg: '#0a0a0a', border: '#FFD70033', text: '#FFD70099' };
-    const t = Math.pow(v / max, 0.45);
-    const alpha = Math.round(45 + t * 55);
-    return {
-      bg: `rgba(255,215,0,${alpha / 100})`,
-      border: `rgba(255,215,0,1)`,
-      text: '#0a0a0a',
-    };
+  if (!dados?.por_objetivo) {
+    return (
+      <div className="h-48 flex items-center justify-center">
+        <div className="flex gap-1.5">
+          {[0,1,2].map(i => (
+            <div key={i} className="w-1.5 h-1.5 bg-[#FFD700]/30 animate-bounce"
+              style={{ animationDelay: `${i * 100}ms` }} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  const fmt = (v: number) =>
-    v >= 1e6 ? `${(v / 1e6).toFixed(0)}k` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}k` : String(v);
+  const maxObj = Math.max(...dados.por_objetivo.map(o => o.valor_total), 1);
+
+  const anos = dados.por_ano.filter(a => a.ano >= 2014 && a.ano <= new Date().getFullYear());
+  const maxAno = Math.max(...anos.map(a => a.valor_total), 1);
+  const W = 400; const H = 100;
+  const pts = anos.map((a, i) => ({
+    x: anos.length > 1 ? (i / (anos.length - 1)) * W : W / 2,
+    y: H - (a.valor_total / maxAno) * (H - 10),
+    ano: a.ano,
+  }));
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaD = pts.length > 0
+    ? `${pathD} L${W},${H} L0,${H} Z`
+    : '';
 
   return (
-    <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-1">
-      {UFS_BRASIL.map(uf => {
-        const c = cor(uf);
-        const total = map.get(uf) ?? 0;
-        return (
-          <div
-            key={uf}
-            title={total ? `${uf}: ${total.toLocaleString('pt-BR')} emendas` : `${uf}: sem dados`}
-            className="aspect-square flex flex-col items-center justify-center border text-center transition-all duration-300 hover:scale-105 cursor-default"
-            style={{ backgroundColor: c.bg, borderColor: c.border }}
-          >
-            <span className="font-bebas text-2xl leading-none font-bold" style={{ color: c.text }}>{uf}</span>
-            {total > 0 && (
-              <span className="font-mono text-xs leading-none mt-1.5 font-bold" style={{ color: c.text }}>
-                {fmt(total)}
-              </span>
-            )}
+    <div className="space-y-10">
+      {/* Total em destaque */}
+      <div className="text-center space-y-2">
+        <p className="font-mono text-[9px] tracking-[0.6em] text-[#FFD700]/30 uppercase">
+          Volume total monitorado · {anos[0]?.ano ?? 2014}–{anos[anos.length - 1]?.ano ?? new Date().getFullYear()}
+        </p>
+        <p className="font-bebas text-6xl md:text-8xl text-[#FFD700] leading-none tracking-widest">
+          {fmtB(dados.valor_total_geral)}
+        </p>
+        <p className="font-mono text-[9px] tracking-widest text-white/20">
+          em investimentos parlamentares registrados
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+
+        {/* Destinação temática (3 colunas) */}
+        <div className="lg:col-span-3 space-y-5">
+          <p className="font-mono text-[9px] tracking-[0.5em] text-[#FFD700]/40 uppercase flex items-center gap-3">
+            <span className="h-px flex-1 bg-[#FFD700]/10" />
+            Destinação por área temática
+            <span className="h-px flex-1 bg-[#FFD700]/10" />
+          </p>
+          <div className="space-y-5">
+            {dados.por_objetivo.map((obj, i) => {
+              const pct = (obj.valor_total / maxObj) * 100;
+              const cor = CORES_GRAFICO[i % CORES_GRAFICO.length];
+              const label = obj.objetivo.length > 34 ? obj.objetivo.slice(0, 34) + '…' : obj.objetivo;
+              return (
+                <div key={obj.objetivo} className="space-y-1.5 group">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/50
+                                     group-hover:text-white/80 transition-colors truncate flex-1">
+                      {label}
+                    </span>
+                    <span className="font-bebas text-lg tracking-wider shrink-0" style={{ color: cor }}>
+                      {fmtB(obj.valor_total)}
+                    </span>
+                  </div>
+                  <div className="relative h-px bg-[#1a1a1a]">
+                    <div className="absolute inset-y-0 left-0 transition-all duration-1000"
+                      style={{ width: `${pct}%`, backgroundColor: cor, height: '1px' }} />
+                    <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full
+                                    transition-all duration-1000"
+                      style={{ left: `${pct}%`, backgroundColor: cor, boxShadow: `0 0 6px ${cor}` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+
+        {/* Evolução + partidos (2 colunas) */}
+        <div className="lg:col-span-2 space-y-6">
+          <p className="font-mono text-[9px] tracking-[0.5em] text-[#FFD700]/40 uppercase flex items-center gap-3">
+            <span className="h-px flex-1 bg-[#FFD700]/10" />
+            Evolução histórica
+            <span className="h-px flex-1 bg-[#FFD700]/10" />
+          </p>
+
+          <div className="border border-[#1a1a1a] bg-black/40 p-4">
+            <svg viewBox={`0 -5 ${W} ${H + 25}`} className="w-full" style={{ height: 150 }}>
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FFD700" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {[0, 0.5, 1].map(t => (
+                <line key={t} x1={0} y1={H - t * (H - 10)} x2={W} y2={H - t * (H - 10)}
+                  stroke="#FFD70010" strokeWidth="0.5" strokeDasharray="4,4" />
+              ))}
+              {areaD && <path d={areaD} fill="url(#areaGrad)" />}
+              {pathD && <path d={pathD} fill="none" stroke="#FFD700" strokeWidth="1.5" strokeLinejoin="round" />}
+              {pts.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r="2.5" fill="#FFD700" />
+                  {i % 2 === 0 && (
+                    <text x={p.x} y={H + 18} textAnchor="middle" fontSize="7" fill="#FFD70055">
+                      {p.ano}
+                    </text>
+                  )}
+                </g>
+              ))}
+            </svg>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-mono text-[8px] tracking-[0.5em] text-white/20 uppercase">
+              Volume por partido
+            </p>
+            {dados.por_partido.slice(0, 5).map((p, i) => (
+              <div key={p.partido} className="flex items-center gap-2">
+                <span className="font-mono text-[9px] text-white/30 w-3 text-right shrink-0">{i + 1}</span>
+                <span className="font-bebas text-sm text-white/60 w-12 shrink-0">{p.partido}</span>
+                <div className="flex-1 h-px bg-[#1a1a1a] relative">
+                  <div className="absolute inset-y-0 left-0 h-px bg-[#FFD700]/50"
+                    style={{ width: `${(p.valor_total / dados.por_partido[0].valor_total) * 100}%` }} />
+                </div>
+                <span className="font-mono text-[8px] text-[#FFD700]/50 shrink-0">{fmtB(p.valor_total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -244,7 +348,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
             <TerminalLine delay={1600}>API Câmara... OK</TerminalLine>
             <TerminalLine delay={2000}>Banco de dados... {loading ? 'CARREGANDO' : 'OK'}</TerminalLine>
             <TerminalLine delay={2400}>
-              {loading ? 'SISTEMA INICIANDO_' : `${metricas.totalEmendas.toLocaleString('pt-BR')} emendas indexadas_`}
+              {loading ? 'SISTEMA INICIANDO_' : `${metricas.totalEmendas.toLocaleString('pt-BR')} registros indexados_`}
             </TerminalLine>
           </div>
         </div>
@@ -269,10 +373,11 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
             <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Situação Atual</h2>
             <div className="h-px flex-1 bg-[#FFD700]/10" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <MetricaCard value={metricas.totalEmendas}        label="Emendas Monitoradas"   sub="Total no banco"         index={0} />
-            <MetricaCard value={TOTAL_MUNICIPIOS_BR}          label="Municípios Brasileiros" sub="Cobertura nacional"     index={1} />
-            <MetricaCard value={TOTAL_PARLAMENTARES_FEDERAIS} label="Parlamentares Federais" sub="Câmara + Senado"        index={2} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricaCard value={metricas.totalEmendas}        label="Investimentos Registrados" sub="Registros no banco"       index={0} />
+            <MetricaCard value={metricas.totalPoliticos}      label="Perfis Políticos"          sub="Parlamentares indexados"  index={1} />
+            <MetricaCard value={TOTAL_MUNICIPIOS_BR}          label="Municípios"                sub="Cobertura nacional"       index={2} />
+            <MetricaCard value={17}                           label="Anos Cobertos"             sub="2010 → 2026"              index={3} />
           </div>
         </section>
       )}
@@ -392,19 +497,16 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
         </div>
       </section>
 
-      {/* ══ HEATMAP POR ESTADO ════════════════════════════════════════════ */}
+      {/* ══ FLUXO DE CAPITAL PÚBLICO ══════════════════════════════════════ */}
       <ScrollReveal delay={0}>
         <section className="space-y-6">
           <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-[#FFD700]/40" />
-            <h2 className="font-mono text-sm tracking-[0.6em] text-[#FFD700] uppercase font-semibold">Cobertura por Estado</h2>
-            <div className="h-px flex-1 bg-[#FFD700]/40" />
+            <div className="h-px flex-1 bg-[#FFD700]/20" />
+            <h2 className="font-mono text-[10px] tracking-[0.6em] text-[#FFD700]/40 uppercase">Fluxo de Capital Público</h2>
+            <div className="h-px flex-1 bg-[#FFD700]/20" />
           </div>
-          <div className="border border-[#FFD700]/40 bg-black/40 p-6">
-            <p className="font-mono text-xs tracking-[0.4em] text-[#FFD700]/70 uppercase mb-4">
-              Intensidade = volume de emendas coletadas · mais dourado = mais emendas
-            </p>
-            <HeatmapEstados />
+          <div className="border border-[#FFD700]/10 bg-black/40 p-6 md:p-10">
+            <GraficoInvestimentos />
           </div>
         </section>
       </ScrollReveal>
