@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'horus_favoritos';
 
@@ -24,6 +24,15 @@ function save(favs: Favorito[]) {
 
 export function useFavoritos() {
   const [favoritos, setFavoritos] = useState<Favorito[]>(load);
+
+  // Sincroniza entre abas: 'storage' só dispara nas OUTRAS abas (não na que escreveu).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) setFavoritos(load());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const toggle = useCallback((politico: Omit<Favorito, 'adicionadoEm'>) => {
     setFavoritos(prev => {

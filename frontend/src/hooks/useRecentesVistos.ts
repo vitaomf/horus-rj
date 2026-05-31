@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const KEY = 'horus_recentes';
 const MAX  = 8;
@@ -22,6 +22,15 @@ function save(items: Recente[]) {
 
 export function useRecentesVistos() {
   const [recentes, setRecentes] = useState<Recente[]>(load);
+
+  // Sincroniza entre abas via storage event (dispara só nas outras abas).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === KEY) setRecentes(load());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const registrar = useCallback((p: Omit<Recente, 'visto_em'>) => {
     setRecentes(prev => {
