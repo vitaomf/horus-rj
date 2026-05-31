@@ -19,7 +19,14 @@ function load(): Favorito[] {
 }
 
 function save(favs: Favorito[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+  // localStorage pode lançar QuotaExceededError (Safari private mode, cota cheia)
+  // ou SecurityError (cookies desabilitados). Falha graciosamente — o estado em
+  // memória mantém a UI funcionando até reload.
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+  } catch (e) {
+    console.warn('[useFavoritos] localStorage indisponível:', e);
+  }
 }
 
 export function useFavoritos() {

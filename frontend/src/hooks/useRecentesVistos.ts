@@ -17,7 +17,13 @@ function load(): Recente[] {
 }
 
 function save(items: Recente[]) {
-  localStorage.setItem(KEY, JSON.stringify(items));
+  // Safari private mode lança em setItem; cookies desabilitados também.
+  // Falha graciosamente — não quebra a UI.
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+  } catch (e) {
+    console.warn('[useRecentesVistos] localStorage indisponível:', e);
+  }
 }
 
 export function useRecentesVistos() {
