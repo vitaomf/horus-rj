@@ -17,9 +17,14 @@ const TABS: { key: TabBusca; label: string }[] = [
 ];
 
 export const BuscaAvancadaPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabBusca) || 'emendas';
-  const [tab, setTab] = useState<TabBusca>(initialTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as TabBusca | null;
+  const tab: TabBusca = tabParam && TABS.some(t => t.key === tabParam) ? tabParam : 'emendas';
+  const setTab = (key: TabBusca) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', key);
+    setSearchParams(next, { replace: false });
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
