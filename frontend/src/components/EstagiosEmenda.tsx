@@ -24,7 +24,7 @@ export const EstagiosEmenda = () => {
             numero: '03',
             nome: 'PAGO',
             icone: '💰',
-            cor: '#888',
+            cor: '#888888',
             descricao: 'Dinheiro efetivamente transferido.',
             detalhe: 'O valor saiu do cofre federal e chegou ao destino. Este é o valor real gasto. Pode ser menor que o empenhado se a obra não foi concluída.'
         }
