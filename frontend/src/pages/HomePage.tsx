@@ -39,13 +39,18 @@ interface EstatDados {
 
 function GraficoInvestimentos() {
   const [dados, setDados] = useState<EstatDados | null>(null);
+  const [erro, setErro] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
 
   useEffect(() => {
+    let vivo = true;
+    setErro(false);
     fetch(`${API_BASE_URL}/api/estatisticas`)
-      .then(r => r.json())
-      .then(setDados)
-      .catch(() => {});
-  }, []);
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(d => { if (vivo) setDados(d); })
+      .catch(() => { if (vivo) setErro(true); });
+    return () => { vivo = false; };
+  }, [tentativa]);
 
   const fmtB = (v: number) => {
     if (v >= 1e9) return `R$ ${(v / 1e9).toFixed(1)}B`;
@@ -53,6 +58,23 @@ function GraficoInvestimentos() {
     if (v >= 1e3) return `R$ ${(v / 1e3).toFixed(0)}K`;
     return `R$ ${v.toFixed(0)}`;
   };
+
+  // Erro: não deixa o usuário preso no spinner — mostra estado + retry
+  if (erro) {
+    return (
+      <div className="h-48 flex flex-col items-center justify-center gap-3">
+        <p className="font-mono text-[9px] tracking-[0.4em] text-[#FFD700]/40 uppercase">
+          Não foi possível carregar os números
+        </p>
+        <button
+          onClick={() => setTentativa(t => t + 1)}
+          className="font-mono text-[9px] tracking-widest text-white/50 border border-white/10 px-4 py-2 hover:border-[#FFD700]/40 hover:text-[#FFD700] transition-colors"
+        >
+          TENTAR NOVAMENTE
+        </button>
+      </div>
+    );
+  }
 
   if (!dados?.por_objetivo) {
     return (
