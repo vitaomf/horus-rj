@@ -2870,6 +2870,8 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                 raise HTTPException(status_code=400, detail="codigo_ibge do município deve ser numérico")
             cod_mun = int(territorio_id)
             cod_uf = cod_mun // 100000
+            if cod_uf not in CODIGO_UF:
+                raise HTTPException(status_code=404, detail="Código IBGE de município inválido")
             mun = {}
             if "indices_municipio" in tabs:
                 for r in conn.execute(
@@ -2891,6 +2893,8 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                         out.append({"indicador": ind, "valor": round(v, 2),
                                     "unidade": unidade, "fonte": fonte, "ano": ano,
                                     "estimado": True, "estimado_por": f"média de {CODIGO_UF.get(cod_uf, '')}"})
+            if not out:
+                return {"disponivel": False}
             return {"disponivel": True, "nivel": "municipio", "id": str(cod_mun),
                     "uf": CODIGO_UF.get(cod_uf, ""), "indicadores": out}
 
