@@ -78,6 +78,31 @@ app.add_middleware(CacheMiddleware)
 # em ~70-85%. minimum_size evita comprimir respostas pequenas (overhead).
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Hierarquia territorial codificada no próprio código IBGE:
+#   município (7 díg) -> estado = cod // 100000 ; região = cod // 1000000
+#   estado (2 díg)    -> região = cod // 10
+REGIAO_NOME = {1: "norte", 2: "nordeste", 3: "sudeste", 4: "sul", 5: "centro-oeste"}
+REGIAO_DIGITO = {v: k for k, v in REGIAO_NOME.items()}
+UF_CODIGO = {
+    "RO": 11, "AC": 12, "AM": 13, "RR": 14, "PA": 15, "AP": 16, "TO": 17,
+    "MA": 21, "PI": 22, "CE": 23, "RN": 24, "PB": 25, "PE": 26, "AL": 27, "SE": 28, "BA": 29,
+    "MG": 31, "ES": 32, "RJ": 33, "SP": 35,
+    "PR": 41, "SC": 42, "RS": 43,
+    "MS": 50, "MT": 51, "GO": 52, "DF": 53,
+}
+CODIGO_UF = {v: k for k, v in UF_CODIGO.items()}
+UF_NOME = {
+    "RO": "Rondônia", "AC": "Acre", "AM": "Amazonas", "RR": "Roraima", "PA": "Pará",
+    "AP": "Amapá", "TO": "Tocantins", "MA": "Maranhão", "PI": "Piauí", "CE": "Ceará",
+    "RN": "Rio Grande do Norte", "PB": "Paraíba", "PE": "Pernambuco", "AL": "Alagoas",
+    "SE": "Sergipe", "BA": "Bahia", "MG": "Minas Gerais", "ES": "Espírito Santo",
+    "RJ": "Rio de Janeiro", "SP": "São Paulo", "PR": "Paraná", "SC": "Santa Catarina",
+    "RS": "Rio Grande do Sul", "MS": "Mato Grosso do Sul", "MT": "Mato Grosso",
+    "GO": "Goiás", "DF": "Distrito Federal",
+}
+# Como cada indicador agrega na cascata: 'sum' (totais) ou 'wmean' (média ponderada por pop)
+INDICE_AGG = {"populacao": "sum", "desmatamento_km2": "sum"}  # default = wmean
+
 # Filtro: rankings públicos só consideram parlamentares individuais.
 # Autores coletivos (bancadas, comissões, relatores) são marcados em
 # coleta_emendas.py com cargo='Autor Coletivo' e excluídos via este predicado.
@@ -2710,6 +2735,173 @@ def status_coleta():
         "log_coleta_nacional": log_nacional,
         "erros_recentes": erros,
     }
+
+
+@app.get("/api/indices/{nivel}/{territorio_id}")
+@limiter.limit("60/minute")
+def indices_territoriais(request: Request, nivel: str, territorio_id: str):
+    """
+    Índices territoriais em cascata (CLAUDE.md).
+      brasil          -> média/total nacional + extremos (5 melhores / 5 piores estados)
+      regiao/{slug}   -> agregado da região + posição no ranking nacional
+      estado/{uf}     -> valor direto + posição entre 27 + comparativo região/Brasil
+      municipio/{cod} -> valor direto; fallback média estadual com flag 'estimado'
+
+    Médias são ponderadas por população; totais (população, desmatamento_km2) somam.
+    Sem dado: omite o indicador (nunca zero — mentira estatística).
+    """
+    nivel = (nivel or "").lower().strip()
+    conn = get_db_connection()
+    try:
+        tabs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        if "indices_estado" not in tabs:
+            return {"disponivel": False}
+
+        # Carrega todos os índices estaduais: est[indicador][uf_cod] = (valor, unidade, fonte, ano)
+        est: dict = {}
+        for r in conn.execute("SELECT codigo_ibge, indicador, valor, unidade, fonte, ano FROM indices_estado"):
+            est.setdefault(r["indicador"], {})[r["codigo_ibge"]] = (
+                r["valor"], r["unidade"], r["fonte"], r["ano"]
+            )
+        if not est:
+            return {"disponivel": False}
+
+        pop_est = {c: v[0] for c, v in est.get("populacao", {}).items()}
+
+        def agrega(indicador: str, uf_codes: list):
+            """Agrega valores de um conjunto de UFs conforme o método do indicador."""
+            vals = est.get(indicador, {})
+            pares = [(c, vals[c][0]) for c in uf_codes if c in vals and vals[c][0] is not None]
+            if not pares:
+                return None
+            if INDICE_AGG.get(indicador) == "sum":
+                return sum(v for _, v in pares)
+            # média ponderada por população (fallback média simples se sem pop)
+            num = sum(v * pop_est.get(c, 0) for c, v in pares)
+            den = sum(pop_est.get(c, 0) for c, _ in pares)
+            if den > 0:
+                return num / den
+            return sum(v for _, v in pares) / len(pares)
+
+        todos_ufs = sorted({c for vals in est.values() for c in vals})
+        meta = lambda ind: next(iter(est.get(ind, {}).values()), (None, None, None, None))
+
+        def pacote(indicador, valor, **extra):
+            _, unidade, fonte, ano = meta(indicador)
+            return {"indicador": indicador, "valor": round(valor, 2) if valor is not None else None,
+                    "unidade": unidade, "fonte": fonte, "ano": ano, **extra}
+
+        # ── BRASIL ───────────────────────────────────────────────────────────
+        if nivel in ("brasil", "br", "nacional"):
+            out = []
+            for ind in sorted(est.keys()):
+                nacional = agrega(ind, todos_ufs)
+                if nacional is None:
+                    continue
+                ranking = sorted(
+                    [(c, est[ind][c][0]) for c in est[ind] if est[ind][c][0] is not None],
+                    key=lambda x: x[1], reverse=True
+                )
+                fmt = lambda t: {"uf": CODIGO_UF.get(t[0], str(t[0])),
+                                 "nome": UF_NOME.get(CODIGO_UF.get(t[0], ""), ""),
+                                 "valor": round(t[1], 2)}
+                out.append(pacote(ind, nacional,
+                                  melhores=[fmt(t) for t in ranking[:5]],
+                                  piores=[fmt(t) for t in ranking[-5:][::-1]]))
+            return {"disponivel": True, "nivel": "brasil", "nome": "Brasil", "indicadores": out}
+
+        # ── REGIÃO ───────────────────────────────────────────────────────────
+        if nivel in ("regiao", "região", "regiao".encode().decode()):
+            slug = territorio_id.lower().strip()
+            dig = REGIAO_DIGITO.get(slug)
+            if dig is None:
+                raise HTTPException(status_code=404, detail="Região desconhecida")
+            uf_codes = [c for c in todos_ufs if c // 10 == dig]
+            out = []
+            for ind in sorted(est.keys()):
+                val = agrega(ind, uf_codes)
+                if val is None:
+                    continue
+                nacional = agrega(ind, todos_ufs)
+                # posição da região entre as 5
+                regioes_vals = []
+                for d in REGIAO_NOME:
+                    rc = [c for c in todos_ufs if c // 10 == d]
+                    rv = agrega(ind, rc)
+                    if rv is not None:
+                        regioes_vals.append((d, rv))
+                regioes_vals.sort(key=lambda x: x[1], reverse=True)
+                pos = next((i + 1 for i, (d, _) in enumerate(regioes_vals) if d == dig), None)
+                out.append(pacote(ind, val, brasil=round(nacional, 2) if nacional is not None else None,
+                                  ranking={"posicao": pos, "de": len(regioes_vals)}))
+            return {"disponivel": True, "nivel": "regiao", "id": slug,
+                    "nome": slug.replace("-", " ").title(), "indicadores": out}
+
+        # ── ESTADO ───────────────────────────────────────────────────────────
+        if nivel in ("estado", "uf"):
+            uf = territorio_id.upper().strip()
+            cod = UF_CODIGO.get(uf) if not uf.isdigit() else int(uf)
+            if cod is None or cod not in CODIGO_UF:
+                raise HTTPException(status_code=404, detail="Estado desconhecido")
+            uf = CODIGO_UF[cod]
+            dig = cod // 10
+            uf_regiao = [c for c in todos_ufs if c // 10 == dig]
+            out = []
+            for ind in sorted(est.keys()):
+                vals = est.get(ind, {})
+                if cod not in vals or vals[cod][0] is None:
+                    continue
+                valor = vals[cod][0]
+                ranking = sorted([(c, vals[c][0]) for c in vals if vals[c][0] is not None],
+                                 key=lambda x: x[1], reverse=True)
+                pos = next((i + 1 for i, (c, _) in enumerate(ranking) if c == cod), None)
+                out.append(pacote(ind, valor,
+                                  ranking={"posicao": pos, "de": len(ranking)},
+                                  regiao=round(agrega(ind, uf_regiao), 2) if agrega(ind, uf_regiao) is not None else None,
+                                  brasil=round(agrega(ind, todos_ufs), 2) if agrega(ind, todos_ufs) is not None else None))
+            return {"disponivel": True, "nivel": "estado", "id": uf,
+                    "nome": UF_NOME.get(uf, uf), "indicadores": out}
+
+        # ── MUNICÍPIO ────────────────────────────────────────────────────────
+        if nivel in ("municipio", "município", "mun"):
+            if not territorio_id.isdigit():
+                raise HTTPException(status_code=400, detail="codigo_ibge do município deve ser numérico")
+            cod_mun = int(territorio_id)
+            cod_uf = cod_mun // 100000
+            mun = {}
+            if "indices_municipio" in tabs:
+                for r in conn.execute(
+                    "SELECT indicador, valor, unidade, fonte, ano FROM indices_municipio WHERE codigo_ibge = ?",
+                    (cod_mun,)
+                ):
+                    mun[r["indicador"]] = (r["valor"], r["unidade"], r["fonte"], r["ano"])
+            out = []
+            for ind in sorted(est.keys()):
+                if ind in mun and mun[ind][0] is not None:
+                    _, unidade, fonte, ano = mun[ind]
+                    out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
+                                "unidade": unidade, "fonte": fonte, "ano": ano, "estimado": False})
+                else:
+                    # fallback: valor do estado, marcado como estimado
+                    vals = est.get(ind, {})
+                    if cod_uf in vals and vals[cod_uf][0] is not None:
+                        v, unidade, fonte, ano = vals[cod_uf]
+                        out.append({"indicador": ind, "valor": round(v, 2),
+                                    "unidade": unidade, "fonte": fonte, "ano": ano,
+                                    "estimado": True, "estimado_por": f"média de {CODIGO_UF.get(cod_uf, '')}"})
+            return {"disponivel": True, "nivel": "municipio", "id": str(cod_mun),
+                    "uf": CODIGO_UF.get(cod_uf, ""), "indicadores": out}
+
+        raise HTTPException(status_code=404, detail="Nível inválido (brasil|regiao|estado|municipio)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Erro em /indices/%s/%s: %s", nivel, territorio_id, e, exc_info=True)
+        return {"disponivel": False}
+    finally:
+        conn.close()
 
 
 @app.get("/api/health")
