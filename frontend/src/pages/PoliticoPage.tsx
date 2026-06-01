@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
-import { BlocoVotacoesNominais } from '../components/perfil/blocos';
+import { BlocoVotacoesNominais, BlocoScorecardLegislativo } from '../components/perfil/blocos';
 import { LayoutPrefeito } from '../components/layouts/LayoutPrefeito';
 import { LayoutVereador } from '../components/layouts/LayoutVereador';
 import { LayoutGovernador } from '../components/layouts/LayoutGovernador';
@@ -1656,9 +1656,10 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             )}
 
-            {/* ── VOTAÇÕES NOMINAIS (deputados federais e senadores) ── */}
+            {/* ── ATUAÇÃO LEGISLATIVA: scorecard (resumo) + votações nominais (detalhe) ── */}
             {(data.cargo === 'Deputado Federal' || data.cargo === 'Parlamentar Federal' || data.cargo === 'Senador') && (
-                <div className="max-w-7xl mx-auto mb-6">
+                <div className="max-w-7xl mx-auto mb-6 space-y-6">
+                    <BlocoScorecardLegislativo cor="#FFD700" politicoId={data.id} />
                     <BlocoVotacoesNominais cor="#FFD700" politicoId={data.id} />
                 </div>
             )}
