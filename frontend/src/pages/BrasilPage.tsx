@@ -242,10 +242,10 @@ export function BrasilPage() {
               className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#03A9F4]/60 uppercase transition-colors">
               Comparar
             </button>
-            <a href="/glossario"
+            <button onClick={() => navigate('/glossario')}
               className="font-mono text-[9px] tracking-[0.3em] text-gray-700 hover:text-[#FFD700]/60 uppercase transition-colors">
               Glossário
-            </a>
+            </button>
             <p className="font-mono text-[9px] tracking-[0.3em] text-gray-800 uppercase hidden md:block">
               Portal da Transparência · TSE · Câmara · Senado
             </p>

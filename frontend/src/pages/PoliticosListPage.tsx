@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, TrendingUp, ChevronRight, Filter, ArrowUpDown, LayoutList, LayoutGrid, Download } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { badgeStyle } from '../utils/partidoCores';
@@ -216,7 +217,7 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                         <span className="text-[#FFD700]/80"> bancadas estaduais</span> e
                         <span className="text-[#FFD700]/80"> relatores do orçamento</span> são excluídas porque a indicação
                         é colegiada — não faz sentido atribuir a um político só. Saiba mais no{' '}
-                        <a href="/glossario" className="underline text-[#FFD700]/70 hover:text-[#FFD700]">glossário</a>.
+                        <Link to="/glossario" className="underline text-[#FFD700]/70 hover:text-[#FFD700]">glossário</Link>.
                     </p>
                 </div>
 
