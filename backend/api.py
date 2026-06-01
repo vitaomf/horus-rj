@@ -1557,6 +1557,126 @@ def votacoes_nominais_politico(
         conn.close()
 
 
+@app.get("/api/politicos/{politico_id}/scorecard_legislativo")
+@limiter.limit("30/minute")
+def scorecard_legislativo(request: Request, politico_id: int):
+    """
+    Scorecard de atuação legislativa derivado das votações nominais (sem coleta nova).
+    Prioridade #2 da régua do HORUS — perfil não fala só de emenda.
+
+    Métricas (todas descritivas, não juízo de valor):
+      - participação: % de comparecimento na janela ativa do parlamentar + ausências
+      - perfil de voto: Sim/Não/Abstenção/Obstrução
+      - alinhamento com a maioria: % das vezes que votou com o lado vencedor do plenário
+      - votações mais disputadas em que votou: como se posicionou nos placares apertados
+
+    Depende de votacoes_agg (scripts/migrate_votacoes_agg.py). Degrada gracioso.
+    """
+    conn = get_db_connection()
+    try:
+        tabs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        if "votacoes_votos" not in tabs or "votacoes_agg" not in tabs:
+            return {"disponivel": False}
+
+        # Janela ativa + total participadas
+        _jan = conn.execute("""
+            SELECT MIN(a.data) AS ini, MAX(a.data) AS fim, COUNT(*) AS participadas
+            FROM votacoes_votos vv
+            JOIN votacoes_agg a ON vv.id_votacao = a.id_votacao
+            WHERE vv.politico_id = ?
+        """, (politico_id,)).fetchone()
+
+        participadas = _jan["participadas"] if _jan else 0
+        if not participadas:
+            return {"disponivel": False}
+
+        ini, fim = _jan["ini"], _jan["fim"]
+
+        # Votações nominais ocorridas na janela ativa (denominador da presença)
+        _per = conn.execute(
+            "SELECT COUNT(*) FROM votacoes_agg WHERE data IS NOT NULL AND data BETWEEN ? AND ?",
+            (ini, fim)
+        ).fetchone()
+        no_periodo = _per[0] if _per and _per[0] else participadas
+        ausencias = max(0, no_periodo - participadas)
+        presenca_pct = round(100 * participadas / no_periodo, 1) if no_periodo else None
+
+        # Perfil de voto
+        _resumo = {r["voto"]: r["c"] for r in conn.execute(
+            "SELECT voto, COUNT(*) c FROM votacoes_votos WHERE politico_id = ? GROUP BY voto",
+            (politico_id,)
+        ).fetchall()}
+
+        # Alinhamento com a maioria (só votos de mérito Sim/Não, votação com maioria definida)
+        _alin = conn.execute("""
+            SELECT
+                SUM(CASE WHEN vv.voto = a.pos_maioria THEN 1 ELSE 0 END) AS com,
+                COUNT(*) AS base
+            FROM votacoes_votos vv
+            JOIN votacoes_agg a ON vv.id_votacao = a.id_votacao
+            WHERE vv.politico_id = ?
+              AND vv.voto IN ('Sim','Não')
+              AND a.pos_maioria IN ('Sim','Não')
+        """, (politico_id,)).fetchone()
+        alin_base = _alin["base"] if _alin else 0
+        alinhamento_pct = round(100 * _alin["com"] / alin_base, 1) if alin_base else None
+
+        # Votações mais disputadas em que votou (placares apertados)
+        disputadas = conn.execute("""
+            SELECT a.id_votacao, a.margem, a.total_sim, a.total_nao,
+                   a.pos_maioria, a.aprovacao, vv.voto AS meu_voto,
+                   v.descricao, v.data
+            FROM votacoes_votos vv
+            JOIN votacoes_agg a ON vv.id_votacao = a.id_votacao
+            LEFT JOIN votacoes v ON vv.id_votacao = v.id_votacao
+            WHERE vv.politico_id = ?
+              AND a.margem IS NOT NULL
+              AND vv.voto IN ('Sim','Não')
+            ORDER BY a.margem ASC, a.data DESC
+            LIMIT 8
+        """, (politico_id,)).fetchall()
+
+        return {
+            "disponivel": True,
+            "periodo": {"inicio": ini, "fim": fim},
+            "participacao": {
+                "presentes": participadas,
+                "no_periodo": no_periodo,
+                "ausencias": ausencias,
+                "presenca_pct": presenca_pct,
+            },
+            "perfil_voto": {
+                "sim": _resumo.get("Sim", 0),
+                "nao": _resumo.get("Não", 0),
+                "abstencao": _resumo.get("Abstenção", 0),
+                "obstrucao": _resumo.get("Obstrução", 0),
+            },
+            "alinhamento_maioria_pct": alinhamento_pct,
+            "votacoes_disputadas": [
+                {
+                    "id_votacao": r["id_votacao"],
+                    "descricao": r["descricao"],
+                    "data": r["data"],
+                    "total_sim": r["total_sim"],
+                    "total_nao": r["total_nao"],
+                    "margem": round(r["margem"], 3) if r["margem"] is not None else None,
+                    "pos_maioria": r["pos_maioria"],
+                    "aprovacao": r["aprovacao"],
+                    "meu_voto": r["meu_voto"],
+                    "votou_com_maioria": r["meu_voto"] == r["pos_maioria"],
+                }
+                for r in disputadas
+            ],
+        }
+    except Exception as e:
+        logger.error("Erro em /scorecard_legislativo politico %s: %s", politico_id, e, exc_info=True)
+        return {"disponivel": False}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}/emendas")
 @limiter.limit("60/minute")
 def emendas_politico_paginadas(
