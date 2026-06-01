@@ -361,6 +361,7 @@ export function ParlamentaresListPage() {
           extra={
             <div className="flex items-center gap-2 mt-2">
               <select
+                aria-label="Filtrar por região"
                 value={filtroRegiao}
                 onChange={e => setFiltroRegiao(e.target.value as SlugRegiao | '')}
                 className="bg-black border border-[#1a1a1a] text-gray-500 px-3 py-1.5 font-mono text-[9px] tracking-widest focus:outline-none focus:border-green-500/30 hover:border-green-500/20 transition-colors"

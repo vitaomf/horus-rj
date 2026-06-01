@@ -48,9 +48,7 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
             if (termo.trim())   params.set('busca', termo.trim());
             if (partido.trim()) params.set('partido', partido.trim());
             if (ano)            params.set('ano', ano);
-            const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`, {
-                headers: { 'ngrok-skip-browser-warning': '69420' }
-            });
+            const res  = await fetch(`${API_BASE_URL}/api/politicos?${params}`);
             const data = await res.json();
             setPoliticos(data.politicos || []);
             setTotalPaginas(data.total_paginas || 1);
@@ -148,6 +146,7 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                     </div>
                     {/* Filtro ano */}
                     <select
+                        aria-label="Filtrar por ano"
                         value={filtroAno}
                         onChange={e => handleAno(e.target.value)}
                         className="bg-black border border-[#1a1a1a] text-white font-mono text-[8px] tracking-widest py-2 px-2 focus:outline-none focus:border-[#FFD700]/30 hover:border-[#FFD700]/20 transition-colors"
@@ -242,12 +241,15 @@ export const PoliticosListPage: React.FC<PoliticosListPageProps> = ({ onPolitico
                                         onClick={() => onPoliticoClick(pol.id)}
                                         className={`w-full flex items-center gap-4 px-0 text-left hover:bg-[#080808] transition-colors group relative border-0 ${compacto ? 'py-2' : 'py-4'}`}
                                         onMouseEnter={() => {
-                                            const link = document.createElement('link');
-                                            link.rel  = 'prefetch';
-                                            link.href = `${API_BASE_URL}/api/politicos/${pol.id}`;
-                                            link.as   = 'fetch';
-                                            link.crossOrigin = 'anonymous';
-                                            document.head.appendChild(link);
+                                            const href = `${API_BASE_URL}/api/politicos/${pol.id}`;
+                                            if (!document.querySelector(`link[href="${href}"]`)) {
+                                                const link = document.createElement('link');
+                                                link.rel = 'prefetch';
+                                                link.href = href;
+                                                link.as = 'fetch';
+                                                link.crossOrigin = 'anonymous';
+                                                document.head.appendChild(link);
+                                            }
                                         }}
                                     >
                                         {/* linha de acento no hover */}

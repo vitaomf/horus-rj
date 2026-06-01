@@ -85,6 +85,7 @@ export function RankingMunicipiosPage() {
           <div className="flex items-center gap-2">
             <MapPin className="w-3 h-3 text-gray-700" />
             <select
+              aria-label="Filtrar por estado"
               value={filtroUF}
               onChange={e => setFiltroUF(e.target.value)}
               className="bg-black border border-[#1a1a1a] text-white font-mono text-[9px] tracking-widest py-1.5 px-3 focus:outline-none focus:border-[#FFD700]/30"
