@@ -298,6 +298,15 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => {
   const anoMax = cobertura?.max ?? 2024;
   const anosCobertos = anoMax - anoMin + 1;
 
+  // Largura reativa: a altura do mapa era decidida uma vez no render
+  // (window.innerWidth), não reagia a resize/rotação de tela.
+  const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
   <>
     {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
@@ -472,7 +481,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => {
                   <p className="font-mono text-[10px] tracking-widest text-[#FFD700]/30 animate-pulse uppercase">Carregando...</p>
                 </div>
               }>
-                <MapaBrasil nivel="regioes" height={typeof window !== 'undefined' && window.innerWidth < 768 ? 320 : 480} />
+                <MapaBrasil nivel="regioes" height={vw < 768 ? 320 : 480} />
               </Suspense>
             </div>
           </div>
