@@ -233,8 +233,9 @@ function DataTicker() {
     'TSE 2022',
     'CÂMARA DOS DEPUTADOS',
     'SENADO FEDERAL',
-    'CONTRATOS FEDERAIS 2026',
-    'EMENDAS PARLAMENTARES 2010–2026',
+    'CONTRATOS FEDERAIS',
+    'EMENDAS PARLAMENTARES',
+    'VOTAÇÕES NOMINAIS',
     'SISTEMA ATIVO',
   ];
   return (
@@ -277,7 +278,27 @@ function MetricaCard({ value, label, sub, index }: { value: number; label: strin
   );
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
+export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => {
+  // Intervalo real coberto pelo dado — derivado, não cravado (a página alegava
+  // "2010–2026 / 17 anos" mas o dado é 2014–2024). Integridade: regra #1.
+  const [cobertura, setCobertura] = useState<{ min: number; max: number } | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/estatisticas`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        const anos = (d.por_ano ?? [])
+          .map((a: { ano: number }) => a.ano)
+          .filter((a: number) => a >= 2000 && a <= new Date().getFullYear());
+        if (anos.length) setCobertura({ min: Math.min(...anos), max: Math.max(...anos) });
+      })
+      .catch(() => {});
+  }, []);
+
+  const anoMin = cobertura?.min ?? 2014;
+  const anoMax = cobertura?.max ?? 2024;
+  const anosCobertos = anoMax - anoMin + 1;
+
+  return (
   <>
     {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
     <header className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-black">
@@ -347,7 +368,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
         {/* Linha divisória com texto */}
         <div className="flex items-center gap-4 w-full max-w-lg">
           <div className="flex-1 h-px bg-[#FFD700]/20" />
-          <span className="font-mono text-[9px] text-[#FFD700]/40 tracking-widest">BRASIL · 2010–{new Date().getFullYear()}</span>
+          <span className="font-mono text-[9px] text-[#FFD700]/40 tracking-widest">BRASIL · {anoMin}–{anoMax}</span>
           <div className="flex-1 h-px bg-[#FFD700]/20" />
         </div>
 
@@ -399,7 +420,7 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
             <MetricaCard value={metricas.totalEmendas}        label="Investimentos Registrados" sub="Registros no banco"       index={0} />
             <MetricaCard value={metricas.totalPoliticos}      label="Perfis Políticos"          sub="Parlamentares indexados"  index={1} />
             <MetricaCard value={TOTAL_MUNICIPIOS_BR}          label="Municípios"                sub="Cobertura nacional"       index={2} />
-            <MetricaCard value={17}                           label="Anos Cobertos"             sub="2010 → 2026"              index={3} />
+            <MetricaCard value={anosCobertos}                 label="Anos Cobertos"             sub={`${anoMin} → ${anoMax}`}  index={3} />
           </div>
         </section>
       )}
@@ -555,4 +576,5 @@ export const HomePage: React.FC<HomePageProps> = ({ metricas, loading }) => (
       }
     `}</style>
   </>
-);
+  );
+};
