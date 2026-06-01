@@ -177,10 +177,14 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
                           <span className="font-bebas text-sm leading-none tracking-widest" style={{ color: c }}>
                             {rotuloVoto(v.meu_voto)}
                           </span>
-                          <span className="font-mono text-[7px] mt-1"
-                            style={{ color: v.votou_com_maioria ? '#4ade80' : '#f87171' }}>
-                            {v.votou_com_maioria ? 'com a maioria' : 'contra a maioria'}
-                          </span>
+                          {v.pos_maioria === 'Empate' ? (
+                            <span className="font-mono text-[7px] mt-1 text-gray-500">empate no plenário</span>
+                          ) : (
+                            <span className="font-mono text-[7px] mt-1"
+                              style={{ color: v.votou_com_maioria ? '#4ade80' : '#f87171' }}>
+                              {v.votou_com_maioria ? 'com a maioria' : 'contra a maioria'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
