@@ -37,8 +37,13 @@ const getMunName = (nome: string) => nome.replace(' - RJ', '').trim();
 const removeAcentos = (str: string) => str.normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 const PageSpinner = () => (
-  <div className="flex justify-center items-center min-h-[60vh]">
-    <div className="animate-spin h-12 w-12 border-4 border-[#FFD700] border-t-transparent rounded-full" />
+  <div className="flex flex-col justify-center items-center min-h-[60vh] gap-3">
+    <div className="flex gap-1.5">
+      {[0, 1, 2].map(i => (
+        <div key={i} className="w-2 h-2 bg-[#FFD700]/40 animate-bounce" style={{ animationDelay: `${i * 100}ms` }} />
+      ))}
+    </div>
+    <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">Carregando</p>
   </div>
 );
 
