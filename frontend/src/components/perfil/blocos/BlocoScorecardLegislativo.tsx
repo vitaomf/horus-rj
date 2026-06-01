@@ -20,13 +20,14 @@ interface Scorecard {
   disponivel: boolean;
   periodo?: { inicio: string; fim: string };
   participacao?: { presentes: number; no_periodo: number; ausencias: number; presenca_pct: number | null };
-  perfil_voto?: { sim: number; nao: number; abstencao: number; obstrucao: number };
+  perfil_voto?: { sim: number; nao: number; abstencao: number; obstrucao: number; lideranca?: number };
   alinhamento_maioria_pct?: number | null;
   votacoes_disputadas?: Disputada[];
 }
 
 const COR_VOTO: Record<string, string> = {
   Sim: '#4ade80', Não: '#f87171', Abstenção: '#facc15', Obstrução: '#fb923c',
+  Liderança: '#7c9cff',
 };
 
 function rotuloVoto(v: string): string {
@@ -90,8 +91,9 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
       {!loading && dados && dados.disponivel && (() => {
         const part = dados.participacao!;
         const pv = dados.perfil_voto!;
+        const lideranca = pv.lideranca ?? 0;
         const alin = dados.alinhamento_maioria_pct;
-        const totalVoto = pv.sim + pv.nao + pv.abstencao + pv.obstrucao;
+        const totalVoto = pv.sim + pv.nao + pv.abstencao + pv.obstrucao + lideranca;
         const seg = (n: number) => totalVoto > 0 ? (n / totalVoto) * 100 : 0;
 
         return (
@@ -119,7 +121,7 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
                 Perfil de voto
               </p>
               <div className="flex h-6 w-full overflow-hidden border border-[#1a1a1a]">
-                {([['Sim', pv.sim], ['Não', pv.nao], ['Obstrução', pv.obstrucao], ['Abstenção', pv.abstencao]] as const)
+                {([['Sim', pv.sim], ['Não', pv.nao], ['Obstrução', pv.obstrucao], ['Abstenção', pv.abstencao], ['Liderança', lideranca]] as const)
                   .filter(([, n]) => n > 0)
                   .map(([k, n]) => (
                     <div key={k} className="h-full flex items-center justify-center transition-all"
@@ -134,7 +136,8 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
                   ))}
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                {([['Sim', pv.sim], ['Não', pv.nao], ['Obstrução', pv.obstrucao], ['Abstenção', pv.abstencao]] as const)
+                {([['Sim', pv.sim], ['Não', pv.nao], ['Obstrução', pv.obstrucao], ['Abstenção', pv.abstencao], ['Liderança', lideranca]] as const)
+                  .filter(([, n]) => n > 0)
                   .map(([k, n]) => (
                     <span key={k} className="flex items-center gap-1.5">
                       <span className="w-2 h-2" style={{ backgroundColor: COR_VOTO[k] }} />
@@ -142,6 +145,11 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
                     </span>
                   ))}
               </div>
+              {lideranca > 0 && (
+                <p className="font-mono text-[7px] tracking-wider text-gray-700 mt-2">
+                  "Liderança" = voto em nome da bancada (Art. 17) — comum em líderes partidários.
+                </p>
+              )}
             </div>
 
             {/* ── Votações mais disputadas ── */}

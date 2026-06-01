@@ -1677,6 +1677,9 @@ def scorecard_legislativo(request: Request, politico_id: int):
                 "nao": _resumo.get("Não", 0),
                 "abstencao": _resumo.get("Abstenção", 0),
                 "obstrucao": _resumo.get("Obstrução", 0),
+                # "Artigo 17" = voto de liderança (orienta a bancada). Para líderes é a
+                # maior parte da atividade — não pode ser omitido do perfil.
+                "lideranca": _resumo.get("Artigo 17", 0),
             },
             "alinhamento_maioria_pct": alinhamento_pct,
             "votacoes_disputadas": [
