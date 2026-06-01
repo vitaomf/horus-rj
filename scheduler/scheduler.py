@@ -85,6 +85,9 @@ def coletar_tse():
 
 def coletar_votacoes_camara():
     _executar("votacoes_camara", "scripts/coleta_votacoes_camara.py")
+    # Reconstrói agregados por votação (votacoes_agg) — base do scorecard
+    # legislativo. Precisa rodar logo após a coleta para não ficar defasado.
+    _executar("votacoes_agg", "scripts/migrate_votacoes_agg.py")
 
 def backup_banco():
     """Copia o banco com SQLite backup API (safe mid-write) e mantém últimos 7 dias."""
