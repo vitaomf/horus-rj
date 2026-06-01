@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapaBrasil } from '../components/MapaBrasil';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
+import { PainelIndices } from '../components/PainelIndices';
 import { HeatmapCard } from '../components/HeatmapCard';
 import { getRegiao, getEstadosByRegiao, type SlugRegiao } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
@@ -103,6 +104,8 @@ export function RegiaoPage() {
             </p>
           </div>
           <MapaBrasil nivel="estados" regiaoFoco={regiao.slug} height={400} />
+          {/* Índices do território — região (canto do mapa, não polui) */}
+          <PainelIndices nivel="regiao" id={regiao.slug} className="border-t border-[#1a1a1a]" />
         </div>
 
         {/* lista de estados */}

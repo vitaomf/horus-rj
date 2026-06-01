@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapaBrasil } from '../components/MapaBrasil';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
+import { PainelIndices } from '../components/PainelIndices';
 import { REGIOES, ESTADOS } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -122,6 +123,9 @@ export function BrasilPage() {
                 );
               })}
             </div>
+
+            {/* Índices do território — Brasil */}
+            <PainelIndices nivel="brasil" id="brasil" className="border-t border-[#FFD700]/10" />
 
             {/* Footer do painel */}
             <div className="px-5 py-4 border-t border-[#FFD700]/10 mt-auto">

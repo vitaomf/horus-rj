@@ -3,6 +3,7 @@ import { badgeStyle } from '../utils/partidoCores';
 import { useEffect, useState } from 'react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
+import { PainelIndices } from '../components/PainelIndices';
 import { getEstado, getRegiaoByUF } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -124,6 +125,11 @@ export function EstadoPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── ÍNDICES DO TERRITÓRIO (cascata) ── */}
+      <div className="border-b border-[#1a1a1a] px-6 py-6 md:px-12">
+        <PainelIndices nivel="estado" id={ufUpper} className="max-w-md" />
       </div>
 
       {/* ── BANNER STATUS ── sempre mostra o que está disponível */}
