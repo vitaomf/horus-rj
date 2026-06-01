@@ -74,7 +74,7 @@ function BuscaPolitico({ label, selecionado, onSelecionar }: {
         >
           {selecionado.foto_url ? (
             <img src={`${API_BASE_URL}/api/foto/${selecionado.id}`} alt={selecionado.nome}
-              className="w-full h-full object-cover object-top"
+              className="w-full h-full object-cover object-top" loading="lazy"
               onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
           ) : (
             <span className="w-full h-full flex items-center justify-center font-bebas text-xl text-[#FFD700]/40">
