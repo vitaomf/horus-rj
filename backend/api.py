@@ -686,6 +686,34 @@ def obter_total_emendas():
         conn.close()
 
 
+@app.get("/api/emendas/por_uf")
+@limiter.limit("60/minute")
+def emendas_por_uf(request: Request):
+    """
+    Contagem de emendas por UF (só as 27 oficiais). Endpoint leve e focado —
+    a RegiaoPage usava /status/coleta (diagnóstico pesado: lê logs, parlamentares,
+    pendências) só pra extrair esta fatia. Aqui é um único GROUP BY indexado.
+    """
+    conn = get_db_connection()
+    try:
+        ufs_tuple = tuple(UFS_OFICIAIS)
+        placeholders = ",".join("?" * len(ufs_tuple))
+        rows = conn.execute(f"""
+            SELECT uf, COUNT(*) AS total, MIN(ano) AS ano_min, MAX(ano) AS ano_max
+            FROM emendas
+            WHERE uf IN ({placeholders})
+            GROUP BY uf ORDER BY total DESC
+        """, ufs_tuple).fetchall()
+        return {"emendas_por_uf": [
+            {"uf": r["uf"], "total": r["total"], "ano_min": r["ano_min"], "ano_max": r["ano_max"]}
+            for r in rows
+        ]}
+    except sqlite3.OperationalError:
+        return {"emendas_por_uf": []}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/total")
 def obter_total_politicos():
     """

@@ -27,7 +27,8 @@ export function RegiaoPage() {
   const [ufStats, setUfStats] = useState<Map<string, UfStat>>(new Map());
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/status/coleta`)
+    // endpoint leve dedicado (era /status/coleta, dashboard pesado — só usávamos esta fatia)
+    fetch(`${API_BASE_URL}/api/emendas/por_uf`)
       .then(r => r.json())
       .then(d => {
         const m = new Map<string, UfStat>();
