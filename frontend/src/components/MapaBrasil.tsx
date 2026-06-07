@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import { useNavigate } from 'react-router-dom';
@@ -56,6 +56,13 @@ export function MapaBrasil({ nivel = 'regioes', regiaoFoco, heatmap, height = 50
     return () => obs.disconnect();
   }, [height]);
 
+  // Parse da topologia (3.3MB) memoizado — só re-roda se geoData mudar.
+  // Antes era refeito a cada tick de resize (dimensions no deps do efeito) = jank.
+  const allFeatures = useMemo(
+    () => (geoData ? (topojson.feature(geoData, geoData.objects.states) as any).features : []),
+    [geoData]
+  );
+
   // Renderizar D3
   useEffect(() => {
     if (!geoData || !svgRef.current || dimensions.width === 0) return;
@@ -64,15 +71,13 @@ export function MapaBrasil({ nivel = 'regioes', regiaoFoco, heatmap, height = 50
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const features = (topojson.feature(geoData, geoData.objects.states) as any).features;
-
     // Filtrar por região se tiver foco
     const featuresVisiveis = regiaoFoco
-      ? features.filter((f: any) => {
+      ? allFeatures.filter((f: any) => {
           const regiao = getRegiaoByUF(f.properties.sigla);
           return regiao?.slug === regiaoFoco;
         })
-      : features;
+      : allFeatures;
 
     const projection = d3.geoMercator().fitExtent([[20, 20], [width - 20, h - 20]], {
       type: 'FeatureCollection',
@@ -165,7 +170,7 @@ export function MapaBrasil({ nivel = 'regioes', regiaoFoco, heatmap, height = 50
           .attr('fill', cores.texto).text(r.nome.toUpperCase());
       });
     }
-  }, [geoData, dimensions, nivel, regiaoFoco, heatmap, navigate]);
+  }, [geoData, allFeatures, dimensions, nivel, regiaoFoco, heatmap, navigate]);
 
   return (
     <div ref={wrapperRef} className="relative w-full overflow-hidden" style={{ height }}>
