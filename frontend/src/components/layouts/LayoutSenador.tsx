@@ -44,6 +44,7 @@ export function LayoutSenador({ data, fotoUrl, perfilTipo, trajetoria, votos }: 
         partido={data.partido}
         fotoUrl={fotoUrl}
         mandato={mandato}
+        bio={data.bio_texto}
         badges={
           <span className="font-mono text-[9px] tracking-widest border px-2 py-1"
                 style={{ borderColor: `${cor}40`, color: cor }}>

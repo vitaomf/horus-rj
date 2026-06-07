@@ -34,6 +34,7 @@ interface Props {
   partido?: string | null;
   fotoUrl?: string | null;
   mandato?: string;
+  bio?: string | null;
   badges?: React.ReactNode;       // chips adicionais (idade, anos, etc.)
   contexto?: ContextoGeo;         // bloco "cidade/estado que governa"
   acoes?: React.ReactNode;        // botões compartilhar, favoritar etc.
@@ -41,7 +42,7 @@ interface Props {
 
 export function PerfilHero({
   cor, cargoLabel, cargoSubtexto, breadcrumbs, nome, nomeUrna,
-  partido, fotoUrl, mandato, badges, contexto, acoes,
+  partido, fotoUrl, mandato, bio, badges, contexto, acoes,
 }: Props) {
   const navigate = useNavigate();
   const nomeExibido = nomeUrna || nome;
@@ -125,6 +126,14 @@ export function PerfilHero({
               )}
               {badges}
             </div>
+
+            {/* Bio Wikipedia */}
+            {bio && (
+              <p className="text-[13px] text-gray-400 leading-relaxed max-w-2xl border-l-2 pl-4"
+                 style={{ borderColor: `${cor}40` }}>
+                {bio}
+              </p>
+            )}
 
             {/* Contexto geográfico (cidade/estado que governa) */}
             {contexto && (

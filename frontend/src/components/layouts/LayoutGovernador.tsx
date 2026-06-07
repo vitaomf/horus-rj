@@ -43,6 +43,7 @@ export function LayoutGovernador({ data, fotoUrl, perfilTipo, trajetoria, votos 
         partido={data.partido}
         fotoUrl={fotoUrl}
         mandato={mandato}
+        bio={data.bio_texto}
         contexto={{
           tipo: 'estado',
           label: uf,

@@ -41,6 +41,7 @@ export function LayoutVereador({ data, fotoUrl, perfilTipo, trajetoria, votos }:
         partido={data.partido}
         fotoUrl={fotoUrl}
         mandato={mandato}
+        bio={data.bio_texto}
         contexto={{
           tipo: 'municipio',
           label: cidadeNome,

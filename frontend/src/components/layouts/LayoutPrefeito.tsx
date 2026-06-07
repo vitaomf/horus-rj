@@ -54,6 +54,7 @@ export function LayoutPrefeito({ data, fotoUrl, perfilTipo, trajetoria, votos }:
         partido={data.partido}
         fotoUrl={fotoUrl}
         mandato={mandato}
+        bio={data.bio_texto}
         badges={
           cargoInfo?.situacao && (
             <span className="font-mono text-[9px] tracking-widest text-gray-500 border border-[#1a1a1a] px-2 py-1">

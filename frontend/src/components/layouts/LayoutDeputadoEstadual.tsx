@@ -37,6 +37,7 @@ export function LayoutDeputadoEstadual({ data, fotoUrl, perfilTipo, trajetoria, 
         partido={data.partido}
         fotoUrl={fotoUrl}
         mandato={mandato}
+        bio={data.bio_texto}
         contexto={uf ? { tipo: 'estado', label: uf, href: `/estado/${uf.toLowerCase()}` } : undefined}
       />
 

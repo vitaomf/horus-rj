@@ -107,9 +107,10 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                 // /detalhes traz emendas e ranking; /contratos é endpoint separado
                 const [detRes, contratosRes] = await Promise.all([
                     axios.get(`${baseUrl}/detalhes`),
-                    axios.get(`${baseUrl}/contratos`).catch(() => ({ data: [] }))
+                    axios.get(`${baseUrl}/contratos`).catch(() => ({ data: [] as any[] }))
                 ]);
-                setData({ ...detRes.data, contratos: contratosRes.data });
+                const contratos = Array.isArray(contratosRes.data) ? contratosRes.data : [];
+                setData({ ...detRes.data, contratos });
             } catch {
                 setData(null);
             } finally {

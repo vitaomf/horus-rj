@@ -38,6 +38,7 @@ export function LayoutCandidato({ data, fotoUrl, perfilTipo, trajetoria, votos }
         nomeUrna={data.nome_urna}
         partido={data.partido}
         fotoUrl={fotoUrl}
+        bio={data.bio_texto}
         badges={
           <span className="font-mono text-[9px] tracking-widest border px-2 py-1"
                 style={{ borderColor: `${cor}60`, color: cor, backgroundColor: `${cor}10` }}>
