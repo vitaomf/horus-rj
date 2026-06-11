@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
+import { PainelIndices } from '../components/PainelIndices';
 import { badgeStyle } from '../utils/partidoCores';
 
 interface Politico {
@@ -186,6 +187,18 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                     </div>
                 </div>
             </header>
+
+            {/* Índices do território — a realidade do lugar antes de quem o representa (constituição) */}
+            {(() => {
+                const m = nome.match(/\s-\s([A-Za-z]{2})\s*$/);
+                const ufMun = m ? m[1].toUpperCase() : 'RJ';
+                const nomeBase = m ? nome.slice(0, m.index).trim() : nome;
+                return (
+                    <div className="max-w-7xl mx-auto px-6 mt-8">
+                        <PainelIndices nivel="municipio" id="" porNome={{ nome: nomeBase, uf: ufMun }} className="max-w-md" />
+                    </div>
+                );
+            })()}
 
             {/* Hierarquia visual de cargos municipais */}
             <div className="max-w-7xl mx-auto">

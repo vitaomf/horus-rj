@@ -53,21 +53,26 @@ function fmtValor(ind: Indicador): string {
 interface Props {
   nivel: Nivel;
   id: string;          // 'brasil' usa qualquer coisa; regiao=slug; estado=UF; municipio=codigo_ibge
+  /** Alternativa para município identificado por nome (MunicipioPage usa "NOME - UF") */
+  porNome?: { nome: string; uf: string };
   className?: string;
 }
 
-export function PainelIndices({ nivel, id, className = '' }: Props) {
+export function PainelIndices({ nivel, id, porNome, className = '' }: Props) {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/indices/${nivel}/${encodeURIComponent(id)}`)
-      .then(r => r.json())
+    const url = porNome
+      ? `${API_BASE_URL}/api/indices/municipio_por_nome?nome=${encodeURIComponent(porNome.nome)}&uf=${encodeURIComponent(porNome.uf)}`
+      : `${API_BASE_URL}/api/indices/${nivel}/${encodeURIComponent(id)}`;
+    fetch(url)
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(setDados)
       .catch(() => setDados(null))
       .finally(() => setLoading(false));
-  }, [nivel, id]);
+  }, [nivel, id, porNome?.nome, porNome?.uf]);
 
   if (!loading && (!dados || !dados.disponivel || !dados.indicadores?.length)) return null;
 

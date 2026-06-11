@@ -2780,6 +2780,81 @@ def status_coleta():
     }
 
 
+@app.get("/api/indices/municipio_por_nome")
+@limiter.limit("60/minute")
+def indices_municipio_por_nome(request: Request, nome: str = Query(..., min_length=2),
+                               uf: str = Query(..., min_length=2, max_length=2)):
+    """
+    Índices do território para a página de município, que identifica a cidade
+    por NOME (ex: "NITERÓI - RJ") e não por código IBGE. Resolve via tabela
+    municipios_ibge (nome normalizado + UF, 99.4% de match) e responde no mesmo
+    shape do /indices/municipio/{cod}. Sem match: 404 (fallback honesto no front).
+    """
+    uf_u = uf.upper().strip()
+    if uf_u not in UF_CODIGO:
+        raise HTTPException(status_code=404, detail="UF desconhecida")
+    # Remove sufixo " - UF" se vier junto no nome
+    base = nome.strip()
+    if base.upper().endswith(f" - {uf_u}"):
+        base = base[: -(len(uf_u) + 3)].strip()
+    nome_norm = _unaccent(base).upper().strip()
+
+    conn = get_db_connection()
+    try:
+        tabs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        if "municipios_ibge" not in tabs or "indices_estado" not in tabs:
+            return {"disponivel": False}
+
+        row = conn.execute(
+            "SELECT codigo_ibge, nome FROM municipios_ibge WHERE nome_normalizado = ? AND uf = ?",
+            (nome_norm, uf_u)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Município não resolvido para código IBGE")
+        cod_mun, nome_oficial = row["codigo_ibge"], row["nome"]
+        cod_uf = cod_mun // 100000
+
+        est: dict = {}
+        for r in conn.execute("SELECT codigo_ibge, indicador, valor, unidade, fonte, ano FROM indices_estado"):
+            est.setdefault(r["indicador"], {})[r["codigo_ibge"]] = (
+                r["valor"], r["unidade"], r["fonte"], r["ano"]
+            )
+        mun = {}
+        if "indices_municipio" in tabs:
+            for r in conn.execute(
+                "SELECT indicador, valor, unidade, fonte, ano FROM indices_municipio WHERE codigo_ibge = ?",
+                (cod_mun,)
+            ):
+                mun[r["indicador"]] = (r["valor"], r["unidade"], r["fonte"], r["ano"])
+
+        out = []
+        for ind in sorted(est.keys()):
+            if ind in mun and mun[ind][0] is not None:
+                _, unidade, fonte, ano = mun[ind]
+                out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
+                            "unidade": unidade, "fonte": fonte, "ano": ano, "estimado": False})
+            else:
+                vals = est.get(ind, {})
+                if cod_uf in vals and vals[cod_uf][0] is not None:
+                    v, unidade, fonte, ano = vals[cod_uf]
+                    out.append({"indicador": ind, "valor": round(v, 2),
+                                "unidade": unidade, "fonte": fonte, "ano": ano,
+                                "estimado": True, "estimado_por": f"média de {CODIGO_UF.get(cod_uf, '')}"})
+        if not out:
+            return {"disponivel": False}
+        return {"disponivel": True, "nivel": "municipio", "id": str(cod_mun),
+                "nome": nome_oficial, "uf": uf_u, "indicadores": out}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Erro em /indices/municipio_por_nome %s-%s: %s", nome, uf, e, exc_info=True)
+        return {"disponivel": False}
+    finally:
+        conn.close()
+
+
 @app.get("/api/indices/{nivel}/{territorio_id}")
 @limiter.limit("60/minute")
 def indices_territoriais(request: Request, nivel: str, territorio_id: str):
