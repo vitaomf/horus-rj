@@ -1996,9 +1996,18 @@ def obter_detalhes_politico(request: Request, politico_id: int):
     finally:
         conn.close()
 
+# Cache em memória do /estatisticas: ~2.3s de GROUP BYs sobre 109k emendas,
+# e o dado só muda após coleta (job diário 3h). TTL 10min cobre com folga.
+_ESTAT_CACHE: dict = {"ts": 0.0, "data": None}
+_ESTAT_TTL = 600  # segundos
+
+
 @app.get("/api/estatisticas")
 @limiter.limit("20/minute")
 def obter_estatisticas(request: Request):
+    import time as _time
+    if _ESTAT_CACHE["data"] is not None and (_time.time() - _ESTAT_CACHE["ts"]) < _ESTAT_TTL:
+        return _ESTAT_CACHE["data"]
     conn = get_db_connection()
     try:
         # 1. Total Geral e Média
@@ -2122,7 +2131,7 @@ def obter_estatisticas(request: Request):
             for r in por_partido_rows
         ]
 
-        return {
+        resultado = {
             "valor_total_geral": valor_total_geral,
             "media_por_emenda": media_por_emenda,
             "top_politicos": top_politicos,
@@ -2131,6 +2140,9 @@ def obter_estatisticas(request: Request):
             "por_objetivo": por_objetivo,
             "por_partido": por_partido,
         }
+        _ESTAT_CACHE["data"] = resultado
+        _ESTAT_CACHE["ts"] = _time.time()
+        return resultado
 
     except Exception as e:
         logger.error("Erro em /estatisticas: %s", e, exc_info=True)
