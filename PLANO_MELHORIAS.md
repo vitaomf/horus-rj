@@ -1,146 +1,124 @@
-# PLANO DE MELHORIAS — HORUS RJ
+# 🗺️ PLANO DE MELHORIAS — pós-postagem
 
-> Documento de trabalho. Atualizar conforme implementação avança.
-> Iniciado em: 2026-05-11
-
----
-
-## ESTADO ATUAL DO DOSSIÊ POLÍTICO
-
-| Recurso | Status | Observação |
-|---|---|---|
-| Foto portrait grande no hero | ✅ Implementado 2026-05-11 | 208×272px, borda dourada |
-| Nome enorme (hero) | ✅ Implementado 2026-05-11 | text-8xl Bebas, imediatamente visível |
-| Bio real (nascimento, escolaridade) | ✅ Implementado 2026-05-11 | Proxy `/api/camara/bio` → Câmara API |
-| Bio irônica (algoritmo de gastos) | ✅ Funciona | `PoliticoPage.tsx` `getBioIronica()` |
-| Cruzamento emendas × contratos | ✅ Funciona | `api.py:833` |
-| Finanças de campanha TSE | ✅ Funciona | `PoliticoPage.tsx` seção TSE |
-| Tags comportamentais (ELEITOREIRO etc.) | ✅ Funciona | `PoliticoPage.tsx` |
-| Mapa de atuação (RJ) | ✅ Funciona | `PoliticoPage.tsx` |
-| Header compacto sticky (ao rolar) | ✅ Implementado 2026-05-11 | Foto pequena + nome + stats |
+> Atualizado em 11/06/2026. Substitui a versão de 11/05 (dossiê — entregue: bio real, mandatos,
+> nome de urna, enriquecimento, foto). Item remanescente daquela versão (foto/bio de senadores
+> via Senado API) foi absorvido na Fase C.
+>
+> Sequência aprovada: **A → B → C → D → E** (município → índices completos → senadores → PLs persistidos → chave).
+> Critério: régua da constituição (CLAUDE.md) — primeiro o que fecha a promessa
+> "entre pelo seu lugar e veja a realidade dele".
+> Esforço: 🟢 horas · 🟡 1-2 dias · 🔴 3-5 dias
 
 ---
 
-## 1. DOSSIÊ POLÍTICO
+## FASE A — Índices na página de município (nome → código IBGE) 🟡
 
-Objetivo: tornar o dossiê uma peça jornalística completa, não apenas um painel de dados.
+**Por quê primeiro:** o PainelIndices existe em Brasil/Região/Estado mas não no município — e o
+cidadão entra pela cidade dele. É o elo que falta da cascata.
 
-### 1(a) FOTO
+**Problema técnico:** MunicipioPage identifica município por **nome** (`"NITERÓI - RJ"`); as
+tabelas `indices_municipio` usam **código IBGE 7 dígitos** (`3303302`).
 
-**Estado atual:** foto portrait grande no hero — proxy backend busca via Câmara API, sem CORS.
+**Passos:**
+1. `scripts/migrate_municipios_ibge.py` — tabela `municipios_ibge(codigo_ibge INTEGER PK, nome TEXT,
+   nome_normalizado TEXT, uf TEXT)` + índice `(nome_normalizado, uf)`.
+2. `scripts/coleta_municipios_ibge.py` — popula da API de localidades do IBGE
+   (`/api/v1/localidades/municipios`, 5.570 itens em 1 GET). Normalização: UPPER + sem acento
+   (mesma `_unaccent` do api.py). Idempotente (INSERT OR REPLACE).
+3. Backend: `GET /api/indices/municipio_por_nome?nome=X&uf=Y` — resolve via `municipios_ibge` e
+   delega pra lógica existente do `/indices/municipio/{cod}`. 404 se não resolver (sem chute).
+4. Frontend: `MunicipioPage` monta `<PainelIndices>` (adaptar prop pra aceitar nome+uf).
+5. **Validação:** taxa de match dos municípios com emendas (esperado >95%); spot-check Niterói
+   (3303302), Rio (3304557), São Paulo (3550308). Não-resolvidos → `logs/municipios_sem_ibge.log`.
 
-**Pendente:**
-- [ ] **Senadores sem foto**: a Câmara API só cobre deputados federais. Romário, por ex., fica sem foto. Adicionar fallback Senado API: `legis.senado.leg.br/dadosabertos/senador/lista/atual`
-- [ ] **Cache no banco**: salvar `foto_url` e `bio_json` no banco após o primeiro fetch, evitando chamadas repetidas a cada visualização
-- [ ] **Match por apelido**: nomes de urna diferentes do nome civil (ex: "Lula" vs "LUIZ INÁCIO LULA DA SILVA") causam falha no match
-
----
-
-### 1(b) NOME E IDENTIFICAÇÃO
-
-**Estado atual:** nome exibido como coletado do Portal da Transparência (nome civil completo em maiúsculas).
-
-**Melhorias planejadas:**
-
-- [ ] **Nome de urna / apelido político**: exibir o nome pelo qual o parlamentar é conhecido publicamente (ex: "Rodrigo Maia" em vez de "RODRIGO MAIA PEREIRA") — disponível na Câmara API campo `nomeCivil` vs `nome`
-- [ ] **Mandato atual**: indicar visualmente se o parlamentar ainda está em exercício ou se o mandato encerrou
-- [ ] **UF de origem / partido atual**: o partido pode ter mudado desde a última eleição. Considerar fonte atualizada
-- [ ] **Tipo de cargo com link**: "Deputado Federal" com link para o perfil oficial na Câmara ou no Senado
+**Risco:** grafias divergentes (ex: "MOJI MIRIM" vs "MOGI MIRIM"). Mitigação: log de
+não-resolvidos + fallback "—" explícito (nunca dado errado).
 
 ---
 
-### 1(c) HISTÓRIA
+## FASE B — Completar os 5 indicadores da constituição 🔴 (1 coletor por vez)
 
-**Estado atual (2026-05-11):** bio real implementada via proxy `/api/camara/bio` — nascimento, UF, escolaridade já aparecem no hero para deputados federais.
+**Estado:** 2/5 prontos (população, alfabetização — IBGE Censo 2022). O frontend
+(`PainelIndices.META`) **já tem** ícone/cor pra idhm, esgoto, homicídios, desmatamento —
+renderiza sozinho quando o dado chegar.
 
-**O que falta:**
-- Trajetória política (quando entrou na vida pública, mandatos anteriores)
-- Partidos pelos quais passou
-- Cargos anteriores (vereador, prefeito, secretário, etc.)
-- Comissões em que atua
-- Projetos de lei relevantes (ou ausência deles)
-- Polêmicas e investigações públicas (CPI, processo no STF, etc.)
+| Ordem | Indicador | Fonte | Caminho técnico | Esforço |
+|---|---|---|---|---|
+| B1 | **IDH-M** | PNUD Atlas Brasil | Sem API estável → CSV municipal (2010 oficial) versionado em `cache/indices/`, importador `coleta_indices_idhm.py` | 🟢 |
+| B2 | **Homicídios/100k** | IPEA Atlas da Violência | API pública do IPEA (séries por município/UF) → `coleta_indices_violencia.py` | 🟡 |
+| B3 | **Desmatamento km²** | INPE TerraBrasilis (PRODES) | API REST por município/ano → `coleta_indices_desmatamento.py`. Cobertura: Amazônia Legal (resto "—", honesto) | 🟡 |
+| B4 | **Esgoto coletado/tratado %** | SNIS/MDR | Sem API — CSV da Série Histórica (IN015/IN046), importador como B1 | 🟡 |
 
-**Fontes disponíveis para automação:**
+**Regras pra todos (constituição):** idempotente; "sem dado" → omitir (nunca zero); `fonte` e
+`ano` gravados por linha; validação de amostra contra valor público conhecido antes do commit
+(ex: IDH São Caetano ≈ 0,862 topo nacional).
 
-| Fonte | O que fornece | Tipo |
-|---|---|---|
-| Câmara API (`/deputados/{id}`) | biografia oficial, escolaridade, profissão, situação | API aberta |
-| Senado API (`/senador/{id}`) | dados biográficos, comissões, mandatos | API aberta |
-| Wikipedia API | artigo biográfico em texto livre | API aberta |
-| Portal da Câmara (scraping) | histórico de votações, projetos | Scraping (instável) |
-
-**Abordagem proposta — em fases:**
-
-**Fase 1 — Bio oficial da Câmara (automática)**
-- Durante a coleta de emendas, enriquecer cada deputado com dados da Câmara API:
-  - `dataNascimento`, `municipioNascimento`, `escolaridade`, `profissao`
-  - `urlFoto` (resolve o problema de cache de foto também)
-  - `urlWebSite`, `redeSocial`
-- Salvar numa nova coluna `bio_json` na tabela `politicos` (TEXT, JSON serializado)
-- Expor via `/api/politicos/{id}` (já retorna o objeto do parlamentar)
-- Exibir no dossiê: uma ficha biográfica discreta abaixo da bio irônica
-
-**Fase 2 — Histórico de mandatos**
-- Câmara API: `GET /deputados/{id}/mandatos` — lista todos os mandatos do parlamentar
-- Senado API: equivalente para senadores
-- Exibir como linha do tempo vertical no dossiê
-
-**Fase 3 — Texto biográfico (Wikipedia ou curado)**
-- Opção A: Wikipedia API — busca automática por nome, extrai o primeiro parágrafo
-  - Risco: pode não ter artigo, ou trazer artigo errado (homônimos)
-  - Implementação: `https://pt.wikipedia.org/api/rest_v1/page/summary/{nome_formatado}`
-- Opção B: campo manual `bio_texto` no banco, editável via script ou endpoint admin
-  - Mais confiável para uso jornalístico
-  - Requer curadoria
-
-**Recomendação:** fazer Fase 1 primeiro (automática, dados oficiais, sem risco editorial), depois decidir entre Wikipedia automatizado e curadoria manual para o texto livre.
-
-**Colunas novas necessárias na tabela `politicos`:**
-
-```sql
-ALTER TABLE politicos ADD COLUMN nome_urna TEXT;
-ALTER TABLE politicos ADD COLUMN data_nascimento TEXT;
-ALTER TABLE politicos ADD COLUMN municipio_nascimento TEXT;
-ALTER TABLE politicos ADD COLUMN escolaridade TEXT;
-ALTER TABLE politicos ADD COLUMN profissao TEXT;
-ALTER TABLE politicos ADD COLUMN url_perfil_oficial TEXT;
-ALTER TABLE politicos ADD COLUMN bio_json TEXT;       -- dados estruturados da Câmara/Senado API
-ALTER TABLE politicos ADD COLUMN bio_texto TEXT;      -- texto biográfico livre (curado ou Wikipedia)
-ALTER TABLE politicos ADD COLUMN mandatos_json TEXT;  -- histórico de mandatos
-ALTER TABLE politicos ADD COLUMN atualizado_em TEXT;  -- timestamp do último enriquecimento
-```
-
-**Script de enriquecimento:**
-- Novo arquivo: `enriquecer_politicos.py`
-- Lê todos os parlamentares da tabela `politicos`
-- Para cada um, tenta buscar na Câmara API (se cargo = Deputado Federal) ou Senado API
-- Salva os campos acima no banco
-- Idempotente: só atualiza se `atualizado_em` for nulo ou > 30 dias
+**Entrega incremental:** 1 coletor = 1 commit = aparece no site na hora.
 
 ---
 
-## PRÓXIMOS PONTOS A DEFINIR
+## FASE C — Raio-X (e foto/bio) para senadores 🟡
 
-*(adicionar aqui conforme a conversa avança)*
+**Estado:** votações coletadas são só da Câmara → senador não tem raio-x (o gate de exibição já
+inclui Senador; falta só o dado). Foto/bio de senador também não tem fonte (Câmara API não cobre).
+
+**Passos:**
+1. `scripts/coleta_votacoes_senado.py` — API dados abertos do Senado
+   (`legis.senado.leg.br/dadosabertos`, votações nominais de plenário). Persiste nas tabelas
+   existentes `votacoes`/`votacoes_votos` com `id_votacao` prefixado `sen-` (evita colisão).
+2. Matching senador↔`politicos` por nome normalizado contra `cargo='Senador'` (+nome_urna).
+   Logar não-matcheados.
+3. Re-rodar `migrate_votacoes_agg.py` (idempotente — pega Câmara+Senado juntos).
+4. No mesmo coletor: foto (`urlFoto`) e bio do senador → `politicos.foto_url`/`bio_json`
+   (fecha o item remanescente do plano de 11/05).
+5. Agendar no scheduler junto do job semanal de votações.
+6. **Validação:** scorecard de 2-3 senadores conhecidos; alinhamento deve discriminar
+   (não pode ficar todo mundo ~50%).
+
+**Risco:** parte dos endpoints do Senado é XML antigo — pode exigir parsing extra.
 
 ---
 
-## ORDEM DE IMPLEMENTAÇÃO SUGERIDA
+## FASE D — PLs autorais persistidos 🟡
 
-| Prioridade | Item | Status |
-|---|---|---|
-| 1 | Hero com foto grande + nome + bio real (Câmara API) | ✅ Feito |
-| 2 | Senado API — foto e bio para senadores | ⬜ Próximo |
-| 3 | Cache de foto + bio no banco (`enriquecer_politicos.py`) | ⬜ |
-| 4 | Nome de urna visível no dossiê | ⬜ |
-| 5 | Linha do tempo de mandatos (Fase 2 do histórico) | ⬜ |
-| 6 | Texto biográfico livre (Wikipedia ou curadoria manual) | ⬜ |
+**Estado:** seção "Atuação Legislativa" consulta a Câmara **ao vivo** (até 30s);
+`BlocoProjetosLegislativos` é placeholder.
+
+**Passos:**
+1. `scripts/migrate_proposicoes.py` — tabela `proposicoes(id_camara INTEGER PK, politico_id, tipo,
+   numero, ano, ementa, status, status_data, status_orgao, url, coletado_em)` + índices
+   `(politico_id)`, `(ano)`.
+2. `scripts/coleta_proposicoes.py` — `/proposicoes?idDeputadoAutor=` por deputado ativo
+   (513 com id_camara), idempotente, rate-limit cortês (~1 req/s).
+3. Endpoint `GET /api/politicos/{id}/proposicoes` (paginado, padrão dos existentes).
+4. Frontend: `BlocoProjetosLegislativos` sai do placeholder; seção legada lê do banco
+   (30s → instantâneo), Câmara-viva vira fallback.
+5. Agendar coleta semanal no scheduler.
+6. **Validação:** deputado produtivo conhecido deve listar dezenas de PLs; contagem bate com o
+   site da Câmara.
+
+**Bônus desbloqueado:** ranking por produção legislativa (dimensão #2 da régua) vira query barata.
 
 ---
 
-## DÍVIDAS TÉCNICAS QUE AFETAM ESTE PLANO
+## FASE E — Rotacionar chave do Portal da Transparência 🟢 (manual, Vitor)
 
-- Coluna `foto_url` existe mas está vazia para a maioria dos parlamentares (preenchida ao vivo)
-- `schema.sql` desatualizado — qualquer `ALTER TABLE` deve ser documentado nos dois lados
-- Sem testes: validar enriquecimentos manualmente antes de popular o banco de produção
+1. **Vitor:** portal → gerar chave nova → substituir no `.env` → revogar a antiga.
+2. **Claude:** varrer repo confirmando que nenhum log/commit imprime a chave (re-conferir pós-rotação).
+
+> Pendência de segurança desde antes do loop (a chave atual já vazou uma vez).
+> Única ação 100% manual do plano.
+
+---
+
+## 📌 Fechamento de cada fase
+
+`tsc` limpo + build + smoke test live + commit descritivo + linha no `logs/loop_progress.log`.
+Dado novo: validação de amostra contra fonte pública antes do commit (integridade = regra #1).
+
+## ⚠️ Relação com a postagem
+
+Nada aqui bloqueia o push de agora — o site está pronto. Este plano é o pós-post.
+Fases A-D são autônomas (posso rodar em loop); a E é do Vitor.
+Pendência da postagem (fora deste plano): definir como o banco de produção (Turso) recebe os
+dados novos — re-upload do SQLite local ou rodar migrations/coletas lá.
