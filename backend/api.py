@@ -550,12 +550,14 @@ def eleitos_municipais(request: Request,
 
     conn = get_db_connection()
     try:
-        # Match por nome normalizado (case + acentos)
+        # Match por nome normalizado (case + acentos). unaccent é função registrada
+        # na conexão — UPPER() puro do SQLite não dobra acentos ("NITERÓI" ≠ "NITEROI"),
+        # o que fazia toda cidade acentuada cair no placeholder genérico.
         rows = conn.execute("""
             SELECT id, cargo, nome, nome_urna, partido, numero, foto_url, sigla_situacao
             FROM eleitos_municipais
             WHERE uf = ?
-              AND UPPER(municipio) = ?
+              AND UPPER(unaccent(municipio)) = ?
               AND ano_eleicao = 2024
         """, (uf_u, mun_n)).fetchall()
 
