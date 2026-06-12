@@ -330,10 +330,16 @@ def ranking_municipios(
         params: list = []
         if uf:
             where.append("UPPER(uf) = ?"); params.append(uf.upper().strip())
-        # Exclui pseudo-municípios (nacionais, múltiplos, etc)
+        # Exclui pseudo-municípios — MÚLTIPLO/Nacional/estados '(UF)'/regiões
+        # dominavam o pódio do ranking (MÚLTIPLO 'ganhava' com R$ 194B).
         where.append("municipio_destino IS NOT NULL")
         where.append("municipio_destino != ''")
         where.append("LENGTH(municipio_destino) > 3")
+        where.append("municipio_destino NOT LIKE '%(UF)%'")
+        where.append("UPPER(municipio_destino) NOT LIKE '%M_LTIPLO%'")
+        where.append("UPPER(municipio_destino) NOT LIKE '%NACIONAL%'")
+        where.append("UPPER(municipio_destino) NOT LIKE '%EXTERIOR%'")
+        where.append("UPPER(municipio_destino) NOT IN ('NORTE','NORDESTE','CENTRO-OESTE','SUDESTE','SUL')")
 
         order = "valor_total DESC" if ordenar == "valor" else "total_emendas DESC"
         where_sql = (" AND ".join(where)) if where else "1=1"
