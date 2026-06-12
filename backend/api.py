@@ -2048,13 +2048,20 @@ def obter_estatisticas(request: Request):
             for r in top_politicos_rows
         ]
 
-        # 3. TOP 10 Municípios
+        # 3. TOP 10 Municípios — só cidades reais. Pseudo-destinos (MÚLTIPLO,
+        # Nacional, estados '(UF)', macrorregiões, Exterior) dominavam o topo
+        # do ranking 'cidades destinatárias' (MÚLTIPLO sozinho = R$ 194B).
         top_municipios_rows = conn.execute("""
             SELECT municipio_destino as nome,
                    COUNT(id) as total_emendas,
                    SUM(valor) as valor_total
             FROM emendas
             WHERE municipio_destino != ''
+              AND municipio_destino NOT LIKE '%(UF)%'
+              AND UPPER(municipio_destino) NOT LIKE '%M_LTIPLO%'
+              AND UPPER(municipio_destino) NOT LIKE '%NACIONAL%'
+              AND UPPER(municipio_destino) NOT LIKE '%EXTERIOR%'
+              AND UPPER(municipio_destino) NOT IN ('NORTE','NORDESTE','CENTRO-OESTE','SUDESTE','SUL')
             GROUP BY municipio_destino
             ORDER BY valor_total DESC
             LIMIT 10
