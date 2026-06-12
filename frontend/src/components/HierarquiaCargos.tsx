@@ -287,7 +287,10 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
 
 // ── MUNICIPAL ────────────────────────────────────────────────────────────────
 function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string; cor: string }) {
-  const slug = municipio.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '-');
+  // Nome limpo pra exibição: remove sufixo " - UF" (vinha "NITERÓI - RJ" e o
+  // capitalize rebaixava pra "Niterói - rj" nos textos descritivos)
+  const municipioLimpo = municipio.replace(/\s*-\s*[A-Za-z]{2}\s*$/, '').trim();
+  const slug = municipioLimpo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '-');
   const [eleitos, setEleitos] = useState<{
     prefeito: EleitoMunicipal | null;
     vice: EleitoMunicipal | null;
@@ -324,7 +327,7 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
   const prefCargo = toCargo(
     eleitos?.prefeito ?? null,
     'Prefeito — Chefe do Poder Executivo Municipal',
-    `É quem manda na administração de ${capitalize(municipio)}. Sanciona leis municipais, nomeia secretários, define investimentos da cidade.`,
+    `É quem manda na administração de ${capitalize(municipioLimpo)}. Sanciona leis municipais, nomeia secretários, define investimentos da cidade.`,
     1
   );
   const viceCargo = toCargo(

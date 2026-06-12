@@ -131,7 +131,17 @@ def importar_csv(uf_filtro: str | None = None):
                         if not nome or not sq or not uf:
                             continue
 
-                        mandato = "2023-2026" if cargo_slug != 'senador' else "2023-2030"
+                        # Convenções de mandato (eleição 2022):
+                        #   executivo (gov/vice): quadriênio civil 2023-2026
+                        #   legislativo (dep fed/est): legislatura até fev/2027 -> 2023-2027
+                        #   senador: 8 anos, até fev/2031 -> 2023-2031
+                        # Mantém consistência com a tabela LEGISLATURAS do api.py.
+                        if cargo_slug == 'senador':
+                            mandato = "2023-2031"
+                        elif cargo_slug in ('deputado_federal', 'deputado_estadual'):
+                            mandato = "2023-2027"
+                        else:
+                            mandato = "2023-2026"
 
                         cur.execute("""
                             INSERT INTO eleitos_estaduais

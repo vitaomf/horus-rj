@@ -179,7 +179,10 @@ export const EstatisticasPage: React.FC = () => {
                         </div>
                         <h3 className="font-mono text-[9px] tracking-[0.35em] text-gray-600 uppercase mb-3 relative z-10">Ticket Médio por Emenda</h3>
                         <div className="text-4xl md:text-6xl lg:text-7xl font-bebas text-white tracking-wider relative z-10">
-                            R$ <CountUp end={media_por_emenda / 1e3} duration={2} decimals={1} suffix="K" />
+                            {/* Escala adaptativa: /1e3 fixo exibia "R$ 3.552,5K" (milhares de K) */}
+                            {media_por_emenda >= 1e6
+                                ? <>R$ <CountUp end={media_por_emenda / 1e6} duration={2} decimals={2} suffix="M" /></>
+                                : <>R$ <CountUp end={media_por_emenda / 1e3} duration={2} decimals={1} suffix="K" /></>}
                         </div>
                     </div>
                 </div>

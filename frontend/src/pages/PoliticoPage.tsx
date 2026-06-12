@@ -1362,6 +1362,14 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             </div>
 
+            {/* ── RAIO-X DE VOTAÇÕES: legislativo antes de emendas (régua da constituição #2 > #4) ── */}
+            {(data.cargo === 'Deputado Federal' || data.cargo === 'Parlamentar Federal' || data.cargo === 'Senador') && (
+                <div className="max-w-7xl mx-auto mb-12 space-y-6">
+                    <BlocoScorecardLegislativo cor="#FFD700" politicoId={data.id} />
+                    <BlocoVotacoesNominais cor="#FFD700" politicoId={data.id} />
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 mb-12">
                 {/* 2. MUNICÍPIOS BENEFICIADOS */}
                 <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6 relative overflow-hidden flex flex-col min-h-[400px]">
@@ -1653,14 +1661,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             VEJA A BASE ELEITORAL ABAIXO ↓
                         </p>
                     )}
-                </div>
-            )}
-
-            {/* ── ATUAÇÃO LEGISLATIVA: scorecard (resumo) + votações nominais (detalhe) ── */}
-            {(data.cargo === 'Deputado Federal' || data.cargo === 'Parlamentar Federal' || data.cargo === 'Senador') && (
-                <div className="max-w-7xl mx-auto mb-6 space-y-6">
-                    <BlocoScorecardLegislativo cor="#FFD700" politicoId={data.id} />
-                    <BlocoVotacoesNominais cor="#FFD700" politicoId={data.id} />
                 </div>
             )}
 
