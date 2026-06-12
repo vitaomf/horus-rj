@@ -22,10 +22,13 @@ DB = "transparencia_rj.db"
 CACHE_FILE = "cache/camara_completa.json"
 DIAS_VALIDADE = 30
 
+# Legislaturas da Câmara (anos reais — 56ª = 2019-2023, 57ª = 2023-2027).
+# ATENÇÃO: tabela anterior estava deslocada +4 anos, gerando mandatos fantasmas
+# futuros (ex: "2027-2031") em todos os perfis. Mantida em sincronia com api.py.
 LEGISLATURAS = {
-    50: (1999, 2003), 51: (2003, 2007), 52: (2007, 2011),
-    53: (2011, 2015), 54: (2015, 2019), 55: (2019, 2023),
-    56: (2023, 2027), 57: (2027, 2031),
+    50: (1995, 1999), 51: (1999, 2003), 52: (2003, 2007),
+    53: (2007, 2011), 54: (2011, 2015), 55: (2015, 2019),
+    56: (2019, 2023), 57: (2023, 2027), 58: (2027, 2031),
 }
 
 # ── Migração ──────────────────────────────────────────────────────────────────
