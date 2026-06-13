@@ -131,6 +131,11 @@ interface PoliticoData {
     mandatos?: MandatoHistorico[];
     total_emendas: number;
     valor_total: number;
+    total_municipios?: number;
+    total_estados?: number;
+    valor_municipios?: number;
+    valor_pago_total?: number;
+    area_distribuicao?: { objetivo: string; valor: number }[];
     dados_campanha?: DadosCampanha | null;
     municipios_beneficiados: MunicipioBeneficiado[];
     emendas_por_ano: EmendasPorAno[];
@@ -695,22 +700,18 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {(() => {
                                 const topMun = data.municipios_beneficiados[0];
                                 const topMunPct = topMun && data.valor_total > 0 ? Math.round((topMun.valor / data.valor_total) * 100) : 0;
-                                const porArea = data.ultimas_emendas.reduce((acc: Record<string, number>, e) => {
-                                    const k = e.objetivo || 'Não informado';
-                                    acc[k] = (acc[k] || 0) + e.valor;
-                                    return acc;
-                                }, {});
-                                const topArea = Object.entries(porArea).sort(([, a], [, b]) => (b as number) - (a as number))[0];
+                                const topArea = (data.area_distribuicao ?? [])[0];
+                                const numMunicipios = data.total_municipios ?? data.municipios_beneficiados.length;
                                 const anosAtivos = data.emendas_por_ano.length;
                                 const fmtCompact = (v: number) => v >= 1e9 ? `R$ ${(v/1e9).toFixed(2)}B` : v >= 1e6 ? `R$ ${(v/1e6).toFixed(1)}M` : `R$ ${(v/1e3).toFixed(0)}K`;
 
                                 const kpis = [
                                     { label: 'Emendas', value: String(data.total_emendas), sub: 'no total', cor: '#FFD700' },
                                     { label: 'Valor empenhado', value: fmtCompact(data.valor_total), sub: 'soma de todos os anos', cor: '#FFD700' },
-                                    { label: 'Municípios', value: String(data.municipios_beneficiados.length), sub: 'atingidos', cor: '#4ade80' },
+                                    { label: 'Municípios', value: String(numMunicipios), sub: 'atingidos', cor: '#4ade80' },
                                     { label: 'Anos ativos', value: String(anosAtivos), sub: 'com emendas', cor: '#60a5fa' },
                                     { label: 'Top município', value: topMun ? topMun.nome.replace(/\s*-\s*[A-Z]{2}$/,'').slice(0, 12) : '—', sub: topMun ? `${topMunPct}% do total` : '', cor: '#f59e0b' },
-                                    { label: 'Área predileta', value: topArea ? String(topArea[0]).slice(0, 14) : '—', sub: topArea ? `${(((topArea[1] as number) / data.valor_total) * 100).toFixed(0)}% do total` : '', cor: '#c084fc' },
+                                    { label: 'Área predileta', value: topArea ? topArea.objetivo.slice(0, 14) : '—', sub: topArea && data.valor_total > 0 ? `${((topArea.valor / data.valor_total) * 100).toFixed(0)}% do total` : '', cor: '#c084fc' },
                                 ];
 
                                 return (
@@ -728,8 +729,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
 
                             {/* #38 Empenho vs Pago */}
                             {(() => {
-                                const empenhado = data.ultimas_emendas.reduce((s, e) => s + (e.valor_empenhado || e.valor || 0), 0);
-                                const pago      = data.ultimas_emendas.reduce((s, e) => s + (e.valor_pago || 0), 0);
+                                const empenhado = data.valor_total;
+                                const pago      = data.valor_pago_total ?? 0;
                                 if (empenhado === 0) return null;
                                 const execPct = Math.min(100, Math.round((pago / empenhado) * 100));
                                 const fmtM = (v: number) => `R$ ${(v / 1e6).toFixed(1)}M`;
@@ -1508,13 +1509,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 {/* Widgets analíticos — preenchem a coluna direita */}
                 {(() => {
                     const CORES = ['#4ade80','#60a5fa','#f97316','#c084fc','#f472b6','#94a3b8'];
-                    const porArea = Object.entries(
-                        data.ultimas_emendas.reduce((acc: Record<string,number>, e) => {
-                            const k = e.objetivo || 'Não informado';
-                            acc[k] = (acc[k] || 0) + e.valor;
-                            return acc;
-                        }, {})
-                    ).sort(([,a],[,b]) => (b as number) - (a as number));
+                    const porArea: [string, number][] = (data.area_distribuicao ?? []).map(a => [a.objetivo, a.valor]);
                     const totalArea = porArea.reduce((s,[,v]) => s + (v as number), 0);
                     const top5 = porArea.slice(0, 5);
                     const outrosVal = porArea.slice(5).reduce((s,[,v]) => s + (v as number), 0);
@@ -1585,10 +1580,16 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {data.municipios_beneficiados.length > 0 && (
                                 <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5">
                                     <p className="font-bebas text-[#FFD700] text-base tracking-widest mb-1">PARA ONDE FOI O DINHEIRO</p>
-                                    <p className="text-gray-600 text-[10px] uppercase tracking-widest mb-4">Top municípios destinatários · proporção sobre o total</p>
+                                    <p className="text-gray-600 text-[10px] uppercase tracking-widest mb-2">Municípios identificados · proporção entre eles</p>
+                                    {data.valor_municipios != null && data.valor_total > 0 && (
+                                        <p className="font-mono text-[9px] leading-relaxed text-gray-500 mb-4">
+                                            <span className="text-[#FFD700]/70">R$ {(data.valor_municipios / 1e6).toFixed(1)}M ({((data.valor_municipios / data.valor_total) * 100).toFixed(0)}%)</span> do total foi para municípios identificados. O restante vai a destinos múltiplos, estaduais ou nacionais — sem cidade definida na fonte.
+                                        </p>
+                                    )}
                                     <div className="space-y-2.5">
                                         {data.municipios_beneficiados.slice(0, 8).map((mun, i) => {
-                                            const pct = mun.valor / data.valor_total * 100;
+                                            const baseMun = data.valor_municipios && data.valor_municipios > 0 ? data.valor_municipios : data.valor_total;
+                                            const pct = mun.valor / baseMun * 100;
                                             const fmt = mun.valor >= 1e6 ? `R$ ${(mun.valor/1e6).toFixed(1)}M` : `R$ ${(mun.valor/1e3).toFixed(0)}K`;
                                             return (
                                                 <div key={i}>
@@ -1609,8 +1610,8 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                             );
                                         })}
                                     </div>
-                                    {data.municipios_beneficiados.length > 8 && (
-                                        <p className="text-gray-600 text-[10px] mt-3">+ {data.municipios_beneficiados.length - 8} outros municípios</p>
+                                    {(data.total_municipios ?? data.municipios_beneficiados.length) > 8 && (
+                                        <p className="text-gray-600 text-[10px] mt-3">+ {(data.total_municipios ?? data.municipios_beneficiados.length) - 8} outros municípios</p>
                                     )}
                                 </div>
                             )}
@@ -1668,7 +1669,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
             {data.total_emendas > 0 && (
                 <div className="max-w-7xl mx-auto mb-6 px-0">
                     <VoceSabia
-                        fato={`${data.nome.split(' ')[0]} destinou emendas para ${data.municipios_beneficiados.length} município${data.municipios_beneficiados.length !== 1 ? 's' : ''} ao longo de sua carreira. O dinheiro empenhado não necessariamente chega todo — parte pode ser bloqueada pelo governo ou ficar pendente de execução.`}
+                        fato={`${data.nome.split(' ')[0]} destinou emendas para ${data.total_municipios ?? data.municipios_beneficiados.length} município${(data.total_municipios ?? data.municipios_beneficiados.length) !== 1 ? 's' : ''} ao longo de sua carreira. O dinheiro empenhado não necessariamente chega todo — parte pode ser bloqueada pelo governo ou ficar pendente de execução.`}
                         fonte="Portal da Transparência"
                     />
                 </div>

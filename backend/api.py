@@ -1871,13 +1871,18 @@ def obter_detalhes_politico(request: Request, politico_id: int):
         if not politico_info:
             raise HTTPException(status_code=404, detail="Político não encontrado")
 
-        # 2. Municípios Beneficiados — top 10 + contagem agregada
+        # 2. Municípios Beneficiados — só municípios REAIS (sufixo " - XX"), top 10.
+        #    Baldes agregados (MÚLTIPLO, "(UF)", NACIONAL, EXTERIOR) não são lugares;
+        #    rotulá-los como "Top município"/"Município favorito" seria falso.
+        #    Mesma régua territorial da home (/estatisticas valor_municipios).
         municipios_rows = conn.execute("""
             SELECT UPPER(municipio_destino) as nome,
                    COUNT(id) as total,
                    SUM(valor) as valor
             FROM emendas
             WHERE politico_id = ?
+              AND municipio_destino LIKE '% - __'
+              AND municipio_destino NOT LIKE '%(UF)%'
             GROUP BY UPPER(municipio_destino)
             ORDER BY valor DESC
             LIMIT 10
@@ -1888,14 +1893,25 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             for r in municipios_rows
         ]
 
-        # Total agregado de municípios distintos (CompararPage precisa do total real,
-        # não dos 10 do ranking).
+        # Total de municípios REAIS distintos (exclui baldes agregados). CompararPage
+        # e os KPIs do perfil usam este número como "municípios atingidos".
         _tmrow = conn.execute(
             "SELECT COUNT(DISTINCT UPPER(municipio_destino)) FROM emendas "
-            "WHERE politico_id = ? AND municipio_destino IS NOT NULL AND municipio_destino != ''",
+            "WHERE politico_id = ? AND municipio_destino LIKE '% - __' "
+            "AND municipio_destino NOT LIKE '%(UF)%'",
             (politico_id,)
         ).fetchone()
         total_municipios_distintos = _tmrow[0] if _tmrow and _tmrow[0] is not None else 0
+
+        # Valor rastreável a município real vs total — mesma honestidade territorial
+        # da home: a maior parte costuma ir a destinos múltiplos/estaduais/nacionais.
+        _vmrow = conn.execute(
+            "SELECT COALESCE(SUM(valor), 0) FROM emendas "
+            "WHERE politico_id = ? AND municipio_destino LIKE '% - __' "
+            "AND municipio_destino NOT LIKE '%(UF)%'",
+            (politico_id,)
+        ).fetchone()
+        valor_municipios = float(_vmrow[0]) if _vmrow and _vmrow[0] else 0
 
         # Total de UFs distintas alcançadas — só conta UFs oficiais (filtra MULTIPLO, etc.)
         _terow = conn.execute(
@@ -1904,6 +1920,30 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             (politico_id, *UFS_OFICIAIS)
         ).fetchone()
         total_estados_distintos = _terow[0] if _terow and _terow[0] is not None else 0
+
+        # Distribuição por área (objetivo) sobre TODAS as emendas. O perfil
+        # calculava isso a partir do subset de 100 emendas, distorcendo a
+        # concentração real (ex.: mostrava 40% quando o verdadeiro era 69%).
+        _area_rows = conn.execute("""
+            SELECT COALESCE(NULLIF(TRIM(objetivo), ''), 'Não informado') as objetivo,
+                   COALESCE(SUM(valor), 0) as valor
+            FROM emendas
+            WHERE politico_id = ?
+            GROUP BY 1
+            ORDER BY valor DESC
+        """, (politico_id,)).fetchall()
+        area_distribuicao = [
+            {"objetivo": r["objetivo"], "valor": float(r["valor"]) if r["valor"] else 0}
+            for r in _area_rows
+        ]
+
+        # Total efetivamente pago (estágio 3) sobre todas as emendas. A barra
+        # "Empenho vs Pago" somava apenas o subset de 100.
+        _pago_row = conn.execute(
+            "SELECT COALESCE(SUM(valor_pago), 0) FROM emendas WHERE politico_id = ?",
+            (politico_id,)
+        ).fetchone()
+        valor_pago_total = float(_pago_row[0]) if _pago_row and _pago_row[0] else 0
 
         # Resumo de atuação legislativa: votações nominais agregadas.
         # Aderente à régua de prioridade do CLAUDE.md — perfil não fala só de emenda.
@@ -2030,6 +2070,9 @@ def obter_detalhes_politico(request: Request, politico_id: int):
             "valor_total": float(politico_info["valor_total"]) if politico_info["valor_total"] else 0,
             "total_municipios": total_municipios_distintos,
             "total_estados": total_estados_distintos,
+            "valor_municipios": valor_municipios,
+            "valor_pago_total": valor_pago_total,
+            "area_distribuicao": area_distribuicao,
             "votacoes_resumo": votacoes_resumo,
             "dados_campanha": dados_campanha,
             "municipios_beneficiados": municipios_beneficiados,
