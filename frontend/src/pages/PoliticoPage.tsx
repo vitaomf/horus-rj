@@ -1401,7 +1401,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     >
                                         <div className="flex justify-between items-end mb-2">
                                             <span className={`font-medium uppercase tracking-wide transition-colors flex items-center gap-2 ${cidadeFiltro === mun.nome ? 'text-black' : 'text-white group-hover:text-[#FFD700]'}`}>
-                                                {String(idx + 1).padStart(2, '0')}. {mun.nome.replace(' - RJ', '')}
+                                                {String(idx + 1).padStart(2, '0')}. {mun.nome.replace(/\s-\s[A-Za-z]{2}$/, '')}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1565,7 +1565,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     <div className="space-y-2">
                                         {[
                                             { emoji: '🏆', label: 'ÁREA PREDILETA',     value: topAreaLabel, detalhe: `${(topAreaPct*100).toFixed(0)}% do total` },
-                                            { emoji: '📍', label: 'MUNICÍPIO FAVORITO', value: topMun?.nome.replace(' - RJ','') || '—', detalhe: topMun ? `${(topMunPct*100).toFixed(0)}% · ${formatMillions(topMun.valor)}` : '' },
+                                            { emoji: '📍', label: 'MUNICÍPIO FAVORITO', value: topMun?.nome.replace(/\s-\s[A-Za-z]{2}$/, '') || '—', detalhe: topMun ? `${(topMunPct*100).toFixed(0)}% · ${formatMillions(topMun.valor)}` : '' },
                                             { emoji: '📅', label: 'ANO MAIS ATIVO',     value: anoMaisAtivo ? String(anoMaisAtivo.ano) : '—', detalhe: anoMaisAtivo ? `R$ ${(anoMaisAtivo.valor_total/1e6).toFixed(1)}M · ${anoMaisAtivo.total} emendas` : '' },
                                         ].map(({ emoji, label, value, detalhe }) => (
                                             <div key={label} className="flex items-center gap-2 bg-[#0a0a0a]/40 px-3 py-2 border border-[#1a1a1a]">
@@ -1595,7 +1595,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                     <div className="flex items-center justify-between gap-2 mb-1">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <span className="font-bebas text-gray-600 text-xs w-5 shrink-0">{i+1}</span>
-                                                            <span className="text-gray-300 text-xs truncate">{mun.nome.replace(' - RJ','')}</span>
+                                                            <span className="text-gray-300 text-xs truncate">{mun.nome.replace(/\s-\s[A-Za-z]{2}$/, '')}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             <span className="font-bebas text-[#FFD700] text-sm">{fmt}</span>
@@ -1853,7 +1853,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     {cidadeFiltro !== null && (
                         <div className="flex items-center gap-4 mb-4 bg-[#FFD700]/10 border border-[#FFD700]/30 px-4 py-2 w-fit">
                             <span className="font-bebas text-[#FFD700] tracking-widest text-xl">
-                                FILTRANDO: {cidadeFiltro.replace(' - RJ', '')}
+                                FILTRANDO: {cidadeFiltro.replace(/\s-\s[A-Za-z]{2}$/, '')}
                             </span>
                             <button
                                 onClick={() => { setCidadeFiltro(null); setPaginaAtual(1); }}
@@ -1894,7 +1894,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     const pago      = emenda.valor_pago || 0;
                                     const execPct   = empenhado > 0 ? Math.min(100, (pago / empenhado) * 100) : 0;
                                     const foiPago   = pago > 0;
-                                    const municipio = emenda.municipio_destino?.replace(' - RJ', '') || '—';
+                                    const municipio = emenda.municipio_destino?.replace(/\s-\s[A-Za-z]{2}$/, '') || '—';
                                     // #45 cor por recência: emendas dos últimos 2 anos mais vivas
                                     const anoAtual = new Date().getFullYear();
                                     const recente  = emenda.ano >= anoAtual - 1;

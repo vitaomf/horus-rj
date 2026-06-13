@@ -153,7 +153,7 @@ function TabMunicipios() {
           >
             <div className="absolute top-0 left-0 right-0 h-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
             <p className="font-bebas text-base tracking-wider text-white group-hover:text-[#FFD700] transition-colors leading-tight">
-              {m.nome.replace(' - RJ', '')}
+              {m.nome.replace(/\s-\s[A-Za-z]{2}$/, '')}
             </p>
             <p className="font-mono text-[8px] tracking-widest text-gray-800 mt-1">RJ</p>
           </button>
@@ -424,7 +424,7 @@ function TabEmendas() {
             >
               <option value="">TODOS</option>
               {municipiosList.map(m => (
-                <option key={m.id} value={m.nome.replace(' - RJ', '')}>{m.nome}</option>
+                <option key={m.id} value={m.nome.replace(/\s-\s[A-Za-z]{2}$/, '')}>{m.nome}</option>
               ))}
             </select>
           </div>

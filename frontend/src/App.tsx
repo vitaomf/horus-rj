@@ -33,7 +33,7 @@ interface Municipio { id: number; nome: string; }
 interface Metricas  { totalEmendas: number; totalMunicipios: number; totalPoliticos: number; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const getMunName = (nome: string) => nome.replace(' - RJ', '').trim();
+const getMunName = (nome: string) => nome.replace(/\s-\s[A-Za-z]{2}$/, '').trim();
 const removeAcentos = (str: string) => str.normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 const PageSpinner = () => (

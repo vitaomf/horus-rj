@@ -376,7 +376,7 @@ export const EstatisticasPage: React.FC = () => {
                                 const wPct = Math.max(5, (m.valor_total / maxVal) * 100);
                                 return (
                                     <div key={`tm-${m.nome}`}
-                                        onClick={() => onMunicipioClick(`${m.nome} - RJ`)}
+                                        onClick={() => onMunicipioClick(/\s-\s[A-Za-z]{2}$/.test(m.nome) ? m.nome : `${m.nome} - RJ`)}
                                         className="group cursor-pointer relative"
                                     >
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-1 relative z-10 px-2 gap-1 sm:gap-0">

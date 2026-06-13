@@ -137,6 +137,11 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
     // Maior valor para calcular a proporção da barra dinâmica de políticos
     const maxValorPolitico = data.politicos.length > 0 ? Math.max(...data.politicos.map(p => p.valor_total)) : 0;
 
+    // UF do município extraída do sufixo " - XX" (nacional; fallback RJ por legado)
+    const mUf = nome.match(/\s-\s([A-Za-z]{2})\s*$/);
+    const ufMun = mUf ? mUf[1].toUpperCase() : 'RJ';
+    const nomeBase = mUf ? nome.slice(0, mUf.index).trim() : nome;
+
     return (
         <div className="min-h-screen text-white relative z-10 pb-20 px-0 md:px-0">
 
@@ -157,7 +162,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
 
                             <h1 style={{ fontFamily: "'Cinzel Decorative', serif" }}
                                 className="text-xl md:text-3xl text-[#FFD700] leading-none uppercase m-0 mt-2 tracking-wide">
-                                {data.municipio.replace(' - RJ', '').trim()}
+                                {data.municipio.replace(/\s-\s[A-Za-z]{2}\s*$/, '').trim()}
                             </h1>
                         </div>
 
@@ -189,20 +194,13 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
             </header>
 
             {/* Índices do território — a realidade do lugar antes de quem o representa (constituição) */}
-            {(() => {
-                const m = nome.match(/\s-\s([A-Za-z]{2})\s*$/);
-                const ufMun = m ? m[1].toUpperCase() : 'RJ';
-                const nomeBase = m ? nome.slice(0, m.index).trim() : nome;
-                return (
-                    <div className="max-w-7xl mx-auto px-6 mt-8">
-                        <PainelIndices nivel="municipio" id="" porNome={{ nome: nomeBase, uf: ufMun }} className="max-w-md" />
-                    </div>
-                );
-            })()}
+            <div className="max-w-7xl mx-auto px-6 mt-8">
+                <PainelIndices nivel="municipio" id="" porNome={{ nome: nomeBase, uf: ufMun }} className="max-w-md" />
+            </div>
 
             {/* Hierarquia visual de cargos municipais */}
             <div className="max-w-7xl mx-auto">
-                <HierarquiaCargos nivel="municipal" uf="RJ" municipio={nome} />
+                <HierarquiaCargos nivel="municipal" uf={ufMun} municipio={nome} />
             </div>
 
             <main className="max-w-7xl mx-auto px-6 mt-16 space-y-16">
