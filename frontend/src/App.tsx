@@ -9,6 +9,7 @@ import { NavProvider } from './contexts/NavContext';
 import { BackToTop } from './components/BackToTop';
 import { ToastProvider } from './components/Toast';
 import { FavoritosPanel } from './components/FavoritosPanel';
+import { FeedbackButton } from './components/FeedbackButton';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ── Lazy loading ──────────────────────────────────────────────────────────────
@@ -231,6 +232,7 @@ function App() {
         <div className="h-16" />
         <BackToTop />
         <FavoritosPanel />
+        <FeedbackButton />
 
         <ErrorBoundary>
         <Suspense fallback={<PageSpinner />}>

@@ -3269,6 +3269,57 @@ def relatorio_inconsistencias(request: Request):
         conn.close()
 
 
+@app.post("/api/feedback")
+@limiter.limit("5/minute")
+async def enviar_feedback(request: Request):
+    """Recebe relato de erro ou sugestão de melhoria do cidadão e grava em SQLite.
+    Só POST público (rate-limited); a leitura é feita direto na tabela `feedback`
+    pra não expor quem reportou (contato) numa rota aberta com CORS livre."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="JSON inválido")
+
+    tipo = str(body.get("tipo", "")).strip().lower()
+    mensagem = str(body.get("mensagem", "")).strip()
+    pagina = str(body.get("pagina", "")).strip()[:300]
+    contato = str(body.get("contato", "")).strip()[:200]
+
+    if tipo not in ("erro", "melhoria"):
+        raise HTTPException(status_code=400, detail="tipo deve ser 'erro' ou 'melhoria'")
+    if not (1 <= len(mensagem) <= 2000):
+        raise HTTPException(status_code=400, detail="mensagem deve ter entre 1 e 2000 caracteres")
+
+    user_agent = (request.headers.get("user-agent") or "")[:300]
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo TEXT NOT NULL,
+                mensagem TEXT NOT NULL,
+                pagina TEXT,
+                contato TEXT,
+                user_agent TEXT,
+                criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        conn.execute(
+            "INSERT INTO feedback (tipo, mensagem, pagina, contato, user_agent) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (tipo, mensagem, pagina, contato, user_agent),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.error("Erro ao gravar feedback: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Não foi possível registrar o feedback")
+    finally:
+        conn.close()
+
+    logger.info("feedback recebido: tipo=%s pagina=%s len=%d", tipo, pagina, len(mensagem))
+    return {"ok": True}
+
+
 # Configuração para servir o Frontend (React/Vite)
 FRONTEND_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
 
