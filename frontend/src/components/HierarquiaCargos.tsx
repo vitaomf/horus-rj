@@ -378,6 +378,25 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
         </div>
       )}
 
+      {/* Câmara sem resultado totalizado — eleição 2024 anulada/sub judice */}
+      {!loading && eleitos && eleitos.vereadores.length === 0 && (
+        <div>
+          <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">
+            CÂMARA DE VEREADORES
+          </p>
+          <div className="border border-[#1a1a1a] rounded-sm bg-[#0a0a0a] p-6">
+            <p className="font-mono text-[11px] leading-relaxed text-gray-400">
+              Resultado de 2024 não totalizado pelo TSE para este município
+              (eleição anulada ou <span className="italic">sub judice</span>).
+            </p>
+            <p className="font-mono text-[9px] tracking-wider text-gray-600 mt-2 normal-case">
+              Fonte: TSE · DivulgaCandContas 2024. Vagas a serem preenchidas por
+              eleição suplementar — dados ainda não publicados.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Secretarias municipais — ainda placeholder */}
       <div>
         <p className="font-bebas tracking-[0.2em] text-xs text-gray-500 mb-4">

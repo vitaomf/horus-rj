@@ -1,6 +1,7 @@
 import sqlite3
 import math
 import unicodedata
+import re
 import os
 import json
 import logging
@@ -51,6 +52,46 @@ def _unaccent(value):
         return ''
     nfd = unicodedata.normalize('NFD', str(value))
     return ''.join(c for c in nfd if unicodedata.category(c) != 'Mn')
+
+
+def _mun_key(value):
+    """Chave canônica de município: sem acento, maiúsculo, pontuação (hífen,
+    apóstrofo, ponto) virada em espaço e espaços colapsados. Faz
+    "GRÃO-PARÁ" == "GRÃO PARÁ" e "PINGO-D'ÁGUA" == "PINGO D'ÁGUA" — o Portal da
+    Transparência e o TSE divergem na pontuação dos nomes."""
+    s = _unaccent(value).upper()
+    s = s.replace("'", ' ').replace('-', ' ').replace('.', ' ')
+    return re.sub(r'\s+', ' ', s).strip()
+
+
+# Municípios cujo nome no Portal da Transparência (emendas) diverge do nome
+# atual do TSE — renomeações oficiais do IBGE e grafias antigas. Sem isto a
+# página da cidade não casa o registro do TSE e prefeito/vereadores "somem".
+# Chave (UF, nome-Portal); valor: nome-TSE atual. Per-UF de propósito: BA
+# "Santa Teresinha" → "Santa Terezinha", mas PB tem "Santa Teresinha" real.
+_MUN_ALIAS_RAW = {
+    ('RO', "ESPIGÃO D'OESTE"):         'Espigão do Oeste',
+    ('RO', "ALVORADA D'OESTE"):        'Alvorada do Oeste',
+    ('RS', 'SANTANA DO LIVRAMENTO'):   "Sant'Ana do Livramento",
+    ('CE', 'ITAPAGÉ'):                 'Itapajé',
+    ('MT', 'POXORÉO'):                 'Poxoréu',
+    ('MG', 'BRASÓPOLIS'):              'Brazópolis',
+    ('PE', 'IGUARACI'):                'Iguaracy',
+    ('RJ', 'TRAJANO DE MORAIS'):       'Trajano de Moraes',
+    ('SE', 'GRACHO CARDOSO'):          'Graccho Cardoso',
+    ('BA', 'CAMACAN'):                 'Camacã',
+    ('BA', 'MUQUÉM DE SÃO FRANCISCO'): 'Muquém do São Francisco',
+    ('BA', 'SANTA TERESINHA'):         'Santa Terezinha',
+    ('SP', 'EMBU'):                    'Embu das Artes',
+    ('SP', 'FLORÍNIA'):                'Florínea',
+    ('TO', 'FORTALEZA DO TABOCÃO'):    'Tabocão',
+    ('RN', 'AÇU'):                     'Assú',
+    ('RN', 'ARÊS'):                    'Arez',
+    ('RN', 'PRESIDENTE JUSCELINO'):    'Serra Caiada',
+    ('RN', 'AUGUSTO SEVERO'):          'Campo Grande',
+    ('RN', 'JANUÁRIO CICCÓ'):          'Boa Saúde',
+}
+MUN_ALIAS = {(uf, _mun_key(p)): _mun_key(t) for (uf, p), t in _MUN_ALIAS_RAW.items()}
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
@@ -156,6 +197,7 @@ def get_db_connection():
     conn.execute("PRAGMA journal_mode=WAL")   # leituras simultâneas com escrita
     conn.execute("PRAGMA foreign_keys = ON")
     conn.create_function("unaccent", 1, _unaccent)
+    conn.create_function("mun_key", 1, _mun_key)
     return conn
 
 
@@ -545,27 +587,26 @@ def eleitos_municipais(request: Request,
         vereadores: [{nome, partido, foto_url, numero, ...}, ...]
     }
     """
-    import unicodedata, re as _re
-    def norm(s: str) -> str:
-        return unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode('ascii').upper().strip()
-
     uf_u  = uf.upper().strip()
     # Remove sufixo " - UF" que vem do frontend (ex: "NITERÓI - RJ" → "NITERÓI")
-    mun_clean = _re.sub(r'\s*-\s*[A-Z]{2}$', '', municipio.strip().upper()).strip()
-    mun_n = norm(mun_clean)
+    mun_clean = re.sub(r'\s*-\s*[A-Z]{2}$', '', municipio.strip().upper()).strip()
+    # Chave canônica (sem acento, pontuação colapsada) + tradução de nomes que o
+    # Portal grava diferente do TSE (renomeações IBGE/grafia antiga).
+    mun_k = _mun_key(mun_clean)
+    mun_k = MUN_ALIAS.get((uf_u, mun_k), mun_k)
 
     conn = get_db_connection()
     try:
-        # Match por nome normalizado (case + acentos). unaccent é função registrada
-        # na conexão — UPPER() puro do SQLite não dobra acentos ("NITERÓI" ≠ "NITEROI"),
-        # o que fazia toda cidade acentuada cair no placeholder genérico.
+        # Match por chave canônica. mun_key é função registrada na conexão —
+        # dobra acento E pontuação ("GRÃO-PARÁ"=="GRÃO PARÁ"), o que UPPER()/
+        # unaccent puro não faziam, deixando cidades caírem no placeholder.
         rows = conn.execute("""
             SELECT id, cargo, nome, nome_urna, partido, numero, foto_url, sigla_situacao
             FROM eleitos_municipais
             WHERE uf = ?
-              AND UPPER(unaccent(municipio)) = ?
+              AND mun_key(municipio) = ?
               AND ano_eleicao = 2024
-        """, (uf_u, mun_n)).fetchall()
+        """, (uf_u, mun_k)).fetchall()
 
         # Resolve politico_id por match de nome (case-insensitive)
         nomes_upper = list({(r["nome"] or '').upper() for r in rows if r["nome"]})
@@ -604,7 +645,7 @@ def eleitos_municipais(request: Request,
 
         return {"prefeito": prefeito, "vice": vice, "vereadores": vereadores}
     except Exception as e:
-        logger.error("Erro em /eleitos/municipal %s/%s: %s", uf_u, mun_n, e)
+        logger.error("Erro em /eleitos/municipal %s/%s: %s", uf_u, mun_k, e)
         return {"prefeito": None, "vice": None, "vereadores": []}
     finally:
         conn.close()
