@@ -12,6 +12,7 @@ interface PorObjetivo { objetivo: string; total: number; valor_total: number; }
 interface PorPartido { partido: string; total_emendas: number; valor_total: number; total_politicos: number; }
 interface EstatisticasData {
     valor_total_geral: number;
+    valor_municipios?: number;
     media_por_emenda: number;
     top_politicos: Politico[];
     top_municipios: Municipio[];
@@ -68,7 +69,9 @@ export const EstatisticasPage: React.FC = () => {
         );
     }
 
-    const { valor_total_geral, media_por_emenda, top_politicos, top_municipios, por_ano, por_objetivo } = data;
+    const { valor_total_geral, valor_municipios, media_por_emenda, top_politicos, top_municipios, por_ano, por_objetivo } = data;
+    const pctMunicipios = valor_municipios && valor_total_geral
+        ? (valor_municipios / valor_total_geral) * 100 : 0;
     void media_por_emenda; // usada indiretamente via data
 
     const formatCurrency = (val: number) => {
@@ -171,6 +174,12 @@ export const EstatisticasPage: React.FC = () => {
                                 : <>R$ <CountUp end={valor_total_geral / 1e6} duration={2} decimals={2} suffix=" MILHÕES" /></>
                             }
                         </div>
+                        {valor_municipios != null && valor_municipios > 0 && (
+                            <p className="font-mono text-[9px] md:text-[10px] leading-relaxed text-gray-500 mt-3 relative z-10">
+                                <span className="text-[#FFD700]/70">R$ {(valor_municipios / 1e9).toFixed(1)} bi ({pctMunicipios.toFixed(0)}%)</span> com município identificado.
+                                O restante vai a destinos nacionais, estaduais ou múltiplos — sem cidade definida na fonte.
+                            </p>
+                        )}
                     </div>
 
                     <div className="bg-[#0a0a0a] border-t-2 border-[#FFD700]/10 p-6 md:p-8 relative overflow-hidden group">

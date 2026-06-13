@@ -2070,6 +2070,17 @@ def obter_estatisticas(request: Request):
         valor_total_geral = float(totais["valor_total_geral"]) if totais["valor_total_geral"] else 0
         media_por_emenda = float(totais["media_por_emenda"]) if totais["media_por_emenda"] else 0
 
+        # Fatia rastreável a um município real (sufixo " - XX"). O resto do total
+        # vai a destinos agregados — MÚLTIPLO, Nacional, estado "(UF)" — que não
+        # amarram a um lugar. Honestidade territorial: só ~5% tem cidade.
+        mun_row = conn.execute("""
+            SELECT COALESCE(SUM(valor), 0) AS v
+            FROM emendas
+            WHERE municipio_destino LIKE '% - __'
+              AND municipio_destino NOT LIKE '%(UF)%'
+        """).fetchone()
+        valor_municipios = float(mun_row["v"]) if mun_row and mun_row["v"] else 0
+
         # 2. TOP 10 Políticos (exclui autores coletivos)
         top_politicos_rows = conn.execute(f"""
             SELECT p.id, p.nome, p.partido, p.cargo,
@@ -2189,6 +2200,7 @@ def obter_estatisticas(request: Request):
 
         resultado = {
             "valor_total_geral": valor_total_geral,
+            "valor_municipios": valor_municipios,
             "media_por_emenda": media_por_emenda,
             "top_politicos": top_politicos,
             "top_municipios": top_municipios,
