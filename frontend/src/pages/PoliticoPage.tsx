@@ -417,7 +417,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
         }
 
         if (data.ultimas_emendas.length > 0) {
-            lines.push('## EMENDAS DETALHADAS');
+            lines.push(data.total_emendas > data.ultimas_emendas.length
+                ? `## EMENDAS DETALHADAS (${data.ultimas_emendas.length} mais recentes de ${data.total_emendas})`
+                : '## EMENDAS DETALHADAS');
             lines.push('ano,valor,valor_empenhado,valor_pago,objetivo,municipio_destino,descricao,fonte_url');
             data.ultimas_emendas.forEach(e =>
                 lines.push([e.ano, e.valor.toFixed(2), e.valor_empenhado.toFixed(2), e.valor_pago.toFixed(2),
@@ -1829,7 +1831,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                         <FileText className="w-7 h-7 text-[#FFD700]" /> EMENDAS REGISTRADAS
                     </h2>
                     <p className="text-gray-400 text-sm font-sans">
-                        Histórico completo dos repasses federais identificados.
+                        {data.total_emendas > data.ultimas_emendas.length
+                            ? `Exibindo as ${data.ultimas_emendas.length} emendas mais recentes de ${data.total_emendas} registradas.`
+                            : 'Histórico completo dos repasses federais identificados.'}
                     </p>
 
                     {/* Filtro pago / não pago */}
