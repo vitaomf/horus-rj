@@ -4,8 +4,11 @@ import unicodedata
 import re
 import os
 import json
+import base64
 import logging
-from fastapi import FastAPI, Query, HTTPException, Request
+import smtplib
+from email.message import EmailMessage
+from fastapi import FastAPI, Query, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -15,6 +18,14 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from typing import Optional
+
+# Carrega .env localmente (SMTP, chaves). Em produção (Koyeb) as vars vêm do
+# ambiente — no-op se não houver .env nem python-dotenv instalado.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -143,6 +154,15 @@ UF_NOME = {
 }
 # Como cada indicador agrega na cascata: 'sum' (totais) ou 'wmean' (média ponderada por pop)
 INDICE_AGG = {"populacao": "sum", "desmatamento_km2": "sum"}  # default = wmean
+
+# Ordem de exibição no painel de índices (80/20): economia → trabalho → infra →
+# educação → desenvolvimento → escala. Indicadores fora da lista vão ao fim (alfabético).
+ORDEM_INDICES = ["renda_per_capita", "ocupacao_pct", "esgoto_adequado_pct",
+                 "alfabetizacao_pct", "idhm", "populacao"]
+
+
+def _ordenar_indices(chaves):
+    return sorted(chaves, key=lambda k: (ORDEM_INDICES.index(k) if k in ORDEM_INDICES else 99, k))
 
 # Filtro: rankings públicos só consideram parlamentares individuais.
 # Autores coletivos (bancadas, comissões, relatores) são marcados em
@@ -956,20 +976,25 @@ def busca_global(request: Request, q: str = Query(..., min_length=2)):
     conn   = get_db_connection()
     result: dict = {"municipios": [], "parlamentares": [], "emendas": [], "leis": []}
 
-    # 1. Municípios — try com tabela `municipios`, fallback em emendas
+    # 1. Municípios — busca em municipios_ibge (todos os 5.570, insensível a
+    #    acento via nome_normalizado). Fallback legado em emendas.
     try:
+        qn = "".join(c for c in unicodedata.normalize("NFKD", q.strip())
+                     if not unicodedata.combining(c)).upper()
         try:
             mun_rows = conn.execute(
-                "SELECT id, nome FROM municipios WHERE UPPER(nome) LIKE UPPER(?) ORDER BY nome LIMIT 5",
-                (q_like,)
+                "SELECT codigo_ibge AS id, nome, uf FROM municipios_ibge "
+                "WHERE nome_normalizado LIKE ? ORDER BY nome LIMIT 6",
+                (f"%{qn}%",)
             ).fetchall()
+            result["municipios"] = [{"id": r["id"], "nome": f"{r['nome'].upper()} - {r['uf']}"} for r in mun_rows]
         except Exception:
             mun_rows = conn.execute(
                 "SELECT ROW_NUMBER() OVER() AS id, municipio_destino AS nome FROM emendas "
                 "WHERE UPPER(municipio_destino) LIKE UPPER(?) GROUP BY municipio_destino ORDER BY municipio_destino LIMIT 5",
                 (q_like,)
             ).fetchall()
-        result["municipios"] = [{"id": r["id"], "nome": r["nome"]} for r in mun_rows]
+            result["municipios"] = [{"id": r["id"], "nome": r["nome"]} for r in mun_rows]
     except Exception as e:
         logger.warning("busca/global municipios falhou: %s", e)
 
@@ -1064,9 +1089,26 @@ def obter_detalhes_municipio(request: Request, nome: str):
         total_emendas = totais["total_emendas"] if totais and totais["total_emendas"] else 0
         valor_total = totais["valor_total"] if totais and totais["valor_total"] else 0
 
-        # 404 quando município não existe (sem nenhuma emenda associada).
-        # Distingue "município sem dados" de "termo inválido".
+        # Sem emenda não é "não existe": se for município REAL (em municipios_ibge),
+        # devolve payload vazio pra página abrir mesmo assim (índices, câmara,
+        # representantes não dependem de emenda). Só 404 se o termo não for município.
         if total_emendas == 0:
+            base = re.sub(r"\s*-\s*[A-Za-z]{2}\s*$", "", nome.strip())
+            base_norm = "".join(c for c in unicodedata.normalize("NFKD", base)
+                                if not unicodedata.combining(c)).upper().strip()
+            m_uf = re.search(r"-\s*([A-Za-z]{2})\s*$", nome.strip())
+            try:
+                if m_uf:
+                    real = conn.execute("SELECT 1 FROM municipios_ibge WHERE nome_normalizado=? AND uf=?",
+                                        (base_norm, m_uf.group(1).upper())).fetchone()
+                else:
+                    real = conn.execute("SELECT 1 FROM municipios_ibge WHERE nome_normalizado=?",
+                                        (base_norm,)).fetchone()
+            except Exception:
+                real = None
+            if real:
+                return {"municipio": nome.upper(), "total_emendas": 0, "valor_total": 0,
+                        "politicos": [], "emendas": []}
             raise HTTPException(status_code=404, detail=f"Município '{nome}' não encontrado.")
 
         # 2. Ranking de Políticos para este Municipio
@@ -2941,7 +2983,7 @@ def indices_municipio_por_nome(request: Request, nome: str = Query(..., min_leng
                 mun[r["indicador"]] = (r["valor"], r["unidade"], r["fonte"], r["ano"])
 
         out = []
-        for ind in sorted(est.keys()):
+        for ind in _ordenar_indices(est.keys()):
             if ind in mun and mun[ind][0] is not None:
                 _, unidade, fonte, ano = mun[ind]
                 out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
@@ -3025,7 +3067,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
         # ── BRASIL ───────────────────────────────────────────────────────────
         if nivel in ("brasil", "br", "nacional"):
             out = []
-            for ind in sorted(est.keys()):
+            for ind in _ordenar_indices(est.keys()):
                 nacional = agrega(ind, todos_ufs)
                 if nacional is None:
                     continue
@@ -3049,7 +3091,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                 raise HTTPException(status_code=404, detail="Região desconhecida")
             uf_codes = [c for c in todos_ufs if c // 10 == dig]
             out = []
-            for ind in sorted(est.keys()):
+            for ind in _ordenar_indices(est.keys()):
                 val = agrega(ind, uf_codes)
                 if val is None:
                     continue
@@ -3078,7 +3120,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
             dig = cod // 10
             uf_regiao = [c for c in todos_ufs if c // 10 == dig]
             out = []
-            for ind in sorted(est.keys()):
+            for ind in _ordenar_indices(est.keys()):
                 vals = est.get(ind, {})
                 if cod not in vals or vals[cod][0] is None:
                     continue
@@ -3109,7 +3151,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                 ):
                     mun[r["indicador"]] = (r["valor"], r["unidade"], r["fonte"], r["ano"])
             out = []
-            for ind in sorted(est.keys()):
+            for ind in _ordenar_indices(est.keys()):
                 if ind in mun and mun[ind][0] is not None:
                     _, unidade, fonte, ano = mun[ind]
                     out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
@@ -3269,10 +3311,65 @@ def relatorio_inconsistencias(request: Request):
         conn.close()
 
 
+# ---- Envio de feedback por e-mail (best-effort; o banco é a fonte durável) ----
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or "587")
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+FEEDBACK_TO_EMAIL = os.getenv("FEEDBACK_TO_EMAIL", "") or SMTP_USER
+
+
+def _enviar_email_feedback(tipo: str, mensagem: str, pagina: str, contato: str,
+                           user_agent: str, trecho: str = "",
+                           img_bytes: Optional[bytes] = None, img_mime: str = "") -> None:
+    """Encaminha o relato por e-mail. Silencioso se SMTP não estiver configurado —
+    o feedback já está salvo no banco, então nunca derruba a resposta ao cidadão.
+    O contato (quando é e-mail) vira Reply-To: responder o e-mail responde a quem
+    reportou; se for anônimo, segue só como notificação. Anexa o print quando há."""
+    if not (SMTP_USER and SMTP_PASS and FEEDBACK_TO_EMAIL):
+        return
+    try:
+        from datetime import datetime
+        quando = datetime.now().strftime("%d/%m/%Y %H:%M")
+        rotulo = "ERRO reportado" if tipo == "erro" else "MELHORIA sugerida"
+        msg = EmailMessage()
+        msg["Subject"] = f"[HORUS] {rotulo} — {pagina or '/'}"
+        msg["From"] = SMTP_USER
+        msg["To"] = FEEDBACK_TO_EMAIL
+        if contato and "@" in contato and " " not in contato:
+            msg["Reply-To"] = contato
+        corpo = (
+            f"{rotulo}\n\n"
+            f"Página : {pagina or '—'}\n"
+            f"Contato: {contato or '(anônimo)'}\n"
+            f"Quando : {quando}\n\n"
+        )
+        if trecho:
+            corpo += f"Trecho reportado:\n«{trecho}»\n\n"
+        corpo += f"Mensagem:\n{mensagem}\n\n"
+        if img_bytes:
+            corpo += "(print anexado)\n\n"
+        corpo += f"———\nUser-Agent: {user_agent or '—'}\n"
+        msg.set_content(corpo)
+        if img_bytes:
+            subtype = (img_mime.split("/")[-1] or "png").lower()
+            ext = "jpg" if subtype == "jpeg" else subtype
+            msg.add_attachment(img_bytes, maintype="image", subtype=subtype,
+                               filename=f"print.{ext}")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+            s.starttls()
+            s.login(SMTP_USER, SMTP_PASS)
+            s.send_message(msg)
+        logger.info("feedback enviado por e-mail (print=%s)", bool(img_bytes))
+    except Exception as e:
+        logger.warning("falha ao enviar e-mail de feedback (segue salvo no banco): %s", e)
+
+
 @app.post("/api/feedback")
 @limiter.limit("5/minute")
-async def enviar_feedback(request: Request):
-    """Recebe relato de erro ou sugestão de melhoria do cidadão e grava em SQLite.
+async def enviar_feedback(request: Request, background_tasks: BackgroundTasks):
+    """Recebe relato de erro ou sugestão de melhoria do cidadão, grava em SQLite
+    (fonte durável) e encaminha por e-mail em background (best-effort).
     Só POST público (rate-limited); a leitura é feita direto na tabela `feedback`
     pra não expor quem reportou (contato) numa rota aberta com CORS livre."""
     try:
@@ -3284,11 +3381,29 @@ async def enviar_feedback(request: Request):
     mensagem = str(body.get("mensagem", "")).strip()
     pagina = str(body.get("pagina", "")).strip()[:300]
     contato = str(body.get("contato", "")).strip()[:200]
+    trecho = str(body.get("trecho", "")).strip()[:2000]
+    imagem = str(body.get("imagem", "")).strip()
 
     if tipo not in ("erro", "melhoria"):
         raise HTTPException(status_code=400, detail="tipo deve ser 'erro' ou 'melhoria'")
     if not (1 <= len(mensagem) <= 2000):
         raise HTTPException(status_code=400, detail="mensagem deve ter entre 1 e 2000 caracteres")
+
+    # Print opcional: data URL base64 de imagem, decodificado aqui e anexado ao
+    # e-mail (não guardado no banco pra não inchar o SQLite). Limite 5MB.
+    img_bytes: Optional[bytes] = None
+    img_mime = ""
+    if imagem:
+        m = re.match(r"^data:(image/(?:png|jpe?g|webp));base64,(.+)$", imagem, re.DOTALL)
+        if not m:
+            raise HTTPException(status_code=400, detail="imagem inválida (use PNG, JPG ou WEBP)")
+        img_mime = m.group(1)
+        try:
+            img_bytes = base64.b64decode(m.group(2), validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="imagem inválida")
+        if len(img_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="imagem maior que 5MB")
 
     user_agent = (request.headers.get("user-agent") or "")[:300]
     conn = get_db_connection()
@@ -3301,13 +3416,21 @@ async def enviar_feedback(request: Request):
                 pagina TEXT,
                 contato TEXT,
                 user_agent TEXT,
+                trecho TEXT,
+                tem_print INTEGER NOT NULL DEFAULT 0,
                 criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             )
         """)
+        # Migração p/ tabelas antigas (CREATE IF NOT EXISTS não adiciona colunas novas).
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)").fetchall()}
+        if "trecho" not in cols:
+            conn.execute("ALTER TABLE feedback ADD COLUMN trecho TEXT")
+        if "tem_print" not in cols:
+            conn.execute("ALTER TABLE feedback ADD COLUMN tem_print INTEGER NOT NULL DEFAULT 0")
         conn.execute(
-            "INSERT INTO feedback (tipo, mensagem, pagina, contato, user_agent) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (tipo, mensagem, pagina, contato, user_agent),
+            "INSERT INTO feedback (tipo, mensagem, pagina, contato, user_agent, trecho, tem_print) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (tipo, mensagem, pagina, contato, user_agent, trecho, 1 if img_bytes else 0),
         )
         conn.commit()
     except Exception as e:
@@ -3316,8 +3439,478 @@ async def enviar_feedback(request: Request):
     finally:
         conn.close()
 
-    logger.info("feedback recebido: tipo=%s pagina=%s len=%d", tipo, pagina, len(mensagem))
+    logger.info("feedback recebido: tipo=%s pagina=%s len=%d trecho=%s print=%s",
+                tipo, pagina, len(mensagem), bool(trecho), bool(img_bytes))
+    background_tasks.add_task(_enviar_email_feedback, tipo, mensagem, pagina, contato,
+                             user_agent, trecho, img_bytes, img_mime)
     return {"ok": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Câmara dos Deputados — agenda/pauta/votações AO VIVO (proxy + cache)
+#
+# A atividade legislativa "do que está acontecendo agora" é transitória: não vai
+# pro banco. Buscamos direto na Dados Abertos da Câmara e cacheamos em memória por
+# alguns minutos pra não martelar a API a cada acesso. Só FEDERAL — estadual e
+# municipal não têm API unificada.
+# ─────────────────────────────────────────────────────────────────────────────
+_CAMARA_BASE = "https://dadosabertos.camara.leg.br/api/v2"
+_camara_cache: dict = {}  # key -> (timestamp, dados)
+
+
+def _camara_get(path: str, params: dict, ttl: int):
+    """GET na Dados Abertos com cache TTL em memória. Retorna a lista `dados`.
+    Import de requests é tardio pra não derrubar o app caso falte a dependência."""
+    import time as _t
+    import requests
+    chave = path + "?" + "&".join(f"{k}={params[k]}" for k in sorted(params))
+    agora = _t.time()
+    cache = _camara_cache.get(chave)
+    if cache and agora - cache[0] < ttl:
+        return cache[1]
+    r = requests.get(f"{_CAMARA_BASE}{path}", params=params, timeout=20,
+                     headers={"User-Agent": "HorusRJ/1.0", "Accept": "application/json"})
+    r.raise_for_status()
+    dados = r.json().get("dados", [])
+    _camara_cache[chave] = (agora, dados)
+    return dados
+
+
+@app.get("/api/camara/agenda")
+@limiter.limit("30/minute")
+def camara_agenda(request: Request, dias: int = 7):
+    """Próximas sessões/eventos da Câmara nos próximos N dias (1–30).
+    `aberta_agora` = há algum evento Em Andamento."""
+    from datetime import date, timedelta
+    dias = max(1, min(dias, 30))
+    hoje = date.today()
+    fim = hoje + timedelta(days=dias)
+    try:
+        evs = _camara_get("/eventos", {
+            "dataInicio": str(hoje), "dataFim": str(fim),
+            "ordenarPor": "dataHoraInicio", "ordem": "ASC", "itens": 100,
+        }, ttl=600)
+    except Exception as e:
+        logger.warning("camara/agenda falhou: %s", e)
+        raise HTTPException(status_code=503, detail="Câmara indisponível no momento")
+
+    eventos = []
+    for e in evs:
+        situ = e.get("situacao") or ""
+        local = (e.get("localCamara") or {}).get("nome") or e.get("localExterno")
+        eventos.append({
+            "id": e.get("id"),
+            "inicio": e.get("dataHoraInicio"),
+            "fim": e.get("dataHoraFim"),
+            "tipo": e.get("descricaoTipo"),
+            "descricao": e.get("descricao"),
+            "situacao": situ,
+            "em_andamento": situ.strip().lower() == "em andamento",
+            "local": local,
+            "orgaos": [{"sigla": o.get("sigla"), "nome": o.get("nome")}
+                       for o in (e.get("orgaos") or [])],
+        })
+    return {
+        "aberta_agora": any(ev["em_andamento"] for ev in eventos),
+        "total": len(eventos),
+        "dias": dias,
+        "eventos": eventos,
+        "fonte_url": "https://www.camara.leg.br/agenda",
+    }
+
+
+@app.get("/api/camara/votacoes-recentes")
+@limiter.limit("30/minute")
+def camara_votacoes_recentes(request: Request, dias: int = 7, itens: int = 20):
+    """Últimas votações nominais registradas (DESC), dos últimos N dias."""
+    from datetime import date, timedelta
+    dias = max(1, min(dias, 60))
+    itens = max(1, min(itens, 50))
+    hoje = date.today()
+    ini = hoje - timedelta(days=dias)
+    try:
+        vs = _camara_get("/votacoes", {
+            "dataInicio": str(ini), "dataFim": str(hoje),
+            "ordem": "DESC", "ordenarPor": "dataHoraRegistro", "itens": itens,
+        }, ttl=300)
+    except Exception as e:
+        logger.warning("camara/votacoes-recentes falhou: %s", e)
+        raise HTTPException(status_code=503, detail="Câmara indisponível no momento")
+
+    votacoes = [{
+        "id": v.get("id"),
+        "data": v.get("dataHoraRegistro") or v.get("data"),
+        "orgao": v.get("siglaOrgao"),
+        "objeto": v.get("proposicaoObjeto"),
+        "descricao": v.get("descricao"),
+        "aprovacao": v.get("aprovacao"),
+    } for v in vs]
+    return {"total": len(votacoes), "votacoes": votacoes,
+            "fonte_url": "https://www.camara.leg.br/votacoes"}
+
+
+@app.get("/api/camara/pauta/{evento_id}")
+@limiter.limit("30/minute")
+def camara_pauta(request: Request, evento_id: int):
+    """Pauta de um evento: o que será discutido/votado (proposições)."""
+    try:
+        itens = _camara_get(f"/eventos/{evento_id}/pauta", {}, ttl=600)
+    except Exception as e:
+        logger.warning("camara/pauta %s falhou: %s", evento_id, e)
+        raise HTTPException(status_code=503, detail="Câmara indisponível no momento")
+
+    out = []
+    for it in itens:
+        prop = it.get("proposicao_") or {}
+        sigla = (f"{prop.get('siglaTipo', '')} {prop.get('numero', '')}/{prop.get('ano', '')}").strip()
+        rel = it.get("relator")
+        relator = rel.get("nome") if isinstance(rel, dict) else (rel if isinstance(rel, str) else None)
+        ementa = prop.get("ementa")
+        out.append({
+            "ordem": it.get("ordem"),
+            "titulo": it.get("titulo"),
+            "proposicao": sigla or None,
+            "ementa": (ementa[:300] if ementa else None),
+            "regime": it.get("regime"),
+            "relator": relator,
+            "situacao": it.get("situacaoItem"),
+        })
+    return {"evento_id": evento_id, "total": len(out), "itens": out}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAPL (Interlegis) — câmaras municipais / assembleias AO VIVO (proxy + cache)
+#
+# Muitas casas legislativas rodam o SAPL do Senado/Interlegis, todas com a MESMA
+# API REST. Um adapter atende todas. O registro `sapl_casas.json` (gerado pela
+# varredura) é a ALLOWLIST: só fazemos proxy pra hosts conhecidos (anti-SSRF).
+# Cada objeto SAPL traz `__str__` legível — usamos como descrição pronta.
+# Só FEDERAL tem API própria (endpoints /api/camara/*); estadual/municipal = aqui.
+# ─────────────────────────────────────────────────────────────────────────────
+_SAPL_REGISTRY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sapl_casas.json")
+try:
+    with open(_SAPL_REGISTRY_PATH, encoding="utf-8") as _f:
+        SAPL_CASAS = json.load(_f)
+except Exception:
+    SAPL_CASAS = {}
+    logger.warning("sapl_casas.json não encontrado — endpoints /api/sapl ficam vazios")
+
+_sapl_cache: dict = {}
+
+
+def _sapl_get(casa: str, path: str, params: dict, ttl: int):
+    """GET na API SAPL da casa (allowlist) com cache TTL. Retorna a lista de dados.
+    O host vem do registro (nacional) — nunca de input do usuário (anti-SSRF)."""
+    import time as _t
+    import requests
+    host = (SAPL_CASAS.get(casa) or {}).get("sapl_host")
+    if not host:
+        raise HTTPException(status_code=404, detail="Casa não cadastrada")
+    base = f"https://{host}/api"
+    chave = casa + "|" + path + "?" + "&".join(f"{k}={params[k]}" for k in sorted(params))
+    agora = _t.time()
+    hit = _sapl_cache.get(chave)
+    if hit and agora - hit[0] < ttl:
+        return hit[1]
+    r = requests.get(f"{base}{path}", params=params, timeout=20,
+                     headers={"User-Agent": "HorusRJ/1.0", "Accept": "application/json"})
+    r.raise_for_status()
+    j = r.json()
+    dados = j.get("results", j) if isinstance(j, dict) else j
+    if not isinstance(dados, list):
+        dados = []
+    _sapl_cache[chave] = (agora, dados)
+    return dados
+
+
+def _sapl_checa(casa: str):
+    if casa not in SAPL_CASAS:
+        raise HTTPException(status_code=404, detail="Casa não cadastrada (veja /api/sapl/casas)")
+
+
+@app.get("/api/sapl/casas")
+@limiter.limit("60/minute")
+def sapl_casas(request: Request):
+    """Casas legislativas (câmaras municipais RJ) com SAPL disponível."""
+    casas = [{"id": k, "nome": v.get("nome"), "uf": v.get("uf", "RJ"),
+              "codigo_ibge": v.get("codigo_ibge")}
+             for k, v in sorted(SAPL_CASAS.items(), key=lambda x: x[1].get("nome", ""))]
+    return {"total": len(casas), "casas": casas}
+
+
+def _slug_sapl(nome: str) -> str:
+    """Mesma normalização da varredura (scripts/varre_sapl.py): minúsculo, sem
+    acento, só alfanumérico — pra casar nome de município com a chave do registro."""
+    s = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+@app.get("/api/sapl/resolver")
+@limiter.limit("60/minute")
+def sapl_resolver(request: Request,
+                  municipio: str = Query(..., min_length=2),
+                  uf: str = Query(..., min_length=2, max_length=2)):
+    """Resolve um município (nome + uf) para o id da casa SAPL, ou null se não
+    houver. Evita despejar as 1.151 casas no cliente só pra checar uma."""
+    casa = f"{_slug_sapl(municipio)}-{uf.strip().lower()}"
+    if casa in SAPL_CASAS:
+        return {"casa": casa, "nome": SAPL_CASAS[casa].get("nome")}
+    return {"casa": None}
+
+
+@app.get("/api/sapl/{casa}/agenda")
+@limiter.limit("30/minute")
+def sapl_agenda(request: Request, casa: str, itens: int = 10):
+    """Sessões plenárias mais recentes da casa. `em_andamento` = iniciada e não finalizada."""
+    _sapl_checa(casa)
+    itens = max(1, min(itens, 30))
+    try:
+        # SAPL usa `o` (não `ordering`) para ordenação; -data_inicio = mais recente.
+        ss = _sapl_get(casa, "/sessao/sessaoplenaria/", {"o": "-data_inicio"}, ttl=600)
+    except Exception as e:
+        logger.warning("sapl agenda %s: %s", casa, e)
+        raise HTTPException(status_code=503, detail="Casa indisponível no momento")
+    sessoes = []
+    for s_ in ss[:itens]:
+        sessoes.append({
+            "id": s_.get("id"),
+            "numero": s_.get("numero"),
+            "data": s_.get("data_inicio"),
+            "hora": s_.get("hora_inicio"),
+            "iniciada": s_.get("iniciada"),
+            "finalizada": s_.get("finalizada"),
+            "em_andamento": bool(s_.get("iniciada")) and not bool(s_.get("finalizada")),
+            "descricao": s_.get("__str__"),
+            "tema": s_.get("tema_solene") or None,
+        })
+    return {"casa": casa, "nome": SAPL_CASAS[casa].get("nome"), "total": len(sessoes),
+            "aberta_agora": any(x["em_andamento"] for x in sessoes), "sessoes": sessoes,
+            "fonte_url": f"https://{SAPL_CASAS[casa].get('sapl_host', '')}"}
+
+
+@app.get("/api/sapl/{casa}/materias")
+@limiter.limit("30/minute")
+def sapl_materias(request: Request, casa: str, itens: int = 20, tramitando: bool = True):
+    """Projetos/matérias legislativas (mais recentes). tramitando=true → só em tramitação."""
+    _sapl_checa(casa)
+    itens = max(1, min(itens, 50))
+    try:
+        # `o` = ordenação SAPL. O filtro server-side em_tramitacao quebra algumas
+        # casas, então filtramos em tramitação do lado de cá.
+        ms = _sapl_get(casa, "/materia/materialegislativa/", {"o": "-ano,-numero"}, ttl=600)
+    except Exception as e:
+        logger.warning("sapl materias %s: %s", casa, e)
+        raise HTTPException(status_code=503, detail="Casa indisponível no momento")
+    if tramitando:
+        ms = [m for m in ms if m.get("em_tramitacao")]
+    materias = []
+    for m in ms[:itens]:
+        em = m.get("ementa")
+        materias.append({
+            "id": m.get("id"),
+            "descricao": m.get("__str__"),
+            "ano": m.get("ano"),
+            "numero": m.get("numero"),
+            "ementa": (em[:300] if em else None),
+            "em_tramitacao": m.get("em_tramitacao"),
+            "apresentacao": m.get("data_apresentacao"),
+        })
+    return {"casa": casa, "nome": SAPL_CASAS[casa].get("nome"),
+            "total": len(materias), "materias": materias,
+            "fonte_url": f"https://{SAPL_CASAS[casa].get('sapl_host', '')}"}
+
+
+@app.get("/api/sapl/{casa}/votacoes")
+@limiter.limit("30/minute")
+def sapl_votacoes(request: Request, casa: str, itens: int = 20):
+    """Registros de votação mais recentes (nem toda casa registra voto nominal)."""
+    _sapl_checa(casa)
+    itens = max(1, min(itens, 50))
+    try:
+        vs = _sapl_get(casa, "/sessao/registrovotacao/", {"o": "-data_hora"}, ttl=600)
+    except Exception as e:
+        logger.warning("sapl votacoes %s: %s", casa, e)
+        raise HTTPException(status_code=503, detail="Casa indisponível no momento")
+    votacoes = [{
+        "id": v.get("id"),
+        "data": v.get("data_hora"),
+        "descricao": v.get("__str__"),
+        "sim": v.get("numero_votos_sim"),
+        "nao": v.get("numero_votos_nao"),
+        "abstencoes": v.get("numero_abstencoes"),
+    } for v in vs[:itens]]
+    return {"casa": casa, "nome": SAPL_CASAS[casa].get("nome"),
+            "total": len(votacoes), "votacoes": votacoes,
+            "fonte_url": f"https://{SAPL_CASAS[casa].get('sapl_host', '')}"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Assembleias estaduais com API PRÓPRIA (não-SAPL)
+#
+# Casas grandes não usam SAPL — cada uma tem API própria de formato distinto.
+# Um adapter por casa normaliza pro mesmo shape de matérias do SAPL. As demais
+# assembleias (AC, AL, AM, MT, PB, PI, RO, RR, TO) já saem via /api/sapl/al-<uf>.
+# ─────────────────────────────────────────────────────────────────────────────
+_assembleia_cache: dict = {}
+
+
+def _assembleia_cached(chave: str, ttl: int, fetch):
+    import time as _t
+    agora = _t.time()
+    hit = _assembleia_cache.get(chave)
+    if hit and agora - hit[0] < ttl:
+        return hit[1]
+    val = fetch()
+    _assembleia_cache[chave] = (agora, val)
+    return val
+
+
+def _materias_almg(itens: int):
+    """ALMG (Minas Gerais) — dadosabertos.almg.gov.br. ord=2 = mais recentes."""
+    import requests
+    r = requests.get("https://dadosabertos.almg.gov.br/api/v2/proposicoes/pesquisa/direcionada",
+                     params={"formato": "json", "tp": 1000, "ord": 2, "p": 1}, timeout=20,
+                     headers={"User-Agent": "HorusRJ/1.0", "Accept": "application/json"})
+    r.raise_for_status()
+    lista = (r.json().get("resultado") or {}).get("listaItem") or []
+    out = []
+    for it in lista[:itens]:
+        sig = (it.get("siglaTipoProjeto") or "").strip()
+        em = it.get("assunto")
+        autor = (it.get("autor") or "").replace("\n", " ").strip()
+        out.append({
+            "descricao": f"{sig} {it.get('numero')}/{it.get('ano')}".strip(),
+            "ano": it.get("ano"),
+            "numero": it.get("numero"),
+            "tipo": it.get("tipoProjeto"),
+            "ementa": (em[:300] if em else None),
+            "situacao": it.get("situacao"),
+            "autor": (autor[:120] or None),
+        })
+    return out
+
+
+# uf -> {nome, fonte, materias(fn)}. Adicionar nova assembleia = uma entrada.
+ASSEMBLEIAS = {
+    "MG": {"nome": "Assembleia Legislativa de Minas Gerais (ALMG)",
+           "fonte": "dadosabertos.almg.gov.br",
+           "fonte_url": "https://dadosabertos.almg.gov.br/",
+           "materias": _materias_almg},
+}
+
+
+@app.get("/api/assembleia/casas")
+@limiter.limit("60/minute")
+def assembleia_casas(request: Request):
+    """Assembleias disponíveis: com adapter de API própria + as que saem via SAPL."""
+    propria = [{"uf": uf, "nome": v["nome"], "fonte": v["fonte"]}
+               for uf, v in sorted(ASSEMBLEIAS.items())]
+    via_sapl = sorted(
+        [{"uf": v["uf"], "nome": v["nome"], "id_sapl": k}
+         for k, v in SAPL_CASAS.items() if v.get("tipo") == "estadual"],
+        key=lambda x: x["uf"])
+    return {"com_api_propria": propria, "via_sapl": via_sapl}
+
+
+@app.get("/api/assembleia/{uf}/materias")
+@limiter.limit("30/minute")
+def assembleia_materias(request: Request, uf: str, itens: int = 20):
+    """Matérias/proposições recentes de uma assembleia com API própria."""
+    uf = uf.upper()
+    itens = max(1, min(itens, 50))
+    cfg = ASSEMBLEIAS.get(uf)
+    if not cfg or "materias" not in cfg:
+        raise HTTPException(status_code=404,
+                            detail="Assembleia sem adapter de matérias (veja /api/assembleia/casas)")
+    try:
+        out = _assembleia_cached(f"mat-{uf}-{itens}", 600, lambda: cfg["materias"](itens))
+    except Exception as e:
+        logger.warning("assembleia %s materias: %s", uf, e)
+        raise HTTPException(status_code=503, detail="Assembleia indisponível no momento")
+    return {"uf": uf, "nome": cfg["nome"], "fonte": cfg["fonte"],
+            "fonte_url": cfg.get("fonte_url"), "total": len(out), "materias": out}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fluxo de dinheiro com a União — quanto SAI (arrecadação federal) vs quanto
+# VOLTA (transferências da União), por UF/região/Brasil. Dados em fluxo_uf
+# (scripts/coleta_fluxo_uf.py). Município não tem 'sai' publicado → indisponível.
+# ─────────────────────────────────────────────────────────────────────────────
+@app.get("/api/fluxo/{nivel}/{territorio_id}")
+@limiter.limit("60/minute")
+def fluxo_territorio(request: Request, nivel: str, territorio_id: str):
+    nivel = nivel.lower()
+    if nivel in ("municipio", "município", "mun"):
+        return {"disponivel": False, "motivo": "Arrecadação federal só é publicada por estado, não por município."}
+
+    conn = get_db_connection()
+    try:
+        tabs = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "fluxo_uf" not in tabs:
+            return {"disponivel": False}
+        row_ano = conn.execute("SELECT MAX(ano) FROM fluxo_uf").fetchone()
+        ano = row_ano[0] if row_ano else None
+        if not ano:
+            return {"disponivel": False}
+        linhas = {r["uf"]: r for r in conn.execute(
+            "SELECT uf, sai, volta, meses_sai, fonte FROM fluxo_uf WHERE ano = ?", (ano,))}
+        if not linhas:
+            return {"disponivel": False}
+        fonte = next(iter(linhas.values()))["fonte"]
+
+        def pacote(ufs):
+            sai_raw = sum(linhas[u]["sai"] for u in ufs if u in linhas and linhas[u]["sai"] is not None)
+            volta = sum(linhas[u]["volta"] for u in ufs if u in linhas and linhas[u]["volta"] is not None)
+            meses = [linhas[u]["meses_sai"] for u in ufs if u in linhas and linhas[u]["meses_sai"]]
+            m = min(meses) if meses else 0
+            # SAI vem somado em m meses. Pra comparar com VOLTA anual, anualiza
+            # (×12/m) e marca como estimado enquanto o ano não fecha (m<12).
+            sai = None
+            estimado = False
+            if m >= 12 and sai_raw:
+                sai = sai_raw
+            elif 0 < m < 12 and sai_raw:
+                sai = sai_raw * 12.0 / m
+                estimado = True
+            saldo = (volta - sai) if sai is not None else None
+            return {"disponivel": True, "nivel": nivel, "ano": ano,
+                    "sai": round(sai, 2) if sai is not None else None,
+                    "volta": round(volta, 2) if volta else None,
+                    "saldo": round(saldo, 2) if saldo is not None else None,
+                    "meses_sai": m, "estimado_sai": estimado,
+                    "parcial": 0 < m < 12, "fonte": fonte,
+                    "fontes": [
+                        {"nome": "Receita Federal · Arrecadação por UF",
+                         "url": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos/receitadata/arrecadacao/arrecadacao-por-estado"},
+                        {"nome": "Tesouro Nacional · SICONFI",
+                         "url": "https://www.tesourotransparente.gov.br/consultas/consultas-siconfi/siconfi-api-de-dados-abertos"},
+                    ]}
+
+        if nivel in ("brasil", "br", "nacional"):
+            return {**pacote(list(linhas.keys())), "nome": "Brasil"}
+
+        if nivel in ("regiao", "região"):
+            slug = territorio_id.lower().strip()
+            dig = REGIAO_DIGITO.get(slug)
+            if dig is None:
+                raise HTTPException(status_code=404, detail="Região desconhecida")
+            ufs = [u for u, c in UF_CODIGO.items() if c // 10 == dig]
+            return {**pacote(ufs), "nome": slug.replace("-", " ").title()}
+
+        if nivel in ("estado", "uf"):
+            uf = territorio_id.upper().strip()
+            if uf not in linhas:
+                return {"disponivel": False}
+            return {**pacote([uf]), "nome": UF_NOME.get(uf, uf), "uf": uf}
+
+        raise HTTPException(status_code=404, detail="Nível inválido")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Erro em /fluxo/%s/%s: %s", nivel, territorio_id, e, exc_info=True)
+        return {"disponivel": False}
+    finally:
+        conn.close()
 
 
 # Configuração para servir o Frontend (React/Vite)
