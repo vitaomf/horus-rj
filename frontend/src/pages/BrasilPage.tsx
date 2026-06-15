@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapaBrasil } from '../components/MapaBrasil';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
 import { PainelIndices } from '../components/PainelIndices';
+import { PainelCamara } from '../components/PainelCamara';
 import { REGIOES, ESTADOS } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -71,7 +72,7 @@ export function BrasilPage() {
             </div>
 
             {/* Mapa */}
-            <div className="flex-1 relative">
+            <div className="relative">
               <MapaBrasil nivel="regioes" height={520} />
 
               {/* Coordenadas decorativas */}
@@ -79,6 +80,9 @@ export function BrasilPage() {
                 15°47'S · 47°52'W · Brasil
               </div>
             </div>
+
+            {/* Câmara federal — preenche o espaço abaixo do mapa */}
+            <PainelCamara nivel="brasil" className="border-t border-[#FFD700]/10 flex-1" />
           </div>
 
           {/* Painel lateral — regiões */}

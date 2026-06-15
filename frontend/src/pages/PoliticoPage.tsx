@@ -1403,20 +1403,20 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                         }}
                                     >
                                         <div className="flex justify-between items-end mb-2">
-                                            <span className={`font-medium uppercase tracking-wide transition-colors flex items-center gap-2 ${cidadeFiltro === mun.nome ? 'text-black' : 'text-white group-hover:text-[#FFD700]'}`}>
+                                            <span className={`font-medium uppercase tracking-wide transition-colors flex items-center gap-2 min-w-0 ${cidadeFiltro === mun.nome ? 'text-black' : 'text-white group-hover:text-[#FFD700]'}`}>
                                                 {String(idx + 1).padStart(2, '0')}. {mun.nome.replace(/\s-\s[A-Za-z]{2}$/, '')}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onMunicipioClick?.(mun.nome);
                                                     }}
-                                                    className="ml-2 font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:scale-125"
+                                                    className="ml-2 font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:scale-125 shrink-0"
                                                 >
                                                     ↗
                                                 </button>
                                             </span>
-                                            <div className="text-right">
-                                                <span className={`font-bebas text-2xl leading-none block ${cidadeFiltro === mun.nome ? 'text-black' : 'text-[#FFD700]'}`}>
+                                            <div className="text-right shrink-0 pl-3">
+                                                <span className={`font-bebas text-2xl leading-none block whitespace-nowrap ${cidadeFiltro === mun.nome ? 'text-black' : 'text-[#FFD700]'}`}>
                                                     {formatMillions(mun.valor)}
                                                 </span>
                                                 <span className={`text-xs font-semibold ${cidadeFiltro === mun.nome ? 'text-black/70' : 'text-gray-500'}`}>

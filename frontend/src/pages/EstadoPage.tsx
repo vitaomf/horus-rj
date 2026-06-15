@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { BreadcrumbNav } from '../components/BreadcrumbNav';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
 import { PainelIndices } from '../components/PainelIndices';
+import { PainelCamara } from '../components/PainelCamara';
+import { PainelFluxo } from '../components/PainelFluxo';
 import { getEstado, getRegiaoByUF } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -128,8 +130,10 @@ export function EstadoPage() {
       </div>
 
       {/* ── ÍNDICES DO TERRITÓRIO (cascata) ── */}
-      <div className="border-b border-[#1a1a1a] px-6 py-6 md:px-12">
-        <PainelIndices nivel="estado" id={ufUpper} className="max-w-md" />
+      <div className="border-b border-[#1a1a1a] px-6 py-6 md:px-12 grid gap-6 md:grid-cols-2 max-w-3xl">
+        <PainelIndices nivel="estado" id={ufUpper} />
+        <PainelCamara nivel="estado" uf={ufUpper} />
+        <PainelFluxo nivel="estado" id={ufUpper} />
       </div>
 
       {/* ── BANNER STATUS ── sempre mostra o que está disponível */}
@@ -226,9 +230,9 @@ export function EstadoPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
-            {municipios.map(m => (
+            {municipios.map((m, i) => (
               <button
-                key={m.id}
+                key={`${m.id}-${i}`}
                 onClick={() => navigate(`/municipios/${encodeURIComponent(m.nome)}`)}
                 className="bg-black hover:bg-[#080808] transition-colors p-4 text-left group relative"
               >
@@ -285,9 +289,9 @@ export function EstadoPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-px bg-[#111]">
-            {parlamentares.map(p => (
+            {parlamentares.map((p, i) => (
               <button
-                key={p.id}
+                key={`${p.id}-${i}`}
                 onClick={() => navigate(`/politicos/${p.id}`)}
                 className="bg-black hover:bg-[#080808] transition-colors p-4 flex items-center gap-3 text-left group relative"
               >
