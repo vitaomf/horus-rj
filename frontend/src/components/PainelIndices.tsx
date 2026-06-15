@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, BookOpen, Droplets, ShieldAlert, Trees, Activity, Info } from 'lucide-react';
+import { Users, BookOpen, Droplets, ShieldAlert, Trees, Activity, Info, Coins, Briefcase, ExternalLink } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 type Nivel = 'brasil' | 'regiao' | 'estado' | 'municipio';
@@ -27,14 +27,17 @@ interface Resposta {
 }
 
 // Metadados de exibição por indicador canônico
-const META: Record<string, { label: string; icone: typeof Users; cor: string }> = {
-  populacao:         { label: 'População',     icone: Users,       cor: '#FFD700' },
-  alfabetizacao_pct: { label: 'Alfabetização', icone: BookOpen,    cor: '#4caf50' },
-  esgoto_tratado_pct:{ label: 'Esgoto tratado',icone: Droplets,    cor: '#29b6f6' },
-  esgoto_coletado_pct:{ label: 'Esgoto coletado',icone: Droplets,  cor: '#29b6f6' },
-  homicidios_100k:   { label: 'Homicídios',    icone: ShieldAlert, cor: '#f44336' },
-  desmatamento_km2:  { label: 'Desmatamento',  icone: Trees,       cor: '#ff9800' },
-  idhm:              { label: 'IDH-M',          icone: Activity,    cor: '#ab47bc' },
+const META: Record<string, { label: string; icone: typeof Users; cor: string; desc: string }> = {
+  renda_per_capita:  { label: 'Renda per capita', icone: Coins,    cor: '#FFD700', desc: 'renda média por pessoa/mês' },
+  ocupacao_pct:      { label: 'Ocupação',       icone: Briefcase,   cor: '#26a69a', desc: '% da população ocupada' },
+  esgoto_adequado_pct:{ label: 'Saneamento',    icone: Droplets,    cor: '#29b6f6', desc: '% com esgoto adequado' },
+  alfabetizacao_pct: { label: 'Alfabetização', icone: BookOpen,    cor: '#4caf50', desc: '% que sabe ler e escrever' },
+  idhm:              { label: 'IDH-M',          icone: Activity,    cor: '#ab47bc', desc: 'desenvolvimento humano (0–1)' },
+  populacao:         { label: 'População',     icone: Users,       cor: '#9e9e9e', desc: 'habitantes (Censo 2022)' },
+  esgoto_tratado_pct:{ label: 'Esgoto tratado',icone: Droplets,    cor: '#29b6f6', desc: '% de esgoto tratado' },
+  esgoto_coletado_pct:{ label: 'Esgoto coletado',icone: Droplets,  cor: '#29b6f6', desc: '% de esgoto coletado' },
+  homicidios_100k:   { label: 'Homicídios',    icone: ShieldAlert, cor: '#f44336', desc: 'por 100 mil habitantes' },
+  desmatamento_km2:  { label: 'Desmatamento',  icone: Trees,       cor: '#ff9800', desc: 'área desmatada (km²)' },
 };
 
 function fmtValor(ind: Indicador): string {
@@ -46,6 +49,7 @@ function fmtValor(ind: Indicador): string {
     if (v >= 1e3) return `${(v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} mil`;
     return v.toLocaleString('pt-BR');
   }
+  if (u === 'Reais') return `R$ ${ind.valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
   if (u === '%') return `${ind.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
   return `${ind.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}${u ? ' ' + u : ''}`;
 }
@@ -101,9 +105,14 @@ export function PainelIndices({ nivel, id, porNome, className = '' }: Props) {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: m.cor }} />
-                    <span className="font-mono text-[9px] tracking-widest text-gray-400 uppercase truncate">
-                      {m.label}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="font-mono text-[9px] tracking-widest text-gray-400 uppercase truncate block">
+                        {m.label}
+                      </span>
+                      <span className="font-sans text-[8px] text-gray-700 leading-tight truncate block">
+                        {m.desc}
+                      </span>
+                    </div>
                   </div>
                   <span className="font-bebas text-lg leading-none shrink-0" style={{ color: m.cor }}>
                     {fmtValor(ind)}
@@ -143,13 +152,22 @@ export function PainelIndices({ nivel, id, porNome, className = '' }: Props) {
             );
           })}
 
-          {/* Rodapé: fonte */}
+          {/* Rodapé: fonte (clicável → site oficial) */}
           {dados!.indicadores![0]?.fonte && (
             <div className="px-4 py-2">
-              <p className="font-mono text-[7px] tracking-wider text-gray-700">
-                Fonte: {dados!.indicadores![0].fonte}
-                {dados!.indicadores![0].ano ? ` · ${dados!.indicadores![0].ano}` : ''}
-              </p>
+              {(() => {
+                const f = dados!.indicadores![0];
+                const url = (f.fonte || '').includes('IBGE') ? 'https://cidades.ibge.gov.br/' : undefined;
+                const txt = `Fonte: ${f.fonte}${f.ano ? ` · ${f.ano}` : ''}`;
+                return url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-mono text-[7px] tracking-wider text-gray-600 hover:text-[#FFD700] transition-colors">
+                    <ExternalLink className="w-2.5 h-2.5" /> {txt}
+                  </a>
+                ) : (
+                  <p className="font-mono text-[7px] tracking-wider text-gray-700">{txt}</p>
+                );
+              })()}
             </div>
           )}
         </div>

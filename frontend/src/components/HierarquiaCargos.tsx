@@ -9,6 +9,12 @@ import {
 import { API_BASE_URL } from '../config';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// Remove eleitos repetidos por id (dados do TSE às vezes trazem duplicatas —
+// ex.: SP) — evita card duplicado e chaves React colidindo.
+function dedupById<T extends { id: number | string }>(a?: T[]): T[] {
+  return a ? Array.from(new Map(a.map(x => [x.id, x])).values()) : [];
+}
+
 function capitalize(nome: string): string {
   return nome.toLowerCase().split(' ').map(w =>
     w.length <= 2 ? w : w[0].toUpperCase() + w.slice(1)
@@ -162,7 +168,12 @@ function NivelEstadual({ uf, cor }: { uf: string; cor: string }) {
     setLoading(true);
     fetch(`${API_BASE_URL}/api/eleitos/estadual?uf=${uf}`)
       .then(r => r.json())
-      .then(setEleitos)
+      .then(d => setEleitos(d ? {
+        ...d,
+        senadores: dedupById(d.senadores),
+        deputados_federais: dedupById(d.deputados_federais),
+        deputados_estaduais: dedupById(d.deputados_estaduais),
+      } : null))
       .catch(() => setEleitos(null))
       .finally(() => setLoading(false));
   }, [uf]);
@@ -303,7 +314,7 @@ function NivelMunicipal({ uf, municipio, cor }: { uf: string; municipio: string;
     setLoading(true);
     fetch(`${API_BASE_URL}/api/eleitos/municipal?uf=${uf}&municipio=${encodeURIComponent(municipio)}`)
       .then(r => r.json())
-      .then(setEleitos)
+      .then(d => setEleitos(d ? { ...d, vereadores: dedupById(d.vereadores) } : null))
       .catch(() => setEleitos(null))
       .finally(() => setLoading(false));
   }, [uf, municipio]);
