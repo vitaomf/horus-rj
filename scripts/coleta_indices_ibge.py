@@ -4,8 +4,11 @@ e persiste em indices_municipio / indices_estado (schema: migrate_indices.py).
 
 Fonte primária: Censo Demográfico 2022.
 Indicadores nesta leva:
-    populacao         — agregado 4714, variável 93  (População residente)
-    alfabetizacao_pct — agregado 9543, variável 2513 (Taxa de alfabetização 15+)
+    populacao           — agregado 4714,  variável 93     (População residente)
+    alfabetizacao_pct   — agregado 9543,  variável 2513   (Taxa de alfabetização 15+)
+    renda_per_capita    — agregado 10295, variável 13431  (Rend. médio mensal domiciliar per capita, R$)
+    esgoto_adequado_pct — agregado 6805,  variável 1000381 (% domic. c/ esgoto adequado: rede/pluvial/fossa ligada)
+    ocupacao_pct        — agregado 10268, variável 675    (Nível de ocupação 10+, %)
 
 População é a espinha dorsal da cascata (médias ponderadas por habitante) além de
 ser um índice exibível. Idempotente: INSERT OR REPLACE em (codigo_ibge, ano, indicador).
@@ -25,10 +28,17 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "transparencia_rj.db")
 BASE = "https://servicodados.ibge.gov.br/api/v3/agregados"
 
-# (indicador, agregado, periodo, variavel, fonte, unidade)
+# (indicador, agregado, periodo, variavel, fonte, unidade, classificacao)
+# classificacao: filtro SIDRA p/ isolar a categoria/total certo (None = sem classif).
+#   - renda/ocupação: cruzam por sexo|cor|idade → fixar todos no Total.
+#   - esgoto: categoria 46290 = "rede geral, pluvial ou fossa ligada à rede" (= adequado).
+TOTAL_PESSOA = "2[6794]|86[95251]|58[95253]"  # sexo·cor·idade, todos no Total
 COLETAS = [
-    ("populacao",         "4714", "2022", "93",   "IBGE Censo 2022", "Pessoas"),
-    ("alfabetizacao_pct", "9543", "2022", "2513", "IBGE Censo 2022", "%"),
+    ("populacao",           "4714",  "2022", "93",      "IBGE Censo 2022", "Pessoas", None),
+    ("alfabetizacao_pct",   "9543",  "2022", "2513",    "IBGE Censo 2022", "%",       None),
+    ("renda_per_capita",    "10295", "2022", "13431",   "IBGE Censo 2022", "Reais",   TOTAL_PESSOA),
+    ("esgoto_adequado_pct", "6805",  "2022", "1000381", "IBGE Censo 2022", "%",       "11558[46290]"),
+    ("ocupacao_pct",        "10268", "2022", "675",     "IBGE Censo 2022", "%",       TOTAL_PESSOA),
 ]
 
 
@@ -38,13 +48,15 @@ def _session():
     return s
 
 
-def _buscar(sess, agregado, periodo, variavel, nivel):
+def _buscar(sess, agregado, periodo, variavel, nivel, classif=None):
     """nivel: 'N3' (estado) ou 'N6' (município). Retorna [(codigo_ibge, valor)]."""
     url = f"{BASE}/{agregado}/periodos/{periodo}/variaveis/{variavel}?localidades={nivel}[all]"
-    r = sess.get(url, timeout=60)
+    if classif:
+        url += f"&classificacao={classif}"
+    r = sess.get(url, timeout=90)
     r.raise_for_status()
     dados = r.json()
-    if not dados or "resultados" not in dados[0]:
+    if not dados or "resultados" not in dados[0] or not dados[0]["resultados"]:
         return []
     out = []
     for serie in dados[0]["resultados"][0]["series"]:
@@ -82,11 +94,11 @@ def main():
     sess = _session()
     total = 0
 
-    for indicador, agregado, periodo, variavel, fonte, unidade in COLETAS:
+    for indicador, agregado, periodo, variavel, fonte, unidade, classif in COLETAS:
         for nivel, tabela in (("N3", "indices_estado"), ("N6", "indices_municipio")):
             rotulo = "estados" if nivel == "N3" else "municípios"
             try:
-                linhas = _buscar(sess, agregado, periodo, variavel, nivel)
+                linhas = _buscar(sess, agregado, periodo, variavel, nivel, classif)
             except Exception as e:
                 print(f"  [ERRO] {indicador} {rotulo}: {type(e).__name__} {str(e)[:80]}")
                 continue
