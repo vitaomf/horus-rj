@@ -1873,6 +1873,42 @@ def emendas_politico_paginadas(
         conn.close()
 
 
+@app.get("/api/politicos/{politico_id}/atuacao")
+@limiter.limit("60/minute")
+def atuacao_politico(request: Request, politico_id: int):
+    """Atuação legislativa (Câmara): proposições autoradas, comissões e discursos.
+    Dados de scripts/coleta_atuacao_camara.py. Indisponível se nada coletado."""
+    conn = get_db_connection()
+    try:
+        tabs = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "atuacao_proposicoes" not in tabs:
+            return {"disponivel": False}
+        n_prop = conn.execute("SELECT COUNT(*) FROM atuacao_proposicoes WHERE politico_id=?", (politico_id,)).fetchone()[0]
+        n_org = conn.execute("SELECT COUNT(*) FROM atuacao_orgaos WHERE politico_id=?", (politico_id,)).fetchone()[0]
+        n_disc = conn.execute("SELECT COUNT(*) FROM atuacao_discursos WHERE politico_id=?", (politico_id,)).fetchone()[0]
+        if n_prop == 0 and n_org == 0 and n_disc == 0:
+            return {"disponivel": False}
+        props = [dict(r) for r in conn.execute(
+            "SELECT sigla,numero,ano,ementa,data FROM atuacao_proposicoes WHERE politico_id=? "
+            "ORDER BY ano DESC, id_prop DESC LIMIT 10", (politico_id,))]
+        orgs = [dict(r) for r in conn.execute(
+            "SELECT sigla,nome,titulo,data_inicio,data_fim FROM atuacao_orgaos WHERE politico_id=? "
+            "ORDER BY (data_fim IS NULL) DESC, data_inicio DESC LIMIT 12", (politico_id,))]
+        discs = [dict(r) for r in conn.execute(
+            "SELECT data_hora,sumario,keywords,url FROM atuacao_discursos WHERE politico_id=? "
+            "ORDER BY data_hora DESC LIMIT 8", (politico_id,))]
+        return {"disponivel": True,
+                "proposicoes": {"total": n_prop, "recentes": props},
+                "comissoes": {"total": n_org, "lista": orgs},
+                "discursos": {"total": n_disc, "recentes": discs},
+                "fonte_url": "https://www.camara.leg.br/deputados"}
+    except Exception as e:
+        logger.error("Erro em /politicos/%s/atuacao: %s", politico_id, e, exc_info=True)
+        return {"disponivel": False}
+    finally:
+        conn.close()
+
+
 @app.get("/api/politicos/{politico_id}")
 @limiter.limit("30/minute")
 def obter_detalhes_politico(request: Request, politico_id: int):

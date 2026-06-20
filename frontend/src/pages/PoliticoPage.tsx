@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 import { EstagiosEmenda } from '../components/EstagiosEmenda';
+import { PainelAtuacaoCamara } from '../components/PainelAtuacaoCamara';
 import { EmendasTooltip } from '../components/EmendasTooltip';
 import { VoceSabia } from '../components/VoceSabia';
 import { BlocoVotacoesNominais, BlocoScorecardLegislativo } from '../components/perfil/blocos';
@@ -585,7 +586,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     toggle({ id: data.id, nome: data.nome, partido: data.partido ?? null, cargo: data.cargo ?? null });
                                     toast(isFavorito(data.id) ? `${data.nome} removido dos favoritos` : `${data.nome} adicionado aos favoritos`, isFavorito(data.id) ? 'info' : 'success');
                                 }}
-                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border px-3 py-1.5 transition-all"
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border px-3 py-2.5 md:py-1.5 transition-all"
                                 style={{
                                     borderColor:  isFavorito(data.id) ? '#FFD70060' : '#2a2a2a',
                                     color:        isFavorito(data.id) ? '#FFD700'   : '#555',
@@ -605,7 +606,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                     }
                                     navigator.clipboard?.writeText(url).then(() => toast('Link copiado!', 'success'));
                                 }}
-                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#FFD700]/40 hover:text-white transition-all px-3 py-1.5"
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#FFD700]/40 hover:text-white transition-all px-3 py-2.5 md:py-1.5"
                             >
                                 <Share2 className="w-3 h-3" />
                                 COMPARTILHAR
@@ -613,7 +614,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             {/* Comparar */}
                             <button
                                 onClick={() => navigate(`/comparar?a=${data.id}`)}
-                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#03A9F4]/50 hover:text-[#03A9F4] transition-all px-3 py-1.5"
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#2a2a2a] text-gray-600 hover:border-[#03A9F4]/50 hover:text-[#03A9F4] transition-all px-3 py-2.5 md:py-1.5"
                             >
                                 <GitCompare className="w-3 h-3" />
                                 COMPARAR
@@ -622,7 +623,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                             <button
                                 onClick={baixarRelatorioCSV}
                                 title="Baixar relatório completo em CSV"
-                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#FFD700]/40 text-[#FFD700]/80 hover:border-[#FFD700] hover:text-[#FFD700] hover:bg-[#FFD700]/10 transition-all px-3 py-1.5"
+                                className="flex items-center gap-1.5 font-mono text-[8px] tracking-widest border border-[#FFD700]/40 text-[#FFD700]/80 hover:border-[#FFD700] hover:text-[#FFD700] hover:bg-[#FFD700]/10 transition-all px-3 py-2.5 md:py-1.5"
                             >
                                 <Download className="w-3 h-3" />
                                 BAIXAR CSV
@@ -1311,7 +1312,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                                                         <p className="text-gray-300 text-xs leading-relaxed">{pl.ementa}</p>
                                                     </div>
                                                     <a href={pl.url} target="_blank" rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1.5 text-[#FFD700] hover:text-white text-[11px] font-bebas tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-1.5 transition-all">
+                                                        className="inline-flex items-center gap-1.5 text-[#FFD700] hover:text-white text-[11px] font-bebas tracking-widest border border-[#FFD700]/30 hover:border-[#FFD700] px-3 py-2.5 md:py-1.5 transition-all">
                                                         VER PROJETO NA CÂMARA →
                                                     </a>
                                                 </div>
@@ -1364,6 +1365,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
                 </div>
             </div>
+
+            {/* ── PLENÁRIO E COMISSÕES (coleta instantânea Câmara: discursos + comissões + nº proposições) ── */}
+            <PainelAtuacaoCamara politicoId={data.id} />
 
             {/* ── RAIO-X DE VOTAÇÕES: legislativo antes de emendas (régua da constituição #2 > #4) ── */}
             {(data.cargo === 'Deputado Federal' || data.cargo === 'Parlamentar Federal' || data.cargo === 'Senador') && (
