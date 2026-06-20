@@ -264,7 +264,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                         {/* Comparar rápido */}
                                         <button
                                             onClick={ev => { ev.stopPropagation(); navigate(`/comparar?a=${politico.id}`); }}
-                                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 font-mono text-[7px] tracking-widest border border-[#03A9F4]/30 text-[#03A9F4]/60 hover:text-[#03A9F4] hover:border-[#03A9F4]/60 px-2 py-1"
+                                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 font-mono text-[7px] tracking-widest border border-[#03A9F4]/30 text-[#03A9F4]/60 hover:text-[#03A9F4] hover:border-[#03A9F4]/60 px-2 py-2.5 md:py-1"
                                             title="Comparar com outro parlamentar"
                                         >
                                             <GitCompare className="w-3 h-3" />
@@ -316,7 +316,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                                 <td className="p-4 text-sm text-gray-300 leading-relaxed max-w-xs">{emenda.descricao}</td>
                                                 <td className="p-4 text-sm text-gray-400 leading-relaxed max-w-sm">{emenda.objetivo}</td>
                                                 <td className="p-4">
-                                                    <span className="bg-[#222] border border-[#444] text-xs font-bold px-2 py-1 rounded-sm uppercase tracking-wider text-gray-300" title={`Código: ${emenda.codigo_emenda}`}>
+                                                    <span className="bg-[#222] border border-[#444] text-xs font-bold px-2 py-2.5 md:py-1 rounded-sm uppercase tracking-wider text-gray-300" title={`Código: ${emenda.codigo_emenda}`}>
                                                         {emenda.status === emenda.codigo_emenda ? 'CADASTRADA' : emenda.status}
                                                     </span>
                                                 </td>
@@ -361,7 +361,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                                 href={emenda.fonte_url || `https://portaldatransparencia.gov.br/emendas/detalhe?codigoEmenda=${emenda.codigo_emenda}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[#FFD700] text-[10px] font-bold flex items-center gap-1 border border-[#FFD700]/20 px-2 py-1"
+                                                className="text-[#FFD700] text-[10px] font-bold flex items-center gap-1 border border-[#FFD700]/20 px-2 py-2.5 md:py-1"
                                             >
                                                 DETALHES <ExternalLink className="w-3 h-3" />
                                             </a>
@@ -495,7 +495,7 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                                                     href={contrato.fonte_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-[#FFD700] text-[10px] font-bold flex items-center gap-1 border border-[#FFD700]/20 px-2 py-1"
+                                                    className="text-[#FFD700] text-[10px] font-bold flex items-center gap-1 border border-[#FFD700]/20 px-2 py-2.5 md:py-1"
                                                 >
                                                     CONTRATO <ExternalLink className="w-3 h-3" />
                                                 </a>
