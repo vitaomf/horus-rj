@@ -43,6 +43,10 @@ const META: Record<string, { label: string; icone: typeof Users; cor: string; de
 function fmtValor(ind: Indicador): string {
   if (ind.valor === null || ind.valor === undefined) return '—';
   const u = ind.unidade || '';
+  // Taxa de homicídios: só o número (a descrição já diz "por 100 mil habitantes").
+  if (ind.indicador === 'homicidios_100k') {
+    return ind.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  }
   if (ind.indicador === 'populacao') {
     const v = ind.valor;
     if (v >= 1e6) return `${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
@@ -152,24 +156,36 @@ export function PainelIndices({ nivel, id, porNome, className = '' }: Props) {
             );
           })}
 
-          {/* Rodapé: fonte (clicável → site oficial) */}
-          {dados!.indicadores![0]?.fonte && (
-            <div className="px-4 py-2">
-              {(() => {
-                const f = dados!.indicadores![0];
-                const url = (f.fonte || '').includes('IBGE') ? 'https://cidades.ibge.gov.br/' : undefined;
-                const txt = `Fonte: ${f.fonte}${f.ano ? ` · ${f.ano}` : ''}`;
-                return url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-[7px] tracking-wider text-gray-600 hover:text-[#FFD700] transition-colors">
-                    <ExternalLink className="w-2.5 h-2.5" /> {txt}
-                  </a>
-                ) : (
-                  <p className="font-mono text-[7px] tracking-wider text-gray-700">{txt}</p>
-                );
-              })()}
-            </div>
-          )}
+          {/* Rodapé: fontes distintas (o painel pode misturar IBGE + Atlas da Violência) */}
+          {(() => {
+            const urlFonte = (f: string): string | undefined => {
+              if (f.includes('Atlas da Violência') || f.includes('IPEA')) return 'https://www.ipea.gov.br/atlasviolencia/';
+              if (f.includes('IBGE')) return 'https://cidades.ibge.gov.br/';
+              return undefined;
+            };
+            const vistos = new Set<string>();
+            const fontes = dados!.indicadores!
+              .filter(i => i.fonte)
+              .map(i => ({ fonte: i.fonte!, ano: i.ano }))
+              .filter(f => { const k = `${f.fonte}·${f.ano}`; if (vistos.has(k)) return false; vistos.add(k); return true; });
+            if (!fontes.length) return null;
+            return (
+              <div className="px-4 py-2 flex flex-col gap-0.5">
+                {fontes.map((f, i) => {
+                  const url = urlFonte(f.fonte);
+                  const txt = `Fonte: ${f.fonte}${f.ano ? ` · ${f.ano}` : ''}`;
+                  return url ? (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[7px] tracking-wider text-gray-600 hover:text-[#FFD700] transition-colors">
+                      <ExternalLink className="w-2.5 h-2.5" /> {txt}
+                    </a>
+                  ) : (
+                    <p key={i} className="font-mono text-[7px] tracking-wider text-gray-700">{txt}</p>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

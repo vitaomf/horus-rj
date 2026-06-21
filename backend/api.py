@@ -155,10 +155,19 @@ UF_NOME = {
 # Como cada indicador agrega na cascata: 'sum' (totais) ou 'wmean' (média ponderada por pop)
 INDICE_AGG = {"populacao": "sum", "desmatamento_km2": "sum"}  # default = wmean
 
+# Indicadores em que MENOR é melhor (homicídio, desmatamento). Inverte a direção
+# do ranking: sem isso, "melhores/piores" e a posição saem trocados — mentira.
+INDICE_MENOR_MELHOR = {"homicidios_100k", "desmatamento_km2"}
+
+
+def _melhor_primeiro(indicador):
+    """reverse= p/ sorted(): True ordena maior→menor (default: maior é melhor)."""
+    return indicador not in INDICE_MENOR_MELHOR
+
 # Ordem de exibição no painel de índices (80/20): economia → trabalho → infra →
-# educação → desenvolvimento → escala. Indicadores fora da lista vão ao fim (alfabético).
+# educação → segurança → desenvolvimento → escala. Fora da lista vão ao fim (alfabético).
 ORDEM_INDICES = ["renda_per_capita", "ocupacao_pct", "esgoto_adequado_pct",
-                 "alfabetizacao_pct", "idhm", "populacao"]
+                 "alfabetizacao_pct", "homicidios_100k", "idhm", "populacao"]
 
 
 def _ordenar_indices(chaves):
@@ -3109,7 +3118,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                     continue
                 ranking = sorted(
                     [(c, est[ind][c][0]) for c in est[ind] if est[ind][c][0] is not None],
-                    key=lambda x: x[1], reverse=True
+                    key=lambda x: x[1], reverse=_melhor_primeiro(ind)
                 )
                 fmt = lambda t: {"uf": CODIGO_UF.get(t[0], str(t[0])),
                                  "nome": UF_NOME.get(CODIGO_UF.get(t[0], ""), ""),
@@ -3139,7 +3148,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                     rv = agrega(ind, rc)
                     if rv is not None:
                         regioes_vals.append((d, rv))
-                regioes_vals.sort(key=lambda x: x[1], reverse=True)
+                regioes_vals.sort(key=lambda x: x[1], reverse=_melhor_primeiro(ind))
                 pos = next((i + 1 for i, (d, _) in enumerate(regioes_vals) if d == dig), None)
                 out.append(pacote(ind, val, brasil=round(nacional, 2) if nacional is not None else None,
                                   ranking={"posicao": pos, "de": len(regioes_vals)}))
@@ -3162,7 +3171,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                     continue
                 valor = vals[cod][0]
                 ranking = sorted([(c, vals[c][0]) for c in vals if vals[c][0] is not None],
-                                 key=lambda x: x[1], reverse=True)
+                                 key=lambda x: x[1], reverse=_melhor_primeiro(ind))
                 pos = next((i + 1 for i, (c, _) in enumerate(ranking) if c == cod), None)
                 out.append(pacote(ind, valor,
                                   ranking={"posicao": pos, "de": len(ranking)},
