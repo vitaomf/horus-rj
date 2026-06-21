@@ -333,7 +333,6 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 if (!bio.encontrado) { setLoadingAtividade(false); return; }
 
                 if (!data.foto_url && bio.urlFoto) setFotoUrl(`${API_BASE_URL}/api/foto/${data.id}`);
-                const depId = bio.id;
                 setBioData({
                     nomeCivil: bio.nomeCivil,
                     nomeEleitoral: bio.nomeEleitoral,
@@ -347,22 +346,9 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     orgaos: bio.orgaos || [],
                 });
 
-                // Atividade legislativa — com timeout próprio (30s) para não travar a UI
-                if (depId) {
-                    const ctrl = new AbortController();
-                    const tid = setTimeout(() => ctrl.abort(), 60000);
-                    try {
-                        const ar = await fetch(
-                            `${API_BASE_URL}/api/camara/atividade?dep_id=${depId}`,
-                            { headers: { 'Cache-Control': 'no-cache' }, signal: ctrl.signal }
-                        );
-                        clearTimeout(tid);
-                        if (ar.ok && !cancelled) {
-                            const a = await ar.json();
-                            if (!cancelled) setAtividade(a);
-                        }
-                    } catch { /* timeout ou abort */ }
-                }
+                // Atuação legislativa NÃO é mais buscada ao vivo aqui (era lenta,
+                // até 60s). Agora vem instantânea da coleta local na seção
+                // "PLENÁRIO E COMISSÕES" (endpoint /api/politicos/{id}/atuacao).
             } catch { /* silencioso */ }
             if (!cancelled) setLoadingAtividade(false);
         })();
@@ -1156,7 +1142,10 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                 </div>
             )}
 
-            {/* ── ATUAÇÃO LEGISLATIVA ─────────────────────────────────────── */}
+            {/* ATUAÇÃO LEGISLATIVA (live, lenta) DESATIVADA — substituída pela seção
+                instantânea "PLENÁRIO E COMISSÕES". Sem fetch ao vivo, atividade é
+                sempre null → esta seção não renderiza (mantida p/ remover depois). */}
+            {atividade && (
             <div className="max-w-7xl mx-auto mb-10">
                 <div className="bg-[#0a0a0a] border border-[#1a1a1a] overflow-hidden">
                     <div className="flex items-center justify-between border-b border-[#1a1a1a] px-6 py-5 gap-4 flex-wrap">
@@ -1365,6 +1354,7 @@ export const PoliticoPage: React.FC<PoliticoPageProps> = ({ politicoId, onVoltar
                     </div>
                 </div>
             </div>
+            )}
 
             {/* ── PLENÁRIO E COMISSÕES (coleta instantânea Câmara: discursos + comissões + nº proposições) ── */}
             <PainelAtuacaoCamara politicoId={data.id} />

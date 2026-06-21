@@ -3,9 +3,11 @@ import { Mic, FileText, Users, ExternalLink } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { PopNumber } from './PopNumber';
 
+interface Proposicao { id_prop: number; sigla: string; numero: string; ano: number; ementa: string }
+
 interface Atuacao {
   disponivel: boolean;
-  proposicoes?: { total: number };
+  proposicoes?: { total: number; recentes?: Proposicao[] };
   comissoes?: { total: number; lista: { sigla: string; titulo: string }[] };
   discursos?: { total: number; recentes: { data_hora: string; sumario: string; keywords: string; url: string }[] };
   fonte_url?: string;
@@ -62,6 +64,26 @@ export function PainelAtuacaoCamara({ politicoId }: { politicoId: number }) {
                   <span className="text-[#FFD700]/80">{o.sigla}</span>
                   {o.titulo && <span className="text-gray-600">· {o.titulo}</span>}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Projetos apresentados (autoria) */}
+        {!!d.proposicoes?.recentes?.length && (
+          <div className="px-6 pt-5">
+            <p className="font-mono text-[9px] tracking-[0.3em] text-gray-500 uppercase mb-3">Projetos apresentados</p>
+            <div className="space-y-2.5">
+              {d.proposicoes.recentes!.map((p, i) => (
+                <a key={i} href={`https://www.camara.leg.br/propostas-legislativas/${p.id_prop}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="block border-l border-[#1a1a1a] pl-3 hover:border-[#FFD700]/40 transition-colors group">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] tracking-wide text-[#FFD700]/80">{p.sigla} {p.numero}/{p.ano}</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-gray-700 group-hover:text-[#FFD700]/60 transition-colors" />
+                  </span>
+                  {p.ementa && <p className="text-gray-400 text-xs leading-snug line-clamp-2">{p.ementa}</p>}
+                </a>
               ))}
             </div>
           </div>

@@ -1,7 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Vote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Vote, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { PerfilCard, PerfilPlaceholder, PerfilStat } from '../base';
+
+// Etiqueta em linguagem clara o TIPO do que foi votado, a partir do texto da
+// descrição (a Câmara descreve o resultado, não o tipo — daí a heurística).
+function categoriaVotacao(desc: string | null): string {
+  const d = (desc || '').toLowerCase();
+  if (/medida provis|\bmpv?\b/.test(d)) return 'Medida Provisória';
+  if (/emenda constitu|\bpec\b/.test(d)) return 'Emenda à Constituição';
+  if (/lei complementar|\bplp\b/.test(d)) return 'Lei Complementar';
+  if (/decreto legislativo|\bpdl\b/.test(d)) return 'Decreto Legislativo';
+  if (/requerimento|\breq\b/.test(d)) return 'Requerimento';
+  if (/reda[çc][aã]o final/.test(d)) return 'Redação Final';
+  if (/destaque/.test(d)) return 'Destaque';
+  if (/parecer/.test(d)) return 'Parecer';
+  if (/projeto de lei|\bpl\b/.test(d)) return 'Projeto de Lei';
+  if (/emenda/.test(d)) return 'Emenda';
+  return 'Outra deliberação';
+}
 
 interface Votacao {
   id_votacao: string;
@@ -126,13 +143,20 @@ export function BlocoVotacoesNominais({ cor, politicoId }: Props) {
                     <p className="text-[12px] text-gray-300 leading-snug line-clamp-2">
                       {v.descricao || v.id_votacao}
                     </p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border border-[#FFD700]/20 text-[#FFD700]/60">
+                        {categoriaVotacao(v.descricao)}
+                      </span>
                       <span className="font-mono text-[8px] text-gray-700">
                         {v.data || v.data_hora?.split('T')[0] || '—'}
                       </span>
                       {v.sigla_orgao && (
                         <span className="font-mono text-[8px] text-gray-700">{v.sigla_orgao}</span>
                       )}
+                      <a href={`https://www.camara.leg.br/propostas-legislativas/${v.id_votacao.split('-')[0]}`} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-[8px] text-gray-700 hover:text-[#FFD700] transition-colors">
+                        <ExternalLink className="w-2.5 h-2.5" /> fonte
+                      </a>
                     </div>
                   </div>
                   <div className="flex flex-col items-end justify-center border-l pl-3 shrink-0"

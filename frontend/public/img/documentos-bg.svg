@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      .doc-line { stroke: #FFD700; stroke-width: 0.6; fill: none; opacity: 0.35; }
+      .doc-thin { stroke: #FFD700; stroke-width: 0.3; fill: none; opacity: 0.25; }
+      .doc-text { font-family: 'Courier New', monospace; font-size: 8px; fill: #FFD700; opacity: 0.40; letter-spacing: 1px; }
+      .doc-text-big { font-family: 'Courier New', monospace; font-size: 14px; fill: #FFD700; opacity: 0.55; letter-spacing: 2px; font-weight: bold; }
+      .doc-rect { stroke: #FFD700; stroke-width: 0.4; fill: none; opacity: 0.3; }
+      .doc-circle { stroke: #FFD700; stroke-width: 0.6; fill: none; opacity: 0.35; }
+      .doc-stamp { fill: none; stroke: #FFD700; stroke-width: 0.8; opacity: 0.45; }
+      .doc-stamp-text { font-family: 'Arial Black', sans-serif; font-size: 10px; fill: #FFD700; opacity: 0.50; letter-spacing: 1.5px; font-weight: 900; }
+      .doc-bar { fill: #FFD700; opacity: 0.30; }
+    </style>
+  </defs>
+
+  <!-- Documento 1 (esquerda alto) -->
+  <g transform="translate(40, 60) rotate(-3)">
+    <rect class="doc-rect" x="0" y="0" width="200" height="260"/>
+    <text class="doc-text-big" x="10" y="20">PORTAL TRANSPARÊNCIA</text>
+    <text class="doc-text" x="10" y="35">REPÚBLICA FEDERATIVA DO BRASIL</text>
+    <line class="doc-line" x1="10" y1="42" x2="190" y2="42"/>
+    <text class="doc-text" x="10" y="58">EMENDA Nº 2024.0001.0042</text>
+    <text class="doc-text" x="10" y="72">EXERCÍCIO: 2024</text>
+    <text class="doc-text" x="10" y="86">AUTOR: PARLAMENTAR INDIVIDUAL</text>
+    <text class="doc-text" x="10" y="100">UF DESTINO: RJ</text>
+    <line class="doc-line" x1="10" y1="110" x2="190" y2="110"/>
+    <text class="doc-text" x="10" y="126">VALOR EMPENHADO:</text>
+    <text class="doc-text" x="10" y="140">R$ 1.500.000,00</text>
+    <line class="doc-thin" x1="10" y1="150" x2="190" y2="150"/>
+    <text class="doc-text" x="10" y="166">OBJETO: AQUISIÇÃO DE</text>
+    <text class="doc-text" x="10" y="178">EQUIPAMENTO HOSPITALAR</text>
+    <text class="doc-text" x="10" y="195">FONTE: 100</text>
+    <text class="doc-text" x="10" y="208">PROGRAMA: 2218</text>
+    <text class="doc-text" x="10" y="221">AÇÃO: 8535</text>
+    <rect class="doc-rect" x="10" y="232" width="180" height="20"/>
+    <text class="doc-text" x="14" y="246">ASSINATURA DIGITAL · ICP-BRASIL</text>
+  </g>
+
+  <!-- Selo circular 1 -->
+  <g transform="translate(280, 80)">
+    <circle class="doc-stamp" cx="40" cy="40" r="38"/>
+    <circle class="doc-stamp" cx="40" cy="40" r="32"/>
+    <text class="doc-stamp-text" x="40" y="35" text-anchor="middle">OFICIAL</text>
+    <text class="doc-stamp-text" x="40" y="50" text-anchor="middle">2024</text>
+  </g>
+
+  <!-- Documento 2 (centro alto) -->
+  <g transform="translate(420, 50) rotate(2)">
+    <rect class="doc-rect" x="0" y="0" width="220" height="180"/>
+    <text class="doc-text-big" x="10" y="20">CARTEIRA PARLAMENTAR</text>
+    <line class="doc-line" x1="10" y1="28" x2="210" y2="28"/>
+    <rect class="doc-rect" x="10" y="38" width="60" height="80"/>
+    <text class="doc-text" x="14" y="80" >FOTO 3X4</text>
+    <text class="doc-text" x="80" y="48">NOME:</text>
+    <text class="doc-text" x="80" y="62">________________</text>
+    <text class="doc-text" x="80" y="76">PARTIDO: __________</text>
+    <text class="doc-text" x="80" y="90">UF: __________</text>
+    <text class="doc-text" x="80" y="104">MANDATO: 2023-2027</text>
+    <text class="doc-text" x="10" y="135">REGISTRO Nº 5 7 4 1 2 / 2023</text>
+    <text class="doc-text" x="10" y="150">EMISSÃO: 01/02/2023</text>
+    <text class="doc-text" x="10" y="165">VÁLIDO ATÉ: 31/01/2027</text>
+  </g>
+
+  <!-- Documento 3 (direita alta) -->
+  <g transform="translate(700, 70) rotate(-4)">
+    <rect class="doc-rect" x="0" y="0" width="190" height="240"/>
+    <text class="doc-text-big" x="10" y="20">CONTRATO FEDERAL</text>
+    <text class="doc-text" x="10" y="34">CGU · CONTROLADORIA-GERAL DA UNIÃO</text>
+    <line class="doc-line" x1="10" y1="42" x2="180" y2="42"/>
+    <text class="doc-text" x="10" y="58">PROCESSO Nº 23000.000123/2024-15</text>
+    <text class="doc-text" x="10" y="72">FORNECEDOR:</text>
+    <text class="doc-text" x="10" y="86">__________________________</text>
+    <text class="doc-text" x="10" y="100">CNPJ: __.___.___/____-__</text>
+    <text class="doc-text" x="10" y="116">VALOR: R$ ____.____,__</text>
+    <line class="doc-thin" x1="10" y1="124" x2="180" y2="124"/>
+    <text class="doc-text" x="10" y="140">OBJETO:</text>
+    <text class="doc-text" x="10" y="154">PRESTAÇÃO DE SERVIÇOS</text>
+    <text class="doc-text" x="10" y="168">DE NATUREZA CONTINUADA</text>
+    <text class="doc-text" x="10" y="182">VIGÊNCIA: 12 MESES</text>
+    <rect class="doc-rect" x="10" y="195" width="170" height="35"/>
+    <text class="doc-text" x="14" y="210">CARIMBO E ASSINATURA</text>
+    <text class="doc-text" x="14" y="223">DO ORDENADOR DE DESPESA</text>
+  </g>
+
+  <!-- Código de barras 1 -->
+  <g transform="translate(920, 100)">
+    <rect class="doc-bar" x="0" y="0" width="2" height="40"/>
+    <rect class="doc-bar" x="4" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="8" y="0" width="3" height="40"/>
+    <rect class="doc-bar" x="14" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="18" y="0" width="2" height="40"/>
+    <rect class="doc-bar" x="22" y="0" width="4" height="40"/>
+    <rect class="doc-bar" x="28" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="32" y="0" width="2" height="40"/>
+    <rect class="doc-bar" x="36" y="0" width="3" height="40"/>
+    <rect class="doc-bar" x="42" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="46" y="0" width="2" height="40"/>
+    <rect class="doc-bar" x="50" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="54" y="0" width="3" height="40"/>
+    <rect class="doc-bar" x="60" y="0" width="2" height="40"/>
+    <rect class="doc-bar" x="65" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="69" y="0" width="4" height="40"/>
+    <rect class="doc-bar" x="76" y="0" width="1" height="40"/>
+    <rect class="doc-bar" x="80" y="0" width="2" height="40"/>
+    <text class="doc-text" x="0" y="52">7 891234 567893</text>
+  </g>
+
+  <!-- Documento 4 (esquerda meio/baixo) -->
+  <g transform="translate(80, 380) rotate(4)">
+    <rect class="doc-rect" x="0" y="0" width="240" height="200"/>
+    <text class="doc-text-big" x="10" y="20">DIÁRIO OFICIAL · UNIÃO</text>
+    <text class="doc-text" x="10" y="34">SEÇÃO 1 · Nº 198 · 14/10/2024</text>
+    <line class="doc-line" x1="10" y1="42" x2="230" y2="42"/>
+    <text class="doc-text" x="10" y="58">DECRETO Nº 12.345 DE 13/10/2024</text>
+    <text class="doc-text" x="10" y="72">________________________________</text>
+    <text class="doc-text" x="10" y="86">________________________________</text>
+    <text class="doc-text" x="10" y="100">________________________________</text>
+    <line class="doc-thin" x1="10" y1="108" x2="230" y2="108"/>
+    <text class="doc-text" x="10" y="124">PORTARIA Nº 1.842/SE/2024</text>
+    <text class="doc-text" x="10" y="138">________________________________</text>
+    <text class="doc-text" x="10" y="152">________________________________</text>
+    <text class="doc-text" x="10" y="168">________________________________</text>
+    <text class="doc-text" x="10" y="186">PÁGINA 47 · COLUNA 2</text>
+  </g>
+
+  <!-- Selo retangular -->
+  <g transform="translate(360, 400) rotate(-8)">
+    <rect class="doc-stamp" x="0" y="0" width="140" height="60"/>
+    <text class="doc-stamp-text" x="70" y="25" text-anchor="middle">PROTOCOLADO</text>
+    <text class="doc-stamp-text" x="70" y="42" text-anchor="middle">14/10/2024</text>
+    <text class="doc-text" x="70" y="55" text-anchor="middle">Nº 0042/2024</text>
+  </g>
+
+  <!-- Documento 5 (centro baixo) -->
+  <g transform="translate(540, 380) rotate(-2)">
+    <rect class="doc-rect" x="0" y="0" width="210" height="220"/>
+    <text class="doc-text-big" x="10" y="20">DECLARAÇÃO DE BENS</text>
+    <text class="doc-text" x="10" y="34">TSE · DIVULGAÇÃO DE CANDIDATURAS</text>
+    <line class="doc-line" x1="10" y1="42" x2="200" y2="42"/>
+    <text class="doc-text" x="10" y="58">CPF: ___.___.___-__</text>
+    <text class="doc-text" x="10" y="72">TÍTULO ELEITORAL: __________</text>
+    <line class="doc-thin" x1="10" y1="80" x2="200" y2="80"/>
+    <text class="doc-text" x="10" y="96">RELAÇÃO DE BENS</text>
+    <text class="doc-text" x="10" y="110">1. ____________  R$ _______</text>
+    <text class="doc-text" x="10" y="124">2. ____________  R$ _______</text>
+    <text class="doc-text" x="10" y="138">3. ____________  R$ _______</text>
+    <text class="doc-text" x="10" y="152">4. ____________  R$ _______</text>
+    <text class="doc-text" x="10" y="166">5. ____________  R$ _______</text>
+    <line class="doc-thin" x1="10" y1="174" x2="200" y2="174"/>
+    <text class="doc-text" x="10" y="190">TOTAL DECLARADO:</text>
+    <text class="doc-text" x="10" y="204">R$ ___.___.___,__</text>
+  </g>
+
+  <!-- Selo circular 2 -->
+  <g transform="translate(800, 420)">
+    <circle class="doc-stamp" cx="40" cy="40" r="38"/>
+    <circle class="doc-stamp" cx="40" cy="40" r="32"/>
+    <text class="doc-stamp-text" x="40" y="35" text-anchor="middle">TSE</text>
+    <text class="doc-stamp-text" x="40" y="50" text-anchor="middle">CONF.</text>
+  </g>
+
+  <!-- Documento 6 (direita baixa) -->
+  <g transform="translate(900, 400) rotate(5)">
+    <rect class="doc-rect" x="0" y="0" width="200" height="180"/>
+    <text class="doc-text-big" x="10" y="20">NOTA DE EMPENHO</text>
+    <line class="doc-line" x1="10" y1="28" x2="190" y2="28"/>
+    <text class="doc-text" x="10" y="46">SIAFI · TESOURO NACIONAL</text>
+    <text class="doc-text" x="10" y="62">NE Nº 2024NE000128</text>
+    <text class="doc-text" x="10" y="76">UG EMITENTE: 153031</text>
+    <text class="doc-text" x="10" y="90">GESTÃO: 15257</text>
+    <line class="doc-thin" x1="10" y1="100" x2="190" y2="100"/>
+    <text class="doc-text" x="10" y="116">FAVORECIDO:</text>
+    <text class="doc-text" x="10" y="130">__________________</text>
+    <text class="doc-text" x="10" y="146">VALOR: R$ ____.___,__</text>
+    <text class="doc-text" x="10" y="162">DATA: __/__/____</text>
+  </g>
+
+  <!-- Linhas de texto soltas como rodapé -->
+  <g transform="translate(40, 640)">
+    <line class="doc-thin" x1="0" y1="0" x2="200" y2="0"/>
+    <line class="doc-thin" x1="0" y1="14" x2="220" y2="14"/>
+    <line class="doc-thin" x1="0" y1="28" x2="180" y2="28"/>
+    <line class="doc-thin" x1="0" y1="42" x2="240" y2="42"/>
+    <line class="doc-thin" x1="0" y1="56" x2="160" y2="56"/>
+    <line class="doc-thin" x1="0" y1="70" x2="200" y2="70"/>
+    <line class="doc-thin" x1="0" y1="84" x2="220" y2="84"/>
+  </g>
+
+  <g transform="translate(900, 660) rotate(-3)">
+    <text class="doc-stamp-text" x="0" y="0">PROCESSO Nº 23000.000456/2024-87</text>
+    <text class="doc-text" x="0" y="18">CONFIDENCIAL</text>
+    <line class="doc-line" x1="0" y1="22" x2="240" y2="22"/>
+  </g>
+
+  <!-- Tag de identidade -->
+  <g transform="translate(320, 580) rotate(8)">
+    <rect class="doc-rect" x="0" y="0" width="160" height="100"/>
+    <line class="doc-thin" x1="0" y1="20" x2="160" y2="20"/>
+    <text class="doc-text-big" x="10" y="15">IDENTIDADE</text>
+    <rect class="doc-rect" x="10" y="28" width="40" height="55"/>
+    <text class="doc-text" x="14" y="60" text-anchor="middle" transform="translate(20,0)">FOTO</text>
+    <text class="doc-text" x="58" y="40">NOME COMPLETO</text>
+    <text class="doc-text" x="58" y="54">RG: __.___.___</text>
+    <text class="doc-text" x="58" y="68">CPF: ___.___.___-__</text>
+    <text class="doc-text" x="58" y="82">VÁLIDO ATÉ:</text>
+    <text class="doc-text" x="58" y="92">__/__/____</text>
+  </g>
+</svg>

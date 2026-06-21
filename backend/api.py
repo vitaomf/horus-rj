@@ -1889,7 +1889,7 @@ def atuacao_politico(request: Request, politico_id: int):
         if n_prop == 0 and n_org == 0 and n_disc == 0:
             return {"disponivel": False}
         props = [dict(r) for r in conn.execute(
-            "SELECT sigla,numero,ano,ementa,data FROM atuacao_proposicoes WHERE politico_id=? "
+            "SELECT id_prop,sigla,numero,ano,ementa,data FROM atuacao_proposicoes WHERE politico_id=? "
             "ORDER BY ano DESC, id_prop DESC LIMIT 10", (politico_id,))]
         orgs = [dict(r) for r in conn.execute(
             "SELECT sigla,nome,titulo,data_inicio,data_fim FROM atuacao_orgaos WHERE politico_id=? "

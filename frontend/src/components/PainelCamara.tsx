@@ -4,12 +4,30 @@ import { API_BASE_URL } from '../config';
 
 type Nivel = 'brasil' | 'estado' | 'municipio';
 
+// Tipo em linguagem clara a partir do texto da votação (a Câmara descreve o
+// resultado, não o tipo) — pra não ficar perdido no "rejeitado a emenda nº...".
+function catVotacao(desc?: string): string {
+  const d = (desc || '').toLowerCase();
+  if (/medida provis|\bmpv?\b/.test(d)) return 'Medida Provisória';
+  if (/emenda constitu|\bpec\b/.test(d)) return 'Emenda à Constituição';
+  if (/lei complementar|\bplp\b/.test(d)) return 'Lei Complementar';
+  if (/decreto legislativo|\bpdl\b/.test(d)) return 'Decreto Legislativo';
+  if (/requerimento|\breq\b/.test(d)) return 'Requerimento';
+  if (/urg[êe]ncia/.test(d)) return 'Urgência';
+  if (/reda[çc][aã]o final/.test(d)) return 'Redação Final';
+  if (/destaque/.test(d)) return 'Destaque';
+  if (/parecer/.test(d)) return 'Parecer';
+  if (/projeto de lei|\bpl\b/.test(d)) return 'Projeto de Lei';
+  if (/emenda/.test(d)) return 'Emenda';
+  return 'Deliberação';
+}
+
 interface Sessao {
   inicio?: string; data?: string; hora?: string;
   descricao?: string; em_andamento?: boolean; orgaos?: { sigla?: string }[];
 }
 interface Materia { descricao?: string; ementa?: string; situacao?: string }
-interface Votacao { descricao?: string; sim?: number; nao?: number; aprovacao?: number }
+interface Votacao { id?: string; objeto?: string; descricao?: string; sim?: number; nao?: number; aprovacao?: number }
 
 interface Painel {
   titulo: string;
@@ -194,12 +212,24 @@ export function PainelCamara({ nivel, uf, municipio, className = '' }: Props) {
           <Secao icone={Gavel} titulo="Últimas votações">
             {dados.votacoes!.map((v, i) => {
               const aprov = v.aprovacao === 1;
+              const rotulo = v.objeto || catVotacao(v.descricao);
+              const temFonte = !!v.id && v.id.includes('-');  // formato federal: prop-seq
               return (
-                <li key={i} className="flex items-baseline gap-2">
-                  <span className={`text-xs shrink-0 ${aprov ? 'text-[#4CAF50]' : 'text-gray-500'}`}>{aprov ? '✓' : '•'}</span>
-                  <span className="text-gray-300 text-[11px] truncate">{v.descricao || 'Votação'}</span>
-                  {(v.sim != null || v.nao != null) && (
-                    <span className="font-mono text-[7px] text-gray-600 shrink-0 ml-auto">sim {v.sim ?? 0} · não {v.nao ?? 0}</span>
+                <li key={i} className="border-l border-[#1a1a1a] pl-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs shrink-0 ${aprov ? 'text-[#4CAF50]' : 'text-gray-500'}`}>{aprov ? '✓' : '•'}</span>
+                    <span className="font-mono text-[8px] tracking-widest px-1.5 py-0.5 border border-[#FFD700]/20 text-[#FFD700]/60 shrink-0">{rotulo}</span>
+                    {(v.sim != null || v.nao != null) && (
+                      <span className="font-mono text-[7px] text-gray-600 shrink-0 ml-auto">sim {v.sim ?? 0} · não {v.nao ?? 0}</span>
+                    )}
+                  </div>
+                  <p className="text-gray-400 text-[10px] leading-snug line-clamp-2 pl-5 mt-1">{v.descricao || 'Votação'}</p>
+                  {temFonte && (
+                    <a href={`https://www.camara.leg.br/propostas-legislativas/${v.id!.split('-')[0]}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[7px] text-gray-700 hover:text-[#FFD700] transition-colors pl-5 mt-0.5">
+                      <ExternalLink className="w-2 h-2" /> fonte
+                    </a>
                   )}
                 </li>
               );

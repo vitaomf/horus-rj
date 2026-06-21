@@ -6,6 +6,7 @@ import { HierarquiaCargos } from '../components/HierarquiaCargos';
 import { PainelIndices } from '../components/PainelIndices';
 import { PainelCamara } from '../components/PainelCamara';
 import { PainelFluxo } from '../components/PainelFluxo';
+import { MapaEstadoMunicipios } from '../components/MapaEstadoMunicipios';
 import { getEstado, getRegiaoByUF } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -33,7 +34,7 @@ export function EstadoPage() {
   const [parlamentares, setParlamentares] = useState<Parlamentar[]>([]);
   const [loadingParl, setLoadingParl]     = useState(true);
   const [municipios, setMunicipios]       = useState<Municipio[]>([]);
-  const [loadingMun, setLoadingMun]       = useState(true);
+  const [, setLoadingMun]                 = useState(true);
   const [stats, setStats]                 = useState<Stats | null>(null);
 
   useEffect(() => {
@@ -213,40 +214,13 @@ export function EstadoPage() {
           </div>
         </div>
 
-        {loadingMun ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="bg-black p-4">
-                <div className="h-3 w-16 bg-[#111] animate-pulse mb-2" />
-                <div className="h-2 w-10 bg-[#0d0d0d] animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : municipios.length === 0 ? (
-          <div className="border border-[#1a1a1a] py-12 text-center">
-            <p className="font-mono text-[9px] tracking-[0.4em] text-gray-700 uppercase">
-              Municípios de {estado.nome} em coleta
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[#111]">
-            {municipios.map((m, i) => (
-              <button
-                key={`${m.id}-${i}`}
-                onClick={() => navigate(`/municipios/${encodeURIComponent(m.nome)}`)}
-                className="bg-black hover:bg-[#080808] transition-colors p-4 text-left group relative"
-              >
-                <div className="absolute top-0 left-0 right-0 h-px bg-[#FFD700]/0 group-hover:bg-[#FFD700]/30 transition-colors" />
-                <p className="font-bebas text-sm tracking-wide text-white group-hover:text-[#FFD700] transition-colors leading-tight">
-                  {m.nome.replace(` - ${ufUpper}`, '').trim()}
-                </p>
-                <p className="font-mono text-[7px] tracking-widest text-[#333] mt-1 group-hover:text-gray-700 transition-colors">
-                  {ufUpper}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Mapa interativo do estado — clique no município abre o perfil */}
+        <div className="border border-[#1a1a1a] bg-[#050505]">
+          <MapaEstadoMunicipios uf={ufUpper} />
+          <p className="px-4 py-2 border-t border-[#1a1a1a] font-mono text-[8px] tracking-widest text-gray-700 uppercase">
+            Passe o mouse para ver o nome · clique para abrir o município
+          </p>
+        </div>
       </div>
 
       {/* ── PARLAMENTARES FEDERAIS ── */}

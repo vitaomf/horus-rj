@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Gavel, UserCheck, Scale, Swords } from 'lucide-react';
+import { Gavel, UserCheck, Scale, Swords, ExternalLink } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { PerfilCard, PerfilStat } from '../base';
 
@@ -178,6 +178,10 @@ export function BlocoScorecardLegislativo({ cor, politicoId }: Props) {
                             <span className="font-mono text-[7px] tracking-wider px-1 border border-[#222] text-gray-700">
                               MARGEM {v.margem !== null ? `${(v.margem * 100).toFixed(1)}%` : '—'}
                             </span>
+                            <a href={`https://www.camara.leg.br/propostas-legislativas/${v.id_votacao.split('-')[0]}`} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-[8px] text-gray-700 hover:text-[#FFD700] transition-colors">
+                              <ExternalLink className="w-2.5 h-2.5" /> fonte
+                            </a>
                           </div>
                         </div>
                         <div className="flex flex-col items-end justify-center border-l pl-3 shrink-0"

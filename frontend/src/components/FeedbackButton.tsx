@@ -131,14 +131,17 @@ export function FeedbackButton() {
         </button>
       )}
 
-      {/* FAB — canto inferior esquerdo (direito é ocupado por BackToTop/Favoritos) */}
+      {/* FAB recolhido — só ícone; expande pra "REPORTAR" no hover (footprint mínimo) */}
       <button
         onClick={abrir}
-        className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-black border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 hover:border-[#FFD700] transition-all shadow-[0_4px_20px_rgba(0,0,0,0.8)] pl-3 pr-3.5 py-2.5 group"
+        title="Reportar erro ou sugerir melhoria"
+        className="fixed bottom-5 left-5 z-50 flex items-center bg-black/80 border border-[#FFD700]/25 text-[#FFD700]/70 opacity-60 hover:opacity-100 hover:bg-[#FFD700]/10 hover:border-[#FFD700] hover:text-[#FFD700] transition-all shadow-[0_4px_16px_rgba(0,0,0,0.6)] p-2 group"
         aria-label="Reportar erro ou sugerir melhoria"
       >
         <MessageSquarePlus className="w-4 h-4 shrink-0" />
-        <span className="font-bebas tracking-[0.2em] text-xs hidden sm:inline">REPORTAR</span>
+        <span className="font-bebas tracking-[0.2em] text-xs whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[88px] group-hover:ml-2 transition-all duration-300">
+          REPORTAR
+        </span>
       </button>
 
       {aberto && (
