@@ -164,6 +164,13 @@ def _melhor_primeiro(indicador):
     """reverse= p/ sorted(): True ordena maior→menor (default: maior é melhor)."""
     return indicador not in INDICE_MENOR_MELHOR
 
+
+def _round_ind(indicador, valor):
+    """IDHM precisa de 3 casas (o 3º decimal decide ranking); demais indicadores, 2."""
+    if valor is None:
+        return None
+    return round(valor, 3 if indicador == "idhm" else 2)
+
 # Ordem de exibição no painel de índices (80/20): economia → trabalho → infra →
 # educação → segurança → desenvolvimento → escala. Fora da lista vão ao fim (alfabético).
 ORDEM_INDICES = ["renda_per_capita", "ocupacao_pct", "esgoto_adequado_pct",
@@ -3031,13 +3038,13 @@ def indices_municipio_por_nome(request: Request, nome: str = Query(..., min_leng
         for ind in _ordenar_indices(est.keys()):
             if ind in mun and mun[ind][0] is not None:
                 _, unidade, fonte, ano = mun[ind]
-                out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
+                out.append({"indicador": ind, "valor": _round_ind(ind, mun[ind][0]),
                             "unidade": unidade, "fonte": fonte, "ano": ano, "estimado": False})
             else:
                 vals = est.get(ind, {})
                 if cod_uf in vals and vals[cod_uf][0] is not None:
                     v, unidade, fonte, ano = vals[cod_uf]
-                    out.append({"indicador": ind, "valor": round(v, 2),
+                    out.append({"indicador": ind, "valor": _round_ind(ind, v),
                                 "unidade": unidade, "fonte": fonte, "ano": ano,
                                 "estimado": True, "estimado_por": f"média de {CODIGO_UF.get(cod_uf, '')}"})
         if not out:
@@ -3106,7 +3113,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
 
         def pacote(indicador, valor, **extra):
             _, unidade, fonte, ano = meta(indicador)
-            return {"indicador": indicador, "valor": round(valor, 2) if valor is not None else None,
+            return {"indicador": indicador, "valor": _round_ind(indicador, valor),
                     "unidade": unidade, "fonte": fonte, "ano": ano, **extra}
 
         # ── BRASIL ───────────────────────────────────────────────────────────
@@ -3122,7 +3129,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                 )
                 fmt = lambda t: {"uf": CODIGO_UF.get(t[0], str(t[0])),
                                  "nome": UF_NOME.get(CODIGO_UF.get(t[0], ""), ""),
-                                 "valor": round(t[1], 2)}
+                                 "valor": _round_ind(ind, t[1])}
                 out.append(pacote(ind, nacional,
                                   melhores=[fmt(t) for t in ranking[:5]],
                                   piores=[fmt(t) for t in ranking[-5:][::-1]]))
@@ -3150,7 +3157,7 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                         regioes_vals.append((d, rv))
                 regioes_vals.sort(key=lambda x: x[1], reverse=_melhor_primeiro(ind))
                 pos = next((i + 1 for i, (d, _) in enumerate(regioes_vals) if d == dig), None)
-                out.append(pacote(ind, val, brasil=round(nacional, 2) if nacional is not None else None,
+                out.append(pacote(ind, val, brasil=_round_ind(ind, nacional),
                                   ranking={"posicao": pos, "de": len(regioes_vals)}))
             return {"disponivel": True, "nivel": "regiao", "id": slug,
                     "nome": slug.replace("-", " ").title(), "indicadores": out}
@@ -3175,8 +3182,8 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
                 pos = next((i + 1 for i, (c, _) in enumerate(ranking) if c == cod), None)
                 out.append(pacote(ind, valor,
                                   ranking={"posicao": pos, "de": len(ranking)},
-                                  regiao=round(agrega(ind, uf_regiao), 2) if agrega(ind, uf_regiao) is not None else None,
-                                  brasil=round(agrega(ind, todos_ufs), 2) if agrega(ind, todos_ufs) is not None else None))
+                                  regiao=_round_ind(ind, agrega(ind, uf_regiao)),
+                                  brasil=_round_ind(ind, agrega(ind, todos_ufs))))
             return {"disponivel": True, "nivel": "estado", "id": uf,
                     "nome": UF_NOME.get(uf, uf), "indicadores": out}
 
@@ -3199,14 +3206,14 @@ def indices_territoriais(request: Request, nivel: str, territorio_id: str):
             for ind in _ordenar_indices(est.keys()):
                 if ind in mun and mun[ind][0] is not None:
                     _, unidade, fonte, ano = mun[ind]
-                    out.append({"indicador": ind, "valor": round(mun[ind][0], 2),
+                    out.append({"indicador": ind, "valor": _round_ind(ind, mun[ind][0]),
                                 "unidade": unidade, "fonte": fonte, "ano": ano, "estimado": False})
                 else:
                     # fallback: valor do estado, marcado como estimado
                     vals = est.get(ind, {})
                     if cod_uf in vals and vals[cod_uf][0] is not None:
                         v, unidade, fonte, ano = vals[cod_uf]
-                        out.append({"indicador": ind, "valor": round(v, 2),
+                        out.append({"indicador": ind, "valor": _round_ind(ind, v),
                                     "unidade": unidade, "fonte": fonte, "ano": ano,
                                     "estimado": True, "estimado_por": f"média de {CODIGO_UF.get(cod_uf, '')}"})
             if not out:

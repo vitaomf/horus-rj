@@ -47,6 +47,10 @@ function fmtValor(ind: Indicador): string {
   if (ind.indicador === 'homicidios_100k') {
     return ind.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
   }
+  // IDHM: índice 0–1, convenção de 3 casas decimais (0,761).
+  if (ind.indicador === 'idhm') {
+    return ind.valor.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  }
   if (ind.indicador === 'populacao') {
     const v = ind.valor;
     if (v >= 1e6) return `${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
