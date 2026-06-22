@@ -7,6 +7,7 @@ import { PainelIndices } from '../components/PainelIndices';
 import { PainelCamara } from '../components/PainelCamara';
 import { PainelFluxo } from '../components/PainelFluxo';
 import { MapaEstadoMunicipios } from '../components/MapaEstadoMunicipios';
+import { MapaEstadoSilhueta } from '../components/MapaEstadoSilhueta';
 import { getEstado, getRegiaoByUF } from '../data/mockBrasil';
 import { API_BASE_URL } from '../config';
 
@@ -121,10 +122,13 @@ export function EstadoPage() {
                 <span>Cap: {estado.capital}</span>
               </div>
             </div>
-            {/* código UF grande */}
-            <div className="border border-[#FFD700]/15 px-5 py-3 text-right hidden md:block">
-              <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-1">código</p>
-              <p style={{ fontFamily: FONT_DECO }} className="text-[#FFD700] text-4xl leading-none">{ufUpper}</p>
+            {/* silhueta do estado + código UF */}
+            <div className="hidden md:flex items-center gap-4">
+              <MapaEstadoSilhueta uf={ufUpper} size={150} />
+              <div className="border border-[#FFD700]/15 px-5 py-3 text-right">
+                <p className="font-mono text-[8px] tracking-[0.4em] text-gray-700 uppercase mb-1">código</p>
+                <p style={{ fontFamily: FONT_DECO }} className="text-[#FFD700] text-4xl leading-none">{ufUpper}</p>
+              </div>
             </div>
           </div>
         </div>

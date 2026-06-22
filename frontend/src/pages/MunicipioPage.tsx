@@ -7,6 +7,7 @@ import { EstagiosEmenda } from '../components/EstagiosEmenda';
 import { HierarquiaCargos } from '../components/HierarquiaCargos';
 import { PainelIndices } from '../components/PainelIndices';
 import { PainelCamara } from '../components/PainelCamara';
+import { MapaMunicipio } from '../components/MapaMunicipio';
 import { badgeStyle } from '../utils/partidoCores';
 
 interface Politico {
@@ -194,9 +195,14 @@ export const MunicipioPage: React.FC<MunicipioPageProps> = ({ nome, onVoltar, on
                 </div>
             </header>
 
-            {/* Índices do território + Câmara — a realidade do lugar antes de quem o representa (constituição) */}
+            {/* Índices do território + mapa da cidade — a realidade do lugar antes de quem o representa (constituição) */}
             <div className="max-w-3xl mx-auto px-6 mt-8 grid gap-6 md:grid-cols-2">
                 <PainelIndices nivel="municipio" id="" porNome={{ nome: nomeBase, uf: ufMun }} />
+                <MapaMunicipio uf={ufMun} municipio={nomeBase} height={340} />
+            </div>
+
+            {/* Câmara municipal (some quando não há dados abertos) */}
+            <div className="max-w-3xl mx-auto px-6 mt-6">
                 <PainelCamara nivel="municipio" municipio={nomeBase} uf={ufMun} />
             </div>
 
