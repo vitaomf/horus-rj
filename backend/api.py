@@ -498,11 +498,12 @@ def eleitos_estaduais_uf(request: Request,
     uf_u = uf.upper().strip()
     conn = get_db_connection()
     try:
-        # JOIN com politicos para obter politico_id quando houver correspondência por nome
+        # politico_id vem do vínculo persistido (scripts/ligar_eleitos_politicos.py);
+        # fallback pro match por nome p/ não regredir em DB sem o script rodado.
         rows = conn.execute("""
             SELECT e.cargo, e.nome, e.nome_urna, e.partido, e.numero,
                    e.foto_url, e.mandato, e.sigla_situacao, e.id,
-                   p.id AS politico_id
+                   COALESCE(e.politico_id, p.id) AS politico_id
             FROM eleitos_estaduais e
             LEFT JOIN politicos p
                    ON UPPER(p.nome) = UPPER(e.nome)

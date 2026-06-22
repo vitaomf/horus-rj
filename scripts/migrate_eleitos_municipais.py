@@ -52,6 +52,7 @@ def main():
             mandato         TEXT,
             sq_candidato    TEXT,
             sigla_situacao  TEXT,
+            politico_id     INTEGER,  -- vínculo p/ perfil+atuação (scripts/ligar_eleitos_politicos.py)
             coletado_em     TEXT    DEFAULT (datetime('now')),
             UNIQUE(sq_candidato, ano_eleicao)
         )

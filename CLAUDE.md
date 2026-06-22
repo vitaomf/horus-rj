@@ -96,6 +96,7 @@ python rebuild_db.py                              # reset total (faz backup auto
 python scripts/migrate_eleitos_municipais.py      # cria tabelas eleitos_municipais e eleitos_estaduais
 python scripts/coleta_tse_estadual.py             # gov, vice-gov, senadores, dep. fed/est ELEITOS 2022 (~1.7k)
 python scripts/coleta_tse_municipal.py            # prefeitos, vice, vereadores ELEITOS 2024 (~70k)
+python scripts/ligar_eleitos_politicos.py         # liga eleitos→politicos.id (perfil+atuação); rodar após coleta_tse_estadual
 
 # Suporte: GeoJSON municípios e fotos
 python scripts/download_geo_municipios.py         # GeoJSONs das 27 UFs para mapa interativo
